@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Step 2: Raw transcription → refined text via Mistral chat API.
 
-Model routing:
-  - Short text (< REFINE_MODEL_THRESHOLD words) → devstral-small-latest
-  - Long text  (>= REFINE_MODEL_THRESHOLD words) → magistral-medium-latest
+Model routing (3 tiers):
+  - Short  (< REFINE_MODEL_THRESHOLD_SHORT words) → devstral-small-latest
+  - Medium (< REFINE_MODEL_THRESHOLD_LONG  words) → magistral-small-latest
+  - Long   (≥ REFINE_MODEL_THRESHOLD_LONG  words) → magistral-medium-latest
 
 Each tier has a fallback model. If all models are exhausted, the raw
 transcription is returned unchanged (graceful degradation).
@@ -12,7 +13,7 @@ transcription is returned unchanged (graceful degradation).
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -22,9 +23,12 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 _API_URL = "https://api.mistral.ai/v1/chat/completions"
 _CONTEXT_FILE = Path(__file__).resolve().parent.parent / "context.txt"
 
-_THRESHOLD = int(os.environ.get("REFINE_MODEL_THRESHOLD", "80"))
+_THRESHOLD_SHORT = int(os.environ.get("REFINE_MODEL_THRESHOLD_SHORT", "80"))
+_THRESHOLD_LONG = int(os.environ.get("REFINE_MODEL_THRESHOLD_LONG", "200"))
 _MODEL_SHORT = os.environ.get("REFINE_MODEL_SHORT", "devstral-small-latest")
 _MODEL_SHORT_FALLBACK = os.environ.get("REFINE_MODEL_SHORT_FALLBACK", "mistral-small-latest")
+_MODEL_MEDIUM = os.environ.get("REFINE_MODEL_MEDIUM", "magistral-small-latest")
+_MODEL_MEDIUM_FALLBACK = os.environ.get("REFINE_MODEL_MEDIUM_FALLBACK", "mistral-medium-latest")
 _MODEL_LONG = os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
 _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-large-latest")
 
@@ -57,8 +61,10 @@ def _load_context() -> str:
 
 
 def _select_models(word_count: int) -> Tuple[str, str]:
-    if word_count < _THRESHOLD:
+    if word_count < _THRESHOLD_SHORT:
         return _MODEL_SHORT, _MODEL_SHORT_FALLBACK
+    if word_count < _THRESHOLD_LONG:
+        return _MODEL_MEDIUM, _MODEL_MEDIUM_FALLBACK
     return _MODEL_LONG, _MODEL_LONG_FALLBACK
 
 
@@ -73,7 +79,18 @@ def _call_model(model: str, messages: List[Dict[str, str]], api_key: str) -> str
         timeout=60,
     )
     response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"].strip()
+    body: Dict[str, Any] = response.json()  # type: ignore[assignment]
+    raw: Any = body["choices"][0]["message"]["content"]  # type: ignore[index]
+    # Reasoning models (magistral) return content as a list of blocks
+    if isinstance(raw, list):
+        parts: List[str] = []
+        for block in raw:  # type: ignore[union-attr]
+            if isinstance(block, dict):
+                parts.append(str(block.get("text", "")))  # type: ignore[union-attr, arg-type]
+            else:
+                parts.append(str(block))  # type: ignore[arg-type]
+        return "".join(parts).strip()
+    return str(raw).strip()
 
 
 def refine(raw_text: str) -> str:
@@ -92,10 +109,11 @@ def refine(raw_text: str) -> str:
 
     for model in (primary, fallback):
         try:
-            print(f"✨ Refining via {model} ({word_count} words)...", file=sys.stderr)
+            if model == primary:
+                print(f"✨ Refining via {model} ({word_count} words)...", file=sys.stderr)
+            else:
+                print(f"⚠️  {primary} unavailable — switching to fallback: {model}", file=sys.stderr)
             result = _call_model(model, messages, api_key)
-            if model != primary:
-                print(f"⚠️  Primary model unavailable — fallback used: {model}", file=sys.stderr)
             return result
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else "?"

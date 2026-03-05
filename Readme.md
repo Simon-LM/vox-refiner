@@ -41,10 +41,11 @@ One API key. No complex UI. Just speak → paste.
 
 The refinement step automatically selects the right model based on the length of the transcription:
 
-| Transcription length | Primary model             | Fallback               |
-| -------------------- | ------------------------- | ---------------------- |
-| < 80 words           | `devstral-small-latest`   | `mistral-small-latest` |
-| ≥ 80 words           | `magistral-medium-latest` | `mistral-large-latest` |
+| Transcription length | Primary model             | Fallback                |
+| -------------------- | ------------------------- | ----------------------- |
+| < 80 words           | `devstral-small-latest`   | `mistral-small-latest`  |
+| 80 – 200 words       | `magistral-small-latest`  | `mistral-medium-latest` |
+| > 200 words          | `magistral-medium-latest` | `mistral-large-latest`  |
 
 If a model is unavailable (rate limit, timeout), the next one is tried automatically.
 If all models fail, the raw Voxtral transcription is returned — the tool never crashes.
