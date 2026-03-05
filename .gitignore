@@ -1,0 +1,20 @@
+# Environment — NEVER commit your API key
+.env
+
+# Personal launcher (use launch_voxtral.example.sh as template)
+launch_voxtral.sh
+
+# Audio files (temporary, generated at runtime)
+*.wav
+*.mp3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db

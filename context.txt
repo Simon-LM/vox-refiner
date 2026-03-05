@@ -1,0 +1,14 @@
+# Voxtral Paste — User context
+#
+# This file is injected into the refinement prompt.
+# Describe your work domain, technical stack, and frequently used vocabulary
+# to help the AI correct transcription errors more accurately.
+#
+# Edit the example below to match your situation.
+
+I am a developer. I work mainly in Python, React and TypeScript.
+
+Frequent vocabulary: API, endpoint, pipeline, transcription, repository, pull request,
+commit, debug, deployment, backend, frontend, refactoring, open source.
+
+Languages used: French and English, sometimes mixed within the same sentence.
