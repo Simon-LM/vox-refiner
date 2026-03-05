@@ -116,6 +116,29 @@ These are listed in `.gitignore`. Never force-add them.
 
 ---
 
+## Deploying to the local installation
+
+The active installation lives at `~/.local/bin/voxtral-paste/`.
+The keyboard shortcut calls `launch_voxtral.sh` from that exact path.
+
+**Do NOT copy-paste the folder manually** — it strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut (the script runs fine with `bash script.sh` but not when called directly).
+
+Use `rsync` instead, which preserves permissions:
+
+```bash
+rsync -av --exclude='.git' --exclude='.venv' --exclude='*.wav' --exclude='*.mp3' \
+  ~/path/to/dev/voxtral-paste/ ~/.local/bin/voxtral-paste/
+```
+
+If you did copy manually and the shortcut no longer works, restore the executable bit:
+
+```bash
+chmod +x ~/.local/bin/voxtral-paste/launch_voxtral.sh
+chmod +x ~/.local/bin/voxtral-paste/record_and_transcribe_local.sh
+```
+
+---
+
 ## AI assistant guidelines
 
 When working with an AI assistant on this project:

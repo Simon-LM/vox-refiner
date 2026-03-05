@@ -95,9 +95,9 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 ### Installation
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/voxtral-paste.git
-cd voxtral-paste
+# 1. Clone the repository into your local bin
+git clone https://github.com/Simon-LM/voxtral-paste.git ~/.local/bin/voxtral-paste
+cd ~/.local/bin/voxtral-paste
 
 # 2. Install Python dependencies
 pip install -r requirements.txt
@@ -106,10 +106,27 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and set your MISTRAL_API_KEY
 
-# 4. (Optional) Edit context.txt to describe your domain
+# 4. Make the scripts executable
+chmod +x record_and_transcribe_local.sh launch_voxtral.sh
 
-# 5. Run
+# 5. (Optional) Edit context.txt to describe your domain
+
+# 6. Test it
 bash record_and_transcribe_local.sh
+```
+
+> **Important:** always use `git clone` or `rsync` to install — do not copy-paste the folder manually.
+> A manual copy strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut.
+> If you did copy manually and the shortcut no longer works, run: `chmod +x ~/.local/bin/voxtral-paste/*.sh`
+
+### Updating
+
+To update to a newer version:
+
+```bash
+cd ~/.local/bin/voxtral-paste
+git pull
+chmod +x record_and_transcribe_local.sh launch_voxtral.sh
 ```
 
 ### Keyboard shortcut (recommended)
@@ -120,7 +137,9 @@ For the best experience, bind Voxtral Paste to a keyboard shortcut so you can la
 
    ```bash
    cp launch_voxtral.example.sh launch_voxtral.sh
-   # Edit launch_voxtral.sh — set your terminal emulator and script path
+   # Edit launch_voxtral.sh:
+   #   - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
+   #   - set your terminal emulator (mate-terminal, gnome-terminal, konsole…)
    chmod +x launch_voxtral.sh
    ```
 
@@ -133,7 +152,7 @@ For the best experience, bind Voxtral Paste to a keyboard shortcut so you can la
    | **KDE**   | System Settings → Shortcuts → Custom Shortcuts |
    | **XFCE**  | Settings → Keyboard → Application Shortcuts    |
 
-   Set the command to the full path of your launcher, e.g.:
+   Set the command to the full path of your launcher:
 
    ```text
    /home/your-username/.local/bin/voxtral-paste/launch_voxtral.sh
