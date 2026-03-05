@@ -2,6 +2,8 @@
 
 # Voxtral Paste
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Voxtral Paste — Speak, get text, paste it anywhere.**
 
 ---
@@ -223,3 +225,13 @@ The core pipeline is stable. The graphical interface is the next planned step.
 No matter how the tool evolves, the core principle will remain the same:
 
 > **Speak. Stop. Paste.**
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+Copyright © 2026 [Simon LM](https://github.com/Simon-LM)
+
+You are free to use, modify, and distribute this software. If you do, **you must keep the copyright notice and license file** in all copies or substantial portions of the code. Attribution is required.
