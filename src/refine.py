@@ -18,6 +18,7 @@ History extraction (optional, ENABLE_HISTORY=true):
 
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -40,9 +41,12 @@ _MODEL_MEDIUM_FALLBACK = os.environ.get("REFINE_MODEL_MEDIUM_FALLBACK", "mistral
 _MODEL_LONG = os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
 _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-large-latest")
 
+_REQUEST_RETRIES = int(os.environ.get("REFINE_REQUEST_RETRIES", "2"))
+
 _ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "false").lower() in ("true", "1", "yes")
 _HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "60"))
-_HISTORY_EXTRACTION_MODEL = os.environ.get("HISTORY_EXTRACTION_MODEL", "magistral-small-latest")
+_HISTORY_EXTRACTION_MODEL = os.environ.get("HISTORY_EXTRACTION_MODEL", "mistral-small-latest")
+_HISTORY_EXTRACTION_FALLBACK_MODEL = os.environ.get("HISTORY_EXTRACTION_FALLBACK_MODEL", "devstral-small-latest")
 
 _HISTORY_SECTION = "\n\n<history>\n{history}\n</history>"
 
@@ -185,29 +189,77 @@ def _select_models(word_count: int) -> Tuple[str, str]:
     return _MODEL_LONG, _MODEL_LONG_FALLBACK
 
 
-def _call_model(model: str, messages: List[Dict[str, str]], api_key: str) -> str:
-    response = requests.post(
-        _API_URL,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={"model": model, "messages": messages},  # type: ignore[arg-type]
-        timeout=60,
-    )
-    response.raise_for_status()
-    body: Dict[str, Any] = response.json()  # type: ignore[assignment]
-    raw: Any = body["choices"][0]["message"]["content"]  # type: ignore[index]
-    # Reasoning models (magistral) return content as a list of blocks
-    if isinstance(raw, list):
-        parts: List[str] = []
-        for block in raw:  # type: ignore[union-attr]
-            if isinstance(block, dict):
-                parts.append(str(block.get("text", "")))  # type: ignore[union-attr, arg-type]
-            else:
-                parts.append(str(block))  # type: ignore[arg-type]
-        return "".join(parts).strip()
-    return str(raw).strip()
+_TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
+
+
+def _refine_timing(word_count: int) -> Tuple[int, float]:
+    """Return (timeout_s, retry_delay_s) based on text word count."""
+    if word_count < 30:
+        return 3, 1.0
+    if word_count < 90:
+        return 5, 1.0
+    if word_count < 180:
+        return 8, 2.0
+    if word_count < 240:
+        return 12, 2.0
+    if word_count < 400:
+        return 18, 3.0
+    if word_count < 600:
+        return 25, 3.0
+    if word_count < 1_000:
+        return 35, 4.0
+    if word_count < 2_000:
+        return 55, 5.0
+    if word_count < 4_000:
+        return 90, 8.0
+    return 150, 10.0
+
+
+def _call_model(model: str, messages: List[Dict[str, str]], api_key: str, *, timeout: int, retry_delay: float) -> str:
+    """Call the Mistral chat API, retrying up to _REQUEST_RETRIES times on transient errors.
+
+    Timeout and retry delay are caller-supplied (computed from word count).
+    Timeout and connection errors are NOT retried here — the caller's fallback
+    loop handles switching to the next model in that case.
+    """
+    last_exc: Exception = RuntimeError("unreachable")
+    for attempt in range(1 + _REQUEST_RETRIES):
+        if attempt > 0:
+            print(
+                f"⏳  {model} — retry {attempt}/{_REQUEST_RETRIES} (waiting {retry_delay:.0f}s)…",
+                file=sys.stderr,
+            )
+            time.sleep(retry_delay)
+        try:
+            response = requests.post(
+                _API_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"model": model, "messages": messages},  # type: ignore[arg-type]
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            body: Dict[str, Any] = response.json()  # type: ignore[assignment]
+            raw: Any = body["choices"][0]["message"]["content"]  # type: ignore[index]
+            # Reasoning models (magistral) return content as a list of blocks
+            if isinstance(raw, list):
+                parts: List[str] = []
+                for block in raw:  # type: ignore[union-attr]
+                    if isinstance(block, dict):
+                        parts.append(str(block.get("text", "")))  # type: ignore[union-attr, arg-type]
+                    else:
+                        parts.append(str(block))  # type: ignore[arg-type]
+                return "".join(parts).strip()
+            return str(raw).strip()
+        except requests.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if code in _TRANSIENT_HTTP_CODES:
+                last_exc = exc
+                continue  # retry same model
+            raise  # 401, 403, 404 — don't retry
+    raise last_exc
 
 
 def _extract_and_update_history(refined_text: str, api_key: str) -> None:
@@ -225,7 +277,19 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
-    raw_bullets = _call_model(_HISTORY_EXTRACTION_MODEL, messages, api_key)
+    wc = len(refined_text.split())
+    timeout, retry_delay = _refine_timing(wc)
+    raw_bullets = None
+    for model in (_HISTORY_EXTRACTION_MODEL, _HISTORY_EXTRACTION_FALLBACK_MODEL):
+        try:
+            raw_bullets = _call_model(model, messages, api_key, timeout=timeout, retry_delay=retry_delay)
+            break
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code in (401, 403):
+                raise
+            print(f"⚠️  History model {model} unavailable, trying fallback...", file=sys.stderr)
+    if raw_bullets is None:
+        raise RuntimeError("All history extraction models unavailable.")
     now = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
     new_lines = []
     for line in raw_bullets.splitlines():
@@ -270,22 +334,25 @@ def refine(raw_text: str) -> str:
         {"role": "user", "content": f"<transcription>\n{raw_text}\n</transcription>"},
     ]
 
+    timeout, retry_delay = _refine_timing(word_count)
     result = raw_text
     succeeded = False
     for model in (primary, fallback):
         try:
             if model == primary:
-                print(f"✨ Refining via {model} ({word_count} words)...", file=sys.stderr)
+                print(f"✨ Refining via {model} ({word_count} words, timeout {timeout}s)...", file=sys.stderr)
             else:
                 print(f"⚠️  {primary} unavailable — switching to fallback: {model}", file=sys.stderr)
-            result = _call_model(model, messages, api_key)
+            result = _call_model(model, messages, api_key, timeout=timeout, retry_delay=retry_delay)
             succeeded = True
             break
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else "?"
-            if status in (429, 500, 503):
-                detail = e.response.text[:200] if e.response is not None else ""
-                print(f"⚠️  {model} unavailable ({status}): {detail}", file=sys.stderr)
+            if status in _TRANSIENT_HTTP_CODES:
+                if status == 429:
+                    print(f"⚠️  {model} rate limit (429) — exhausted retries, switching model…", file=sys.stderr)
+                else:
+                    print(f"⚠️  {model} server error ({status}) — switching model…", file=sys.stderr)
                 continue
             raise
         except requests.RequestException:

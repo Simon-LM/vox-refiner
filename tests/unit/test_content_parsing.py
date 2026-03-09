@@ -35,19 +35,19 @@ class TestContentParsingString:
     def test_plain_string_returned_as_is(self, monkeypatch):
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, "Hello world.")
-        result = refine._call_model("some-model", [], "test-key")
+        result = refine._call_model("some-model", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Hello world."
 
     def test_plain_string_stripped(self, monkeypatch):
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, "  Hello world.  \n")
-        result = refine._call_model("some-model", [], "test-key")
+        result = refine._call_model("some-model", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Hello world."
 
     def test_empty_string_returned(self, monkeypatch):
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, "")
-        result = refine._call_model("some-model", [], "test-key")
+        result = refine._call_model("some-model", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == ""
 
 
@@ -60,14 +60,14 @@ class TestContentParsingList:
             {"type": "text", "text": "Second part."},
         ]
         _mock_response(monkeypatch, refine, content)
-        result = refine._call_model("magistral-small-latest", [], "test-key")
+        result = refine._call_model("magistral-small-latest", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "First part. Second part."
 
     def test_list_of_plain_strings_joined(self, monkeypatch):
         """Fallback: list contains raw strings (not dicts)."""
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, ["Hello ", "world."])
-        result = refine._call_model("magistral-small-latest", [], "test-key")
+        result = refine._call_model("magistral-small-latest", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Hello world."
 
     def test_list_with_missing_text_key(self, monkeypatch):
@@ -75,17 +75,17 @@ class TestContentParsingList:
         refine = _get_refine(monkeypatch)
         content = [{"type": "thinking"}, {"type": "text", "text": "Answer."}]
         _mock_response(monkeypatch, refine, content)
-        result = refine._call_model("magistral-small-latest", [], "test-key")
+        result = refine._call_model("magistral-small-latest", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Answer."
 
     def test_single_item_list(self, monkeypatch):
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, [{"type": "text", "text": "Only."}])
-        result = refine._call_model("magistral-small-latest", [], "test-key")
+        result = refine._call_model("magistral-small-latest", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Only."
 
     def test_list_result_stripped(self, monkeypatch):
         refine = _get_refine(monkeypatch)
         _mock_response(monkeypatch, refine, [{"type": "text", "text": "  Trimmed.  "}])
-        result = refine._call_model("magistral-small-latest", [], "test-key")
+        result = refine._call_model("magistral-small-latest", [], "test-key", timeout=5, retry_delay=1.0)
         assert result == "Trimmed."

@@ -12,6 +12,7 @@ import requests
 
 def _get_transcribe(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    monkeypatch.setenv("TRANSCRIBE_REQUEST_RETRIES", "0")
     if "src.transcribe" in sys.modules:
         del sys.modules["src.transcribe"]
     import src.transcribe as transcribe

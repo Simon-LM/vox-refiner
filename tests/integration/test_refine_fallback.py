@@ -13,6 +13,7 @@ import requests
 
 def _get_refine(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    monkeypatch.setenv("REFINE_REQUEST_RETRIES", "0")
     if "src.refine" in sys.modules:
         del sys.modules["src.refine"]
     import src.refine as refine
@@ -126,6 +127,7 @@ class TestHistoryExtraction:
     @staticmethod
     def _load(monkeypatch):
         monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+        monkeypatch.setenv("REFINE_REQUEST_RETRIES", "0")
         if "src.refine" in sys.modules:
             del sys.modules["src.refine"]
         import src.refine as refine
@@ -191,12 +193,25 @@ class TestHistoryExtraction:
         assert not re.search(r"\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\].*\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]", content)
         assert re.search(r"- \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] New fact", content)
 
-    def test_extraction_raises_on_api_failure(self, monkeypatch, tmp_path):
-        """_extract_and_update_history raises on API error — caller handles it."""
+    def test_extraction_falls_back_when_primary_fails(self, monkeypatch, tmp_path):
+        """If primary model fails with 429, fallback model is used."""
+        refine = self._load(monkeypatch)
+        monkeypatch.setattr(refine, "_HISTORY_FILE", tmp_path / "history.txt")
+        mock_post = MagicMock(side_effect=[
+            _error_response(429),
+            _ok_response("- Fallback bullet"),
+        ])
+        monkeypatch.setattr(requests, "post", mock_post)
+        refine._extract_and_update_history("Some text.", "test-key")
+        assert mock_post.call_count == 2
+        assert (tmp_path / "history.txt").exists()
+
+    def test_extraction_raises_when_all_models_fail(self, monkeypatch, tmp_path):
+        """_extract_and_update_history raises RuntimeError when both models fail."""
         refine = self._load(monkeypatch)
         monkeypatch.setattr(refine, "_HISTORY_FILE", tmp_path / "history.txt")
         monkeypatch.setattr(requests, "post", MagicMock(return_value=_error_response(429)))
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(RuntimeError, match="All history extraction models unavailable"):
             refine._extract_and_update_history("Some text.", "test-key")
         assert not (tmp_path / "history.txt").exists()
 
