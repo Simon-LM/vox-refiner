@@ -26,7 +26,7 @@ _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
 def _get_timeout(file_size: int) -> int:
     """Return HTTP timeout in seconds based on audio file size (MP3 @64kbps, speech ×1.5)."""
     if file_size < 300_000:    # < ~80 words
-        return 2
+        return 3
     if file_size < 800_000:    # < ~240 words
         return 3
     if file_size < 1_500_000:  # < ~500 words
@@ -78,6 +78,10 @@ def _transcribe_single(audio_path: str, api_key: str) -> str:
                 last_exc = exc
                 continue
             raise  # 401, 403, 404 — don't retry
+        except requests.Timeout as exc:
+            print(f"⏱️  Voxtral timed out ({timeout}s) — will retry…", file=sys.stderr)
+            last_exc = exc
+            continue
     raise last_exc
 
 

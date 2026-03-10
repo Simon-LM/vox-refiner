@@ -107,6 +107,7 @@ class TestTranscribeErrors:
             transcribe.transcribe(str(audio_file))
 
     def test_timeout_raises_request_exception(self, monkeypatch, tmp_path):
+        """With retries=0 a Timeout propagates immediately (baseline check)."""
         transcribe = _get_transcribe(monkeypatch)
         audio_file = tmp_path / "audio.mp3"
         audio_file.write_bytes(b"fake audio")
@@ -116,3 +117,69 @@ class TestTranscribeErrors:
         )
         with pytest.raises(requests.Timeout):
             transcribe.transcribe(str(audio_file))
+
+
+class TestTranscribeRetry:
+    """Verify that transient errors (Timeout, 429, 5xx) are actually retried.
+
+    These tests use retries=1 with zero delay to exercise the retry path
+    without sleeping.  The core bug was that requests.Timeout was NOT caught
+    in the retry loop, causing the exception to escape immediately.
+    """
+
+    def _get_with_one_retry(self, monkeypatch):
+        """Return a transcribe module loaded with 1 retry and 0s delay."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+        monkeypatch.setenv("TRANSCRIBE_REQUEST_RETRIES", "0")  # base load
+        if "src.transcribe" in sys.modules:
+            del sys.modules["src.transcribe"]
+        import src.transcribe as tm
+        monkeypatch.setattr(tm, "_TRANSCRIBE_RETRIES", 1)
+        monkeypatch.setattr(tm, "_TRANSCRIBE_RETRY_DELAY", 0.0)
+        return tm
+
+    def test_timeout_retried_succeeds_on_second_attempt(self, monkeypatch, tmp_path):
+        """A Timeout on the first attempt must be caught and retried.
+
+        Before the fix, requests.Timeout was not caught in the retry loop, so
+        it escaped immediately instead of being retried.
+        """
+        tm = self._get_with_one_retry(monkeypatch)
+        audio_file = tmp_path / "audio.mp3"
+        audio_file.write_bytes(b"x" * 10_000)
+
+        mock_post = MagicMock(
+            side_effect=[requests.Timeout("timed out"), _ok_response("Retry worked.")]
+        )
+        monkeypatch.setattr(requests, "post", mock_post)
+
+        result = tm.transcribe(str(audio_file))
+        assert result == "Retry worked."
+        assert mock_post.call_count == 2
+
+    def test_timeout_exhausted_raises_requests_timeout(self, monkeypatch, tmp_path):
+        """After exhausting all retries on Timeout, requests.Timeout is re-raised."""
+        tm = self._get_with_one_retry(monkeypatch)
+        audio_file = tmp_path / "audio.mp3"
+        audio_file.write_bytes(b"x" * 10_000)
+
+        monkeypatch.setattr(
+            requests, "post", MagicMock(side_effect=requests.Timeout("timed out"))
+        )
+        with pytest.raises(requests.Timeout):
+            tm.transcribe(str(audio_file))
+
+    def test_429_retried_succeeds_on_second_attempt(self, monkeypatch, tmp_path):
+        """A 429 rate-limit response must be retried, not raised immediately."""
+        tm = self._get_with_one_retry(monkeypatch)
+        audio_file = tmp_path / "audio.mp3"
+        audio_file.write_bytes(b"x" * 10_000)
+
+        mock_post = MagicMock(
+            side_effect=[_error_response(429), _ok_response("After 429.")]
+        )
+        monkeypatch.setattr(requests, "post", mock_post)
+
+        result = tm.transcribe(str(audio_file))
+        assert result == "After 429."
+        assert mock_post.call_count == 2
