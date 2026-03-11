@@ -13,6 +13,32 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.8.1] — 2026-03-11
+
+### Changed
+
+- **Model speed factors recalibrated**: `magistral-small-latest` ×2.5 → ×3.0,
+  `magistral-medium-latest` ×3.0 → ×4.5 — observed timeouts on long transcriptions
+  (≥ 240 words) confirmed the previous factors were too low for reasoning models
+- **System prompts hardened** (SHORT, MEDIUM, LONG):
+  - New `SECURITY` block: explicitly identifies the `<transcription>` content as
+    untrusted external input and guards against prompt-injection patterns
+    ("ignore previous instructions", "you are now…", "pretend that…")
+  - `IMPORTANT` block: extended to cover questions addressed to an AI assistant;
+    added "The speaker is talking to someone else" clarification to prevent the model
+    from treating spoken questions as requests directed at itself
+  - Point 1 (SHORT) and Point 3 (MEDIUM/LONG): sources for vocabulary correction now
+    explicitly include `<history>` in addition to `<context>`; guard added to forbid
+    injecting any name, concept, or technical detail absent from those sources;
+    `<history>` inaccuracy warning added
+  - Point 5 (MEDIUM/LONG): reinforced with explicit prohibition on completing reasoning
+    chains, answering spoken questions, or adding unstated examples/conclusions;
+    open-ended output must remain open-ended
+  - LONG Point 4: "voice" removed from "speaker's words, voice, and register" —
+    the model receives text only, not audio
+
+---
+
 ## [1.8.0] — 2026-03-11
 
 ### Added
