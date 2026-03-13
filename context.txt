@@ -1,4 +1,4 @@
-# Voxtral Paste — User context
+# VoxRefiner — User context
 #
 # This file is injected into the refinement prompt.
 # Describe your work domain, technical stack, and frequently used vocabulary

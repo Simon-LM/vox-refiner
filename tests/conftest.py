@@ -1,4 +1,4 @@
-"""Shared fixtures for the voxtral-paste test suite."""
+"""Shared fixtures for the vox-refiner test suite."""
 
 import pytest
 

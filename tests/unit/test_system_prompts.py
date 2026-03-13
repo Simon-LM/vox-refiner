@@ -73,10 +73,10 @@ class TestPromptFormatting:
         """When history_section is non-empty, it must appear in the formatted prompt."""
         refine = _get_refine(monkeypatch)
         prompt = getattr(refine, prompt_name)
-        history_block = "\n\n<history>\n- User works on Voxtral Paste\n</history>"
+        history_block = "\n\n<history>\n- User works on VoxRefiner\n</history>"
         result = prompt.format(context="x", history_section=history_block)
         assert "<history>" in result
-        assert "Voxtral Paste" in result
+        assert "VoxRefiner" in result
 
 
 class TestPromptDifferentiation:

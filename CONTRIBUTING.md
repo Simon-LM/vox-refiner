@@ -1,6 +1,6 @@
 <!-- @format -->
 
-# Contributing to Voxtral Paste
+# Contributing to VoxRefiner
 
 Thank you for your interest in contributing.
 This document covers the conventions used in this project — for external contributors and for AI assistants working alongside the maintainer.
@@ -10,7 +10,7 @@ This document covers the conventions used in this project — for external contr
 ## Project structure
 
 ```text
-voxtral-paste/
+vox-refiner/
 ├── src/
 │   ├── transcribe.py       # Step 1: audio → raw transcription (Voxtral API)
 │   └── refine.py           # Step 2: raw text → refined text (Mistral chat API)
@@ -118,7 +118,7 @@ These are listed in `.gitignore`. Never force-add them.
 
 ## Deploying to the local installation
 
-The active installation lives at `~/.local/bin/voxtral-paste/`.
+The active installation lives at `~/.local/bin/vox-refiner/`.
 The keyboard shortcut calls `launch_voxtral.sh` from that exact path.
 
 **Do NOT copy-paste the folder manually** — it strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut (the script runs fine with `bash script.sh` but not when called directly).
@@ -127,14 +127,14 @@ Use `rsync` instead, which preserves permissions:
 
 ```bash
 rsync -av --exclude='.git' --exclude='.venv' --exclude='*.wav' --exclude='*.mp3' \
-  ~/path/to/dev/voxtral-paste/ ~/.local/bin/voxtral-paste/
+  ~/path/to/dev/vox-refiner/ ~/.local/bin/vox-refiner/
 ```
 
 If you did copy manually and the shortcut no longer works, restore the executable bit:
 
 ```bash
-chmod +x ~/.local/bin/voxtral-paste/launch_voxtral.sh
-chmod +x ~/.local/bin/voxtral-paste/record_and_transcribe_local.sh
+chmod +x ~/.local/bin/vox-refiner/launch_voxtral.sh
+chmod +x ~/.local/bin/vox-refiner/record_and_transcribe_local.sh
 ```
 
 ---

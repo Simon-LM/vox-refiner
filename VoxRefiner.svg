@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 420" width="400" height="420">
+  <defs>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00FF88;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00CC66;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Gradient from chaotic (left) to ordered (right) -->
+    <linearGradient id="morphGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00FF88;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#00EE77;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00CC66;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="subtleglow">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip to icon area -->
+    <clipPath id="iconClip">
+      <rect x="40" y="40" width="320" height="280"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="420" rx="72" fill="#080808"/>
+
+  <!-- Dot grid -->
+  <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+    <circle cx="9" cy="9" r="0.7" fill="#181818"/>
+  </pattern>
+  <rect width="400" height="420" rx="72" fill="url(#dots)"/>
+
+  <!-- ===================== -->
+  <!-- ICON: wave → text     -->
+  <!-- ===================== -->
+  <!-- Center Y = 175, total width ~320px (x: 40 to 360) -->
+  <!-- Left zone (chaotic wave): x 40–160 -->
+  <!-- Transition zone: x 160–240 -->
+  <!-- Right zone (clean text lines): x 240–360 -->
+
+  <!-- === LEFT: raw sound wave bars (chaotic, organic heights) === -->
+  <!-- Each bar centered on y=175, varying heights -->
+  <g filter="url(#glow)">
+    <rect x="42"  y="135" width="9" height="80"  rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="57"  y="118" width="9" height="114" rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="72"  y="148" width="9" height="54"  rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="87"  y="105" width="9" height="140" rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="102" y="130" width="9" height="90"  rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="117" y="112" width="9" height="126" rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="132" y="142" width="9" height="66"  rx="4.5" fill="url(#morphGrad)"/>
+    <rect x="147" y="122" width="9" height="106" rx="4.5" fill="url(#morphGrad)"/>
+  </g>
+
+  <!-- === TRANSITION: bars progressively become flat lines === -->
+  <g filter="url(#subtleglow)">
+    <!-- bar heights shrink toward flat -->
+    <rect x="165" y="128" width="9" height="94"  rx="4.5" fill="url(#morphGrad)" opacity="0.95"/>
+    <rect x="180" y="138" width="9" height="74"  rx="4.5" fill="url(#morphGrad)" opacity="0.9"/>
+    <rect x="195" y="150" width="9" height="50"  rx="4.5" fill="url(#morphGrad)" opacity="0.85"/>
+    <rect x="210" y="158" width="9" height="34"  rx="4.5" fill="url(#morphGrad)" opacity="0.8"/>
+    <rect x="225" y="163" width="9" height="24"  rx="4.5" fill="url(#morphGrad)" opacity="0.75"/>
+  </g>
+
+  <!-- === RIGHT: clean horizontal text lines === -->
+  <g filter="url(#subtleglow)">
+    <!-- Line 1 — full width -->
+    <rect x="248" y="138" width="108" height="9" rx="4.5" fill="url(#morphGrad)" opacity="0.95"/>
+    <!-- Line 2 — full width -->
+    <rect x="248" y="162" width="108" height="9" rx="4.5" fill="url(#morphGrad)" opacity="0.85"/>
+    <!-- Line 3 — full width -->
+    <rect x="248" y="186" width="108" height="9" rx="4.5" fill="url(#morphGrad)" opacity="0.75"/>
+    <!-- Line 4 — shorter, like end of paragraph -->
+    <rect x="248" y="210" width="68"  height="9" rx="4.5" fill="url(#morphGrad)" opacity="0.5"/>
+  </g>
+
+  <!-- Subtle vertical separator between wave and text zones -->
+  <line x1="237" y1="100" x2="237" y2="250"
+        stroke="#00FF88" stroke-width="1" opacity="0.12" stroke-dasharray="4 4"/>
+
+  <!-- ===================== -->
+  <!-- WORDMARK              -->
+  <!-- ===================== -->
+  <text x="200" y="318"
+        font-family="'Courier New', monospace"
+        font-size="30"
+        font-weight="700"
+        fill="url(#greenGrad)"
+        text-anchor="middle"
+        letter-spacing="8"
+        filter="url(#subtleglow)">VOXREFINER</text>
+
+  <!-- Tagline -->
+  <text x="200" y="346"
+        font-family="'Courier New', monospace"
+        font-size="12"
+        font-weight="400"
+        fill="#00CC66"
+        text-anchor="middle"
+        letter-spacing="3"
+        opacity="0.6">SPEAK · REFINER · PASTE</text>
+
+</svg>

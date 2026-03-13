@@ -203,7 +203,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- Installation guide in README: `git clone` directly to `~/.local/bin/voxtral-paste/`, explicit `chmod +x` step
+- Installation guide in README: `git clone` directly to `~/.local/bin/vox-refiner/`, explicit `chmod +x` step
 - `.markdownlint.json` added to suppress MD013 / MD024 false positives in CHANGELOG and CONTRIBUTING
 
 ---

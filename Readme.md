@@ -1,16 +1,18 @@
 <!-- @format -->
 
-# Voxtral Paste
+# VoxRefiner
+
+![VoxRefiner logo](VoxRefiner.svg)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Voxtral Paste — Speak, get text, paste it anywhere.**
+**VoxRefiner — Speak, get text, paste it anywhere.**
 
 ---
 
-## What is Voxtral Paste?
+## What is VoxRefiner?
 
-Voxtral Paste is a small and simple voice-to-text tool that lets you speak and instantly paste the resulting text wherever you want.
+VoxRefiner is a small and simple voice-to-text tool that lets you speak and instantly paste the resulting text wherever you want.
 
 You start recording, you speak, you stop — and the transcription is automatically cleaned up and copied to your clipboard.
 
@@ -20,7 +22,7 @@ One API key. No complex UI. Just speak → paste.
 
 ## How it works
 
-1. You launch Voxtral Paste from the terminal or via a keyboard shortcut
+1. You launch VoxRefiner from the terminal or via a keyboard shortcut
 2. Recording starts immediately
 3. You speak
 4. You stop the recording (**Ctrl+C**)
@@ -58,7 +60,7 @@ The threshold and models are fully configurable via `.env`.
 
 ## History context (optional)
 
-Voxtral Paste can automatically build a `history.txt` file by extracting key facts from
+VoxRefiner can automatically build a `history.txt` file by extracting key facts from
 your longer transcriptions. Enable it with `ENABLE_HISTORY=true` in your `.env`.
 
 **What is stored:**
@@ -134,7 +136,7 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 
 ---
 
-## Why Voxtral Paste?
+## Why VoxRefiner?
 
 - Designed for **speed and simplicity**
 - **One API key only** — Mistral
@@ -162,8 +164,8 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 
 ```bash
 # 1. Clone the repository into your local bin
-git clone https://github.com/Simon-LM/voxtral-paste.git ~/.local/bin/voxtral-paste
-cd ~/.local/bin/voxtral-paste
+git clone https://github.com/Simon-LM/vox-refiner.git ~/.local/bin/vox-refiner
+cd ~/.local/bin/vox-refiner
 
 # 2. Install Python dependencies
 pip install -r requirements.txt
@@ -183,21 +185,21 @@ bash record_and_transcribe_local.sh
 
 > **Important:** always use `git clone` or `rsync` to install — do not copy-paste the folder manually.
 > A manual copy strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut.
-> If you did copy manually and the shortcut no longer works, run: `chmod +x ~/.local/bin/voxtral-paste/*.sh`
+> If you did copy manually and the shortcut no longer works, run: `chmod +x ~/.local/bin/vox-refiner/*.sh`
 
 ### Updating
 
 To update to a newer version:
 
 ```bash
-cd ~/.local/bin/voxtral-paste
+cd ~/.local/bin/vox-refiner
 git pull
 chmod +x record_and_transcribe_local.sh launch_voxtral.sh
 ```
 
 ### Keyboard shortcut (recommended)
 
-For the best experience, bind Voxtral Paste to a keyboard shortcut so you can launch it with a single key press from anywhere.
+For the best experience, bind VoxRefiner to a keyboard shortcut so you can launch it with a single key press from anywhere.
 
 1. Set up the launcher script:
 
@@ -221,7 +223,7 @@ For the best experience, bind Voxtral Paste to a keyboard shortcut so you can la
    Set the command to the full path of your launcher:
 
    ```text
-   /home/your-username/.local/bin/voxtral-paste/launch_voxtral.sh
+   /home/your-username/.local/bin/vox-refiner/launch_voxtral.sh
    ```
 
 3. Press your shortcut → speak → stop (Ctrl+C) → paste anywhere.
@@ -230,7 +232,7 @@ For the best experience, bind Voxtral Paste to a keyboard shortcut so you can la
 
 ## Philosophy
 
-Voxtral Paste is intentionally minimal.
+VoxRefiner is intentionally minimal.
 
 You provide your Mistral API key once, and the tool just works.
 
@@ -299,7 +301,7 @@ The next major step is a real desktop application with:
 
 ## Status
 
-Voxtral Paste is an **open source personal utility**, shared as-is.
+VoxRefiner is an **open source personal utility**, shared as-is.
 
 It is functional, minimal, and intentionally simple.
 The core pipeline is stable. The graphical interface is the next planned step.

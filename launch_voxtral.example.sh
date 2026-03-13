@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# ─── Voxtral Paste — Launcher example ────────────────────────────────────────
+# ─── VoxRefiner — Launcher example ────────────────────────────────────────
 #
-# This script opens a new terminal window and runs Voxtral Paste.
+# This script opens a new terminal window and runs VoxRefiner.
 # Copy it to launch_voxtral.sh and customize it for your setup.
 #
 # Usage:
@@ -18,7 +18,7 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Path to the main script (adjust to your installation)
-SCRIPT_PATH="$HOME/.local/bin/voxtral-paste/record_and_transcribe_local.sh"
+SCRIPT_PATH="$HOME/.local/bin/vox-refiner/record_and_transcribe_local.sh"
 
 # PID file to track the previous terminal (avoids duplicate windows)
 PID_FILE="/tmp/voxtral_terminal.pid"

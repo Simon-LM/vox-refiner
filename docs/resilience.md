@@ -2,7 +2,7 @@
 
 # Resilience — Timeouts, Retries & Audio Splitting
 
-This document describes the retry and timeout strategy used by Voxtral Paste
+This document describes the retry and timeout strategy used by VoxRefiner
 to handle transient API errors and large audio files gracefully.
 
 ---

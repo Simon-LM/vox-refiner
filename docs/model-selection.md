@@ -3,7 +3,7 @@
 # Model Selection — Decisions & Rationale
 
 This document records the reasoning behind the model choices and routing thresholds
-used in Voxtral Paste. It will be updated as further testing is done.
+used in VoxRefiner. It will be updated as further testing is done.
 
 ---
 
