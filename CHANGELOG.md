@@ -13,6 +13,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.8.2] — 2026-03-13
+
+### Changed
+
+- **Project rebrand**: renamed public project name from **Voxtral Paste** to
+  **VoxRefiner** to avoid trademark confusion with third-party commercial names
+- **Repository and install paths**: updated documentation/examples from
+  `voxtral-paste` to `vox-refiner`
+- **README branding refresh**: updated title/text references to VoxRefiner and
+  added project logo (`VoxRefiner.svg`)
+- **README messaging refresh**: updated the product tagline and intro copy to the
+  new VoxRefiner branding narrative
+- **Supporting docs/examples/tests**: aligned naming references across
+  `CONTRIBUTING.md`, `docs/*`, `history.example.txt`, launcher examples, and
+  prompt-related test fixtures
+
+### Fixed
+
+- **README markdown lint compatibility**: adjusted logo rendering with scoped
+  markdownlint directives while preserving centered display on GitHub
+
+---
+
 ## [1.8.1] — 2026-03-11
 
 ### Changed

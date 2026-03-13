@@ -2,19 +2,26 @@
 
 # VoxRefiner
 
-![VoxRefiner logo](VoxRefiner.svg)
+<!-- markdownlint-disable-next-line MD033 -->
+<p align="center">
+  <!-- markdownlint-disable-next-line MD033 -->
+  <img src="VoxRefiner.svg" alt="VoxRefiner logo" width="260" />
+</p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**VoxRefiner — Speak, get text, paste it anywhere.**
+**VoxRefiner — Speak naturally. AI refines it. Just paste it anywhere.**
 
 ---
 
 ## What is VoxRefiner?
 
-VoxRefiner is a small and simple voice-to-text tool that lets you speak and instantly paste the resulting text wherever you want.
+VoxRefiner turns your voice into clean, ready-to-paste text — instantly. Speak naturally,
+let AI refine your words, and paste the result anywhere. No typing, no manual cleanup.
 
-You start recording, you speak, you stop — and the transcription is automatically cleaned up and copied to your clipboard.
+Powered by a personal context file (your projects, tech stack, vocabulary) and a smart
+history that gets better the more you use it, VoxRefiner understands you — not just
+your words.
 
 One API key. No complex UI. Just speak → paste.
 
