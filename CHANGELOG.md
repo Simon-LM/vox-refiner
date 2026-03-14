@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.8.7] — 2026-03-14
+
+### Changed
+
+- Launcher naming harmonized to kebab-case:
+  - `launch_vox-refiner.sh` → `launch-vox-refiner.sh`
+  - `launch_vox-refiner.example.sh` → `launch-vox-refiner.example.sh`
+- Updated launcher references in docs and scripts (`Readme.md`, `CONTRIBUTING.md`,
+  `.gitignore`, `vox-refiner-update.sh`)
+- Harmonized `launch-vox-refiner.sh` content with the launcher template style
+  and naming conventions
+- Fixed README keyboard-shortcut section formatting and command block rendering
+
+---
+
 ## [1.8.6] — 2026-03-14
 
 ### Changed
@@ -360,5 +375,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `context.txt` for user domain vocabulary injection into the refinement prompt
 - Graceful degradation: returns raw transcription if all models fail
 - `.env` configuration with `.env.example` template
-- `launch_vox-refiner.example.sh` for keyboard shortcut setup (multi-terminal documented)
-- `.gitignore` excluding `.env`, `launch_vox-refiner.sh`, audio files
+- `launch-vox-refiner.example.sh` for keyboard shortcut setup (multi-terminal documented)
+- `.gitignore` excluding `.env`, `launch-vox-refiner.sh`, audio files

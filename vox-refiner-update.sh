@@ -82,8 +82,8 @@ repair_exec_bits() {
     chmod +x record_and_transcribe_local.sh
     chmod +x vox-refiner-update.sh
 
-    if [ -f "launch_vox-refiner.sh" ]; then
-        chmod +x launch_vox-refiner.sh
+    if [ -f "launch-vox-refiner.sh" ]; then
+        chmod +x launch-vox-refiner.sh
     fi
 }
 

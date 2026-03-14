@@ -208,7 +208,7 @@ cp .env.example .env
 # Edit .env and set your MISTRAL_API_KEY
 
 # 4. Make the scripts executable
-chmod +x record_and_transcribe_local.sh launch_vox-refiner.sh vox-refiner-update.sh
+chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-update.sh
 
 # 5. (Optional) Create and edit personal context
 cp context.example.txt context.txt
@@ -236,7 +236,7 @@ Manual fallback (if needed):
 
 ```bash
 git pull --ff-only
-chmod +x record_and_transcribe_local.sh launch_vox-refiner.sh vox-refiner-update.sh
+chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-update.sh
 ```
 
 ### Keyboard shortcut (recommended)
@@ -246,16 +246,16 @@ For the best experience, bind VoxRefiner to a keyboard shortcut so you can launc
 1. Set up the launcher script:
 
    ```bash
-   cp launch_vox-refiner.example.sh launch_vox-refiner.sh
+   cp launch-vox-refiner.example.sh launch-vox-refiner.sh
    ```
 
-# Edit launch_vox-refiner.sh:
+# Edit launch-vox-refiner.sh:
 
 # - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
 
 # - set your terminal emulator (mate-terminal, gnome-terminal, konsole…)
 
-chmod +x launch_vox-refiner.sh
+chmod +x launch-vox-refiner.sh
 
 ````
 
@@ -271,7 +271,7 @@ chmod +x launch_vox-refiner.sh
 Set the command to the full path of your launcher:
 
 ```text
-/home/your-username/.local/bin/vox-refiner/launch_vox-refiner.sh
+/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
 ````
 
 3. Press your shortcut → speak → stop (Ctrl+C) → paste anywhere.

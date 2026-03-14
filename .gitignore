@@ -1,8 +1,8 @@
 # Environment — NEVER commit your API key
 .env
 
-# Personal launcher (use launch_vox-refiner.example.sh as template)
-launch_vox-refiner.sh
+# Personal launcher (use launch-vox-refiner.example.sh as template)
+launch-vox-refiner.sh
 
 # Auto-generated history context (personal, stays local)
 history.txt

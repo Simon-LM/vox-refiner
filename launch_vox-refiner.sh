@@ -1,14 +1,9 @@
 #!/bin/bash
 
-# ─── VoxRefiner — Launcher example ────────────────────────────────────────
+# ─── VoxRefiner — Personal launcher ─────────────────────────────────────────
 #
 # This script opens a new terminal window and runs VoxRefiner.
-# Copy it to launch_vox-refiner.sh and customize it for your setup.
-#
-# Usage:
-#   1. cp launch_vox-refiner.example.sh launch_vox-refiner.sh
-#   2. Edit SCRIPT_PATH and the terminal command below
-#   3. Bind launch_vox-refiner.sh to a keyboard shortcut in your OS
+# You can bind this file directly to a keyboard shortcut.
 #
 # Terminal examples:
 #   MATE:    mate-terminal -- bash -c "\"$SCRIPT_PATH\"; exec bash"
@@ -17,7 +12,7 @@
 #   XFCE:    xfce4-terminal -e "bash -c \"\\\"$SCRIPT_PATH\\\"; exec bash\""
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Path to the main script (adjust to your installation)
+# Path to your main script
 SCRIPT_PATH="$HOME/.local/bin/vox-refiner/record_and_transcribe_local.sh"
 
 # PID file to track the previous terminal (avoids duplicate windows)
@@ -34,7 +29,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Launch a new terminal and save its PID
-# ⬇️ Replace with your terminal emulator (see examples above)
+# Replace with your terminal emulator if needed.
 mate-terminal -- bash -c "\"$SCRIPT_PATH\"; exec bash" &
 NEW_PID=$!
 echo "$NEW_PID" > "$PID_FILE"
