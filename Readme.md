@@ -208,7 +208,7 @@ cp .env.example .env
 # Edit .env and set your MISTRAL_API_KEY
 
 # 4. Make the scripts executable
-chmod +x record_and_transcribe_local.sh launch_voxtral.sh voxrefiner-update.sh
+chmod +x record_and_transcribe_local.sh launch_vox-refiner.sh vox-refiner-update.sh
 
 # 5. (Optional) Create and edit personal context
 cp context.example.txt context.txt
@@ -228,15 +228,15 @@ To update to a newer version:
 
 ```bash
 cd ~/.local/bin/vox-refiner
-./voxrefiner-update.sh --check
-./voxrefiner-update.sh --apply
+./vox-refiner-update.sh --check
+./vox-refiner-update.sh --apply
 ```
 
 Manual fallback (if needed):
 
 ```bash
 git pull --ff-only
-chmod +x record_and_transcribe_local.sh launch_voxtral.sh voxrefiner-update.sh
+chmod +x record_and_transcribe_local.sh launch_vox-refiner.sh vox-refiner-update.sh
 ```
 
 ### Keyboard shortcut (recommended)
@@ -246,27 +246,33 @@ For the best experience, bind VoxRefiner to a keyboard shortcut so you can launc
 1. Set up the launcher script:
 
    ```bash
-   cp launch_voxtral.example.sh launch_voxtral.sh
-   # Edit launch_voxtral.sh:
-   #   - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
-   #   - set your terminal emulator (mate-terminal, gnome-terminal, konsole…)
-   chmod +x launch_voxtral.sh
+   cp launch_vox-refiner.example.sh launch_vox-refiner.sh
    ```
+
+# Edit launch_vox-refiner.sh:
+
+# - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
+
+# - set your terminal emulator (mate-terminal, gnome-terminal, konsole…)
+
+chmod +x launch_vox-refiner.sh
+
+````
 
 2. Bind it to a keyboard shortcut in your desktop environment:
 
-   | Desktop   | Where to configure                             |
-   | --------- | ---------------------------------------------- |
-   | **MATE**  | System → Preferences → Keyboard Shortcuts      |
-   | **GNOME** | Settings → Keyboard → Custom Shortcuts         |
-   | **KDE**   | System Settings → Shortcuts → Custom Shortcuts |
-   | **XFCE**  | Settings → Keyboard → Application Shortcuts    |
+| Desktop   | Where to configure                             |
+| --------- | ---------------------------------------------- |
+| **MATE**  | System → Preferences → Keyboard Shortcuts      |
+| **GNOME** | Settings → Keyboard → Custom Shortcuts         |
+| **KDE**   | System Settings → Shortcuts → Custom Shortcuts |
+| **XFCE**  | Settings → Keyboard → Application Shortcuts    |
 
-   Set the command to the full path of your launcher:
+Set the command to the full path of your launcher:
 
-   ```text
-   /home/your-username/.local/bin/vox-refiner/launch_voxtral.sh
-   ```
+```text
+/home/your-username/.local/bin/vox-refiner/launch_vox-refiner.sh
+````
 
 3. Press your shortcut → speak → stop (Ctrl+C) → paste anywhere.
 

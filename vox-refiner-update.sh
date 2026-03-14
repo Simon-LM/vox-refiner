@@ -80,10 +80,10 @@ ensure_clean_tracked_tree() {
 
 repair_exec_bits() {
     chmod +x record_and_transcribe_local.sh
-    chmod +x voxrefiner-update.sh
+    chmod +x vox-refiner-update.sh
 
-    if [ -f "launch_voxtral.sh" ]; then
-        chmod +x launch_voxtral.sh
+    if [ -f "launch_vox-refiner.sh" ]; then
+        chmod +x launch_vox-refiner.sh
     fi
 }
 

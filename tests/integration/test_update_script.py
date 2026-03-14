@@ -1,4 +1,4 @@
-"""Integration tests for voxrefiner-update.sh."""
+"""Integration tests for vox-refiner-update.sh."""
 
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ def _setup_repo_pair(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _install_updater(work: Path, repo_root: Path) -> None:
-    src = repo_root / "voxrefiner-update.sh"
-    dst = work / "voxrefiner-update.sh"
+    src = repo_root / "vox-refiner-update.sh"
+    dst = work / "vox-refiner-update.sh"
     shutil.copy2(src, dst)
     dst.chmod(dst.stat().st_mode | stat.S_IXUSR)
 
@@ -50,7 +50,7 @@ def test_check_reports_up_to_date(tmp_path: Path):
     _, work = _setup_repo_pair(tmp_path)
     _install_updater(work, repo_root)
 
-    result = _run(["bash", "./voxrefiner-update.sh", "--check"], cwd=work)
+    result = _run(["bash", "./vox-refiner-update.sh", "--check"], cwd=work)
 
     assert result.returncode == 0
     assert "Up to date" in result.stdout
@@ -70,7 +70,7 @@ def test_check_reports_update_available(tmp_path: Path):
     _run(["git", "commit", "-m", "remote update"], cwd=other)
     _run(["git", "push"], cwd=other)
 
-    result = _run(["bash", "./voxrefiner-update.sh", "--check"], cwd=work)
+    result = _run(["bash", "./vox-refiner-update.sh", "--check"], cwd=work)
 
     assert result.returncode == 0
     assert "Update available" in result.stdout
@@ -82,7 +82,7 @@ def test_apply_refuses_dirty_tracked_tree(tmp_path: Path):
     _install_updater(work, repo_root)
 
     (work / "README.md").write_text("dirty\n", encoding="utf-8")
-    result = _run(["bash", "./voxrefiner-update.sh", "--apply"], cwd=work, check=False)
+    result = _run(["bash", "./vox-refiner-update.sh", "--apply"], cwd=work, check=False)
 
     assert result.returncode != 0
     assert "Local tracked changes detected" in (result.stdout + result.stderr)

@@ -11,9 +11,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+---
+
+## [1.8.6] — 2026-03-14
+
+### Changed
+
+- Scripts renamed for naming consistency with the `vox-refiner` repo slug:
+  - `launch_voxtral.sh` → `launch_vox-refiner.sh`
+  - `launch_voxtral.example.sh` → `launch_vox-refiner.example.sh`
+  - `voxrefiner-update.sh` → `vox-refiner-update.sh`
+- PID temp file renamed `/tmp/voxtral_terminal.pid` → `/tmp/vox-refiner_terminal.pid`
+- All references updated in `Readme.md`, `CONTRIBUTING.md`, `record_and_transcribe_local.sh`,
+  `vox-refiner-update.sh` (self-reference), and tests
+
+---
+
+## [1.8.5] — 2026-03-14
+
 ### Added
 
-- `voxrefiner-update.sh` with:
+- `vox-refiner-update.sh` with:
   - `--check`: fetch remote refs/tags and report update status
   - `--apply`: fast-forward-only update flow with tracked-tree safety checks
 - `context.example.txt` template for personal domain vocabulary/context
@@ -23,8 +41,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `context.txt` is now ignored by git and intended as a local file created from
   `context.example.txt`
 - End-of-run quick commands now include update commands:
-  - `./voxrefiner-update.sh --check`
-  - `./voxrefiner-update.sh --apply`
+  - `./vox-refiner-update.sh --check`
+  - `./vox-refiner-update.sh --apply`
 - README installation/update flow now documents the new context and update
   workflow
 
@@ -342,5 +360,5 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - `context.txt` for user domain vocabulary injection into the refinement prompt
 - Graceful degradation: returns raw transcription if all models fail
 - `.env` configuration with `.env.example` template
-- `launch_voxtral.example.sh` for keyboard shortcut setup (multi-terminal documented)
-- `.gitignore` excluding `.env`, `launch_voxtral.sh`, audio files
+- `launch_vox-refiner.example.sh` for keyboard shortcut setup (multi-terminal documented)
+- `.gitignore` excluding `.env`, `launch_vox-refiner.sh`, audio files

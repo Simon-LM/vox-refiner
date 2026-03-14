@@ -15,7 +15,7 @@ vox-refiner/
 │   ├── transcribe.py       # Step 1: audio → raw transcription (Voxtral API)
 │   └── refine.py           # Step 2: raw text → refined text (Mistral chat API)
 ├── record_and_transcribe_local.sh   # Main entry point (bash pipeline)
-├── launch_voxtral.example.sh        # Keyboard shortcut launcher template
+├── launch_vox-refiner.example.sh    # Keyboard shortcut launcher template
 ├── context.txt             # User domain vocabulary (injected into refinement prompt)
 ├── .env.example            # Configuration template
 ├── requirements.txt
@@ -106,11 +106,11 @@ Move items from `[Unreleased]` to the new version section.
 
 ## Files that must never be committed
 
-| File                | Reason                             |
-| ------------------- | ---------------------------------- |
-| `.env`              | Contains the Mistral API key       |
-| `launch_voxtral.sh` | Personal launcher with local paths |
-| `*.wav`, `*.mp3`    | Temporary audio files              |
+| File                    | Reason                             |
+| ----------------------- | ---------------------------------- |
+| `.env`                  | Contains the Mistral API key       |
+| `launch_vox-refiner.sh` | Personal launcher with local paths |
+| `*.wav`, `*.mp3`        | Temporary audio files              |
 
 These are listed in `.gitignore`. Never force-add them.
 
@@ -119,7 +119,7 @@ These are listed in `.gitignore`. Never force-add them.
 ## Deploying to the local installation
 
 The active installation lives at `~/.local/bin/vox-refiner/`.
-The keyboard shortcut calls `launch_voxtral.sh` from that exact path.
+The keyboard shortcut calls `launch_vox-refiner.sh` from that exact path.
 
 **Do NOT copy-paste the folder manually** — it strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut (the script runs fine with `bash script.sh` but not when called directly).
 
@@ -133,7 +133,7 @@ rsync -av --exclude='.git' --exclude='.venv' --exclude='*.wav' --exclude='*.mp3'
 If you did copy manually and the shortcut no longer works, restore the executable bit:
 
 ```bash
-chmod +x ~/.local/bin/vox-refiner/launch_voxtral.sh
+chmod +x ~/.local/bin/vox-refiner/launch_vox-refiner.sh
 chmod +x ~/.local/bin/vox-refiner/record_and_transcribe_local.sh
 ```
 
