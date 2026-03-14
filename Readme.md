@@ -189,7 +189,9 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 ### Requirements
 
 - Linux (tested on Ubuntu / MATE)
-- `ffmpeg` (with `libmp3lame` support) installed
+- `ffmpeg` (with `libmp3lame` support)
+- `sox` (for microphone recording via `rec`)
+- `xclip` (clipboard integration)
 - Python 3.10+
 - A [Mistral API key](https://console.mistral.ai/api-keys)
 
@@ -200,27 +202,32 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 git clone https://github.com/Simon-LM/vox-refiner.git ~/.local/bin/vox-refiner
 cd ~/.local/bin/vox-refiner
 
-# 2. Install Python dependencies
-pip install -r requirements.txt
+# 2. Run the installer (creates .venv, installs Python deps, sets chmod,
+#    and creates missing local files from templates)
+./install.sh
 
 # 3. Configure your API key
-cp .env.example .env
 # Edit .env and set your MISTRAL_API_KEY
 
-# 4. Make the scripts executable
-chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-update.sh
+# 4. Launch VoxRefiner
+./launch-vox-refiner.sh
 
-# 5. (Optional) Create and edit personal context
-cp context.example.txt context.txt
-# Edit context.txt to describe your domain
+# 5. (Recommended) Configure a keyboard shortcut
+# Use this command for best compatibility :
+# /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
 
-# 6. Test it
-bash record_and_transcribe_local.sh
+# 6. (Optional) Create a desktop menu entry
+cp vox-refiner.example.desktop ~/.local/share/applications/vox-refiner.desktop
+# Edit /home/your-username in that file, then validate:
+# desktop-file-validate ~/.local/share/applications/vox-refiner.desktop
 ```
 
 > **Important:** always use `git clone` or `rsync` to install — do not copy-paste the folder manually.
 > A manual copy strips the executable bit from `.sh` files, which silently breaks the keyboard shortcut.
 > If you did copy manually and the shortcut no longer works, run: `chmod +x ~/.local/bin/vox-refiner/*.sh`
+
+> **Venv note:** daily usage does **not** require `source .venv/bin/activate`.
+> The launcher and scripts use `./.venv/bin/python` directly.
 
 ### Updating
 
@@ -245,21 +252,24 @@ For the best experience, bind VoxRefiner to a keyboard shortcut so you can launc
 
 1. Set up the launcher script:
 
-   ```bash
-   cp launch-vox-refiner.example.sh launch-vox-refiner.sh
-   ```
-
+```bash
+cp launch-vox-refiner.example.sh launch-vox-refiner.sh
 # Edit launch-vox-refiner.sh:
-
-# - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
-
-# - set your terminal emulator (mate-terminal, gnome-terminal, konsole…)
-
+#   - set SCRIPT_PATH to the full path of record_and_transcribe_local.sh
+#   - optional: set VOXREFINER_TERMINAL (mate-terminal, gnome-terminal, xfce4-terminal, konsole, xterm)
 chmod +x launch-vox-refiner.sh
+```
 
-````
+Why keep `launch-vox-refiner.example.sh`?
 
-2. Bind it to a keyboard shortcut in your desktop environment:
+- The `.example` file is the shared, versioned template for everyone.
+- `launch-vox-refiner.sh` is your personal local copy (paths, terminal choice), so it stays untracked.
+- This separation avoids committing machine-specific paths and keeps installation reproducible.
+- The launcher auto-detects an available terminal in this order:
+  `mate-terminal` -> `gnome-terminal` -> `xfce4-terminal` -> `konsole` -> `xterm`.
+- If needed, set `VOXREFINER_TERMINAL` in `launch-vox-refiner.sh` to force one terminal.
+
+1. Bind it to a keyboard shortcut in your desktop environment:
 
 | Desktop   | Where to configure                             |
 | --------- | ---------------------------------------------- |
@@ -272,9 +282,15 @@ Set the command to the full path of your launcher:
 
 ```text
 /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
-````
+```
 
-3. Press your shortcut → speak → stop (Ctrl+C) → paste anywhere.
+Compatibility note:
+
+- Ubuntu MATE 24.04: bind the keyboard shortcut directly to `launch-vox-refiner.sh`.
+- Ubuntu Budgie 24.04: both `launch-vox-refiner.sh` and `vox-refiner.desktop` may work,
+  but the direct launcher script remains the recommended default.
+
+1. Press your shortcut -> speak -> stop (Ctrl+C) -> paste anywhere.
 
 ### Desktop menu entry (.desktop, optional)
 
@@ -284,20 +300,20 @@ If you want VoxRefiner to appear in your desktop app menu, use the template file
 
 ```bash
 mkdir -p ~/.local/share/applications
-cp vox-refiner.desktop.example ~/.local/share/applications/vox-refiner.desktop
+cp vox-refiner.example.desktop ~/.local/share/applications/vox-refiner.desktop
 ```
 
-2. Edit `~/.local/share/applications/vox-refiner.desktop` and replace
+1. Edit `~/.local/share/applications/vox-refiner.desktop` and replace
    `/home/your-username/` with your actual home path.
 
-3. Validate and enable it:
+1. Validate and enable it:
 
 ```bash
 desktop-file-validate ~/.local/share/applications/vox-refiner.desktop
 chmod +x ~/.local/share/applications/vox-refiner.desktop
 ```
 
-4. Refresh your desktop app cache (optional on some environments):
+1. Refresh your desktop app cache (optional on some environments):
 
 ```bash
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
@@ -323,7 +339,7 @@ The goal is to remove friction between speaking and writing — including the fr
 - Stack:
   - Bash — audio recording & orchestration
   - Python — transcription and refinement via Mistral API
-  - `sox`, `ffmpeg`, `lame` — local audio processing
+  - `sox`, `ffmpeg`, `xclip` — local audio/clipboard integration
   - `requests`, `python-dotenv` — Python dependencies
 - Interface: terminal-based
 

@@ -20,6 +20,12 @@
 # Path to the main script (adjust to your installation)
 SCRIPT_PATH="$HOME/.local/bin/vox-refiner/record_and_transcribe_local.sh"
 
+# Optional terminal override.
+# Examples:
+#   VOXREFINER_TERMINAL=mate-terminal
+#   VOXREFINER_TERMINAL=gnome-terminal
+VOXREFINER_TERMINAL="${VOXREFINER_TERMINAL:-}"
+
 # PID file to track the previous terminal (avoids duplicate windows)
 PID_FILE="/tmp/vox-refiner_terminal.pid"
 
@@ -34,8 +40,50 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # Launch a new terminal and save its PID
-# ⬇️ Replace with your terminal emulator (see examples above)
-mate-terminal -- bash -c "\"$SCRIPT_PATH\"; exec bash" &
+# Priority: explicit override -> MATE -> GNOME -> XFCE -> KDE -> xterm.
+run_in_terminal() {
+    case "$1" in
+        mate-terminal|gnome-terminal)
+            "$1" -- bash -c "\"$SCRIPT_PATH\"; exec bash" &
+            ;;
+        xfce4-terminal)
+            "$1" -e "bash -c \"\"$SCRIPT_PATH\"; exec bash\"" &
+            ;;
+        konsole)
+            "$1" -e bash -c "\"$SCRIPT_PATH\"; exec bash" &
+            ;;
+        xterm)
+            "$1" -e bash -lc "\"$SCRIPT_PATH\"; exec bash" &
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+if [ -n "$VOXREFINER_TERMINAL" ] && command -v "$VOXREFINER_TERMINAL" >/dev/null 2>&1; then
+    if ! run_in_terminal "$VOXREFINER_TERMINAL"; then
+        echo "❌ Unsupported VOXREFINER_TERMINAL: $VOXREFINER_TERMINAL"
+        echo "Supported values: mate-terminal, gnome-terminal, xfce4-terminal, konsole, xterm"
+        exit 1
+    fi
+elif command -v mate-terminal >/dev/null 2>&1; then
+    run_in_terminal mate-terminal
+elif command -v gnome-terminal >/dev/null 2>&1; then
+    run_in_terminal gnome-terminal
+elif command -v xfce4-terminal >/dev/null 2>&1; then
+    run_in_terminal xfce4-terminal
+elif command -v konsole >/dev/null 2>&1; then
+    run_in_terminal konsole
+elif command -v xterm >/dev/null 2>&1; then
+    run_in_terminal xterm
+else
+    echo "❌ No supported terminal emulator found (mate-terminal, gnome-terminal, xfce4-terminal, konsole, xterm)."
+    echo "Set VOXREFINER_TERMINAL to a supported terminal command."
+    exit 1
+fi
+
 NEW_PID=$!
 echo "$NEW_PID" > "$PID_FILE"
 

@@ -3,6 +3,8 @@
 
 # Personal launcher (use launch-vox-refiner.example.sh as template)
 launch-vox-refiner.sh
+# Legacy personal launcher name (kept ignored for backward compatibility)
+launch_vox-refiner.sh
 
 # Auto-generated history context (personal, stays local)
 history.txt

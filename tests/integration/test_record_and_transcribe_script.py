@@ -33,6 +33,20 @@ def _build_sandbox(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     # Minimal Python entrypoints expected by the shell script.
     src_dir = sandbox / "src"
     src_dir.mkdir()
+
+    # Minimal venv python expected by the script under test.
+    venv_bin = sandbox / ".venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    _write_executable(
+        venv_bin / "python",
+        """
+#!/usr/bin/env bash
+set -euo pipefail
+exec python3 "$@"
+""".strip()
+        + "\n",
+    )
+
     (src_dir / "transcribe.py").write_text(
         """
 import sys

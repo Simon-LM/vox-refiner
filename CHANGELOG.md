@@ -13,6 +13,39 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.9.0] — 2026-03-14
+
+### Added
+
+- `install.sh` one-shot installer:
+  - checks required system tools (`python3`, `python3-venv`, `ffmpeg`, `sox`, `xclip`)
+  - creates `.venv` and installs Python dependencies
+  - creates missing local files from templates (`.env`, `context.txt`, launcher)
+  - applies executable permissions (`chmod +x`) on runtime scripts
+
+### Changed
+
+- `record_and_transcribe_local.sh` now uses `./.venv/bin/python` explicitly
+  (no manual `source .venv/bin/activate` required for keyboard/desktop launches)
+- README installation flow simplified around `./install.sh`
+- README requirements clarified: `ffmpeg`, `sox`, and `xclip` are system dependencies
+- Renamed desktop entry template file to follow the `*.example.*` convention:
+  `vox-refiner.desktop.example` → `vox-refiner.example.desktop`
+- Updated `Readme.md` and `CONTRIBUTING.md` references to the new template name
+- Removed accidental tracked personal launcher `launch_vox-refiner.sh` from the repository
+- Added backward-compatible ignore rule for legacy personal launcher name
+  (`launch_vox-refiner.sh`) in `.gitignore`
+- Clarified in README why `launch-vox-refiner.example.sh` is kept: shared template
+  vs local personal launcher copy
+- `launch-vox-refiner.example.sh` now auto-detects a terminal emulator with fallback order:
+  `mate-terminal` -> `gnome-terminal` -> `xfce4-terminal` -> `konsole` -> `xterm`
+- Added optional `VOXREFINER_TERMINAL` override in launcher template
+- README updated to document terminal fallback and override
+- `install.sh` now installs `xterm` when using `--install-system-deps` and warns
+  when no supported terminal emulator is detected
+
+---
+
 ## [1.8.8] — 2026-03-14
 
 ### Added

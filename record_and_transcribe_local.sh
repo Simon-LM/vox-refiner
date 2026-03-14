@@ -2,6 +2,13 @@
 
 cd "$(dirname "$0")"
 SCRIPT_NAME="$(basename "$0")"
+VENV_PYTHON="$(pwd)/.venv/bin/python"
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "❌ Missing .venv Python interpreter: $VENV_PYTHON"
+    echo "Run ./install.sh first."
+    exit 1
+fi
 
 # ─── Mode ────────────────────────────────────────────────────────────────────────────────
 RETRY_MODE=false
@@ -83,7 +90,7 @@ fi
 
 # ─── Step 1: Speech-to-text (Voxtral) ───────────────────────────────────────
 
-raw_transcription=$(python3 src/transcribe.py local_audio.mp3 2>/dev/tty)
+raw_transcription=$("$VENV_PYTHON" src/transcribe.py local_audio.mp3 2>/dev/tty)
 
 if [ -z "$raw_transcription" ]; then
     echo "❌ Empty transcription."
@@ -101,7 +108,7 @@ if [ "${ENABLE_REFINE:-true}" = "true" ]; then
         VOXTRAL_MODELS_FILE=$(mktemp)
         export VOXTRAL_MODELS_FILE
     fi
-    refined_text=$(printf '%s' "$raw_transcription" | python3 src/refine.py 2>/dev/tty)
+    refined_text=$(printf '%s' "$raw_transcription" | "$VENV_PYTHON" src/refine.py 2>/dev/tty)
     # Graceful degradation: if refinement fails, fall back to raw transcription
     final_text="${refined_text:-$raw_transcription}"
 else
@@ -157,7 +164,7 @@ if [ "${ENABLE_HISTORY:-false}" = "true" ] && [ -n "$final_text" ]; then
     word_count=$(printf '%s' "$raw_transcription" | wc -w)
     threshold="${REFINE_MODEL_THRESHOLD_SHORT:-90}"
     if [ "$word_count" -ge "$threshold" ]; then
-        printf '%s' "$final_text" | python3 src/refine.py --update-history 2>/dev/tty &
+        printf '%s' "$final_text" | "$VENV_PYTHON" src/refine.py --update-history 2>/dev/tty &
         echo "🔄 History context update running in background..."
     fi
 fi
@@ -170,6 +177,10 @@ echo ""
 echo "💡 Useful files:"
 echo "   ${EDITOR:-nano} context.txt   → edit personal context"
 echo "   ${EDITOR:-nano} .env          → edit settings"
+if [ "${ENABLE_HISTORY:-false}" = "true" ]; then
+    echo "   cat history.txt    → view history"
+    echo "   ${EDITOR:-nano} history.txt   → edit history"
+fi
 echo ""
 echo "💡 Updates:"
 echo "   ./vox-refiner-update.sh --check   → check for updates"
