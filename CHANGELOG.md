@@ -11,12 +11,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+---
+
+## [1.8.4] — 2026-03-14
+
+### Changed
+
+- `silenceremove` filter: switched to `detection=peak` (faster than default `rms`)
+  and added `start_periods=1` to also strip leading silence before the first word
+
+---
+
+## [1.8.3] — 2026-03-14
+
 ### Added
 
 - New logo asset set under `Logo/`:
   - `Logo/VoxRefiner_Logo.svg`
   - `Logo/VoxRefiner_subtitile_Logo.svg`
   - `Logo/VoxRefiner_old.svg` (archived previous variant)
+- New test coverage for recording script safeguards:
+  - `tests/integration/test_record_and_transcribe_script.py`: executes the shell
+    script in a sandbox with stubbed `rec`/`ffmpeg`/`xclip`; covers clean-start,
+    WAV size rejection, and retry mode
+  - `tests/unit/test_record_script_structure.py`: asserts key safety primitives
+    are present in the script
 
 ### Changed
 
@@ -26,6 +45,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - clean audio artifacts (`local_audio.wav`, `local_audio.mp3`) before new recording
   - record to temporary WAV and promote only after validation
   - reject abnormally large WAV files via configurable `MAX_WAV_BYTES`
+- `docs/resilience.md`: new _Recording-stage safeguards_ section documenting the
+  three shell-level guards
+
+### Fixed
+
+- `tests/unit/test_refine_timing.py`: aligned timeout factor expectations with
+  current `_MODEL_SPEED_FACTOR` values (`magistral-medium-latest` ×4.5,
+  `magistral-small-latest` ×3.0)
 
 ### Removed
 
