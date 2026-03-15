@@ -76,7 +76,9 @@ your longer transcriptions. Enable it with `ENABLE_HISTORY=true` in your `.env`.
   understand your work over time
 - Each bullet carries a `[YYYY-MM-DD HH:MM:SS]` timestamp, added by the application (not the AI)
 - On each update the model consolidates the list: duplicates are removed, stale facts are
-  dropped and new ones are merged within the `HISTORY_MAX_BULLETS` limit (default: 60)
+  dropped and new ones are merged within the `HISTORY_MAX_BULLETS` limit (default: 100)
+- To avoid saturation, the app only sends the most recent 80% of history entries to the
+  model, keeping 20% capacity available for new bullets on each update
 
 **What is NOT stored:**
 

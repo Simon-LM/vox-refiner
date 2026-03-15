@@ -19,6 +19,7 @@ History extraction (optional, ENABLE_HISTORY=true):
 import os
 import sys
 import time
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -44,7 +45,7 @@ _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-lar
 _REQUEST_RETRIES = int(os.environ.get("REFINE_REQUEST_RETRIES", "2"))
 
 _ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "false").lower() in ("true", "1", "yes")
-_HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "60"))
+_HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "100"))
 _HISTORY_EXTRACTION_MODEL = os.environ.get("HISTORY_EXTRACTION_MODEL", "mistral-small-latest")
 _HISTORY_EXTRACTION_FALLBACK_MODEL = os.environ.get("HISTORY_EXTRACTION_FALLBACK_MODEL", "devstral-small-latest")
 _HISTORY_TIMEOUT_MULTIPLIER = float(os.environ.get("HISTORY_TIMEOUT_MULTIPLIER", "1.5"))
@@ -250,6 +251,28 @@ def _select_models(word_count: int) -> Tuple[str, str]:
     return _MODEL_LONG, _MODEL_LONG_FALLBACK
 
 
+def _history_line_key(line: str) -> str:
+    """Normalize a history bullet for deduplication, ignoring timestamp prefix."""
+    content = line.strip()
+    if content.startswith("- ["):
+        closing = content.find("] ")
+        if closing != -1:
+            return content[closing + 2 :].strip().lower()
+    if content.startswith("- "):
+        return content[2:].strip().lower()
+    return content.lower()
+
+
+def _parse_history_lines(content: str) -> List[str]:
+    """Keep only valid history bullets from raw history content."""
+    lines: List[str] = []
+    for raw in content.splitlines():
+        line = raw.strip()
+        if line.startswith("- ") and len(line) > 3:
+            lines.append(line)
+    return lines
+
+
 _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
 
 
@@ -343,9 +366,14 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
         if _HISTORY_FILE.exists()
         else ""
     )
+    max_bullets = max(1, _HISTORY_MAX_BULLETS)
+    reserved_slots = max(1, math.ceil(max_bullets * 0.20))
+    submission_limit = max(1, max_bullets - reserved_slots)
+    existing_lines = _parse_history_lines(existing_content)
+    model_history = "\n".join(existing_lines[-submission_limit:])
     system_prompt = _HISTORY_EXTRACTION_PROMPT.format(max_bullets=_HISTORY_MAX_BULLETS)
     user_content = (
-        f"<history>\n{existing_content}\n</history>\n\n"
+        f"<history>\n{model_history}\n</history>\n\n"
         f"<text>\n{refined_text}\n</text>"
     )
     messages = [
@@ -381,7 +409,19 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
         new_lines.append(line)
     if not new_lines:
         return
-    kept = new_lines[:_HISTORY_MAX_BULLETS]
+
+    # Preserve omitted existing bullets and let model output override duplicates.
+    merged_by_key: Dict[str, str] = {}
+    for line in existing_lines:
+        merged_by_key[_history_line_key(line)] = line
+    for line in new_lines:
+        key = _history_line_key(line)
+        if key in merged_by_key:
+            merged_by_key.pop(key)
+        merged_by_key[key] = line
+
+    merged_lines = list(merged_by_key.values())
+    kept = merged_lines[-max_bullets:]
     _HISTORY_FILE.write_text("\n".join(kept) + "\n", encoding="utf-8")
     print(f"📝 History updated ({len(kept)} bullet(s)).", file=sys.stderr)
 

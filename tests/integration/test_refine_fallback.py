@@ -289,6 +289,73 @@ class TestHistoryExtraction:
         assert mock_post.call_count == 2
         assert (tmp_path / "history.txt").exists()
 
+    def test_history_submission_keeps_20_percent_free(self, monkeypatch, tmp_path):
+        """Only the most recent 80% of history is sent to the model."""
+        refine = self._load(monkeypatch)
+        monkeypatch.setattr(refine, "_HISTORY_FILE", tmp_path / "history.txt")
+        monkeypatch.setattr(refine, "_HISTORY_MAX_BULLETS", 50)
+
+        existing = "\n".join([f"- [2026-03-01 00:00:{i:02d}] Fact {i}" for i in range(50)]) + "\n"
+        (tmp_path / "history.txt").write_text(existing, encoding="utf-8")
+
+        mock_post = MagicMock(return_value=_ok_response("- New fact"))
+        monkeypatch.setattr(requests, "post", mock_post)
+
+        refine._extract_and_update_history("Some text.", "test-key")
+
+        user_content = mock_post.call_args.kwargs["json"]["messages"][1]["content"]
+        history_block = user_content.split("<history>\n", 1)[1].split("\n</history>", 1)[0]
+        sent_lines = [line for line in history_block.splitlines() if line.startswith("- ")]
+        assert len(sent_lines) == 40
+        assert "Fact 49" in history_block
+        assert "Fact 0" not in history_block
+
+    def test_existing_history_is_preserved_if_model_returns_only_new(self, monkeypatch, tmp_path):
+        """Model omissions must not wipe existing history bullets."""
+        refine = self._load(monkeypatch)
+        history_file = tmp_path / "history.txt"
+        history_file.write_text(
+            "- [2026-03-01 10:00:00] Existing one\n- [2026-03-01 10:01:00] Existing two\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(refine, "_HISTORY_FILE", history_file)
+        monkeypatch.setattr(requests, "post", MagicMock(return_value=_ok_response("- Brand new")))
+
+        refine._extract_and_update_history("New text.", "test-key")
+
+        content = history_file.read_text(encoding="utf-8")
+        assert "Existing one" in content
+        assert "Existing two" in content
+        assert "Brand new" in content
+
+    def test_history_rotation_drops_oldest_entries(self, monkeypatch, tmp_path):
+        """When over capacity, keep the most recent bullets (tail-rotation)."""
+        refine = self._load(monkeypatch)
+        history_file = tmp_path / "history.txt"
+        history_file.write_text(
+            "- [2026-03-01 10:00:00] Old A\n"
+            "- [2026-03-01 10:01:00] Old B\n"
+            "- [2026-03-01 10:02:00] Old C\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(refine, "_HISTORY_FILE", history_file)
+        monkeypatch.setattr(refine, "_HISTORY_MAX_BULLETS", 3)
+        monkeypatch.setattr(
+            requests,
+            "post",
+            MagicMock(return_value=_ok_response("- [2026-03-01 10:02:00] Old C\n- New D\n- New E")),
+        )
+
+        refine._extract_and_update_history("Text.", "test-key")
+
+        lines = [line.strip() for line in history_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+        assert len(lines) == 3
+        assert any("Old C" in line for line in lines)
+        assert any("New D" in line for line in lines)
+        assert any("New E" in line for line in lines)
+        assert not any("Old A" in line for line in lines)
+        assert not any("Old B" in line for line in lines)
+
     def test_refine_does_not_trigger_extraction(self, monkeypatch, tmp_path):
         """refine() is pure: it never calls history extraction (clipboard not delayed)."""
         monkeypatch.setenv("ENABLE_HISTORY", "true")

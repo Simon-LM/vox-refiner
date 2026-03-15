@@ -13,6 +13,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [1.9.3] — 2026-03-15
+
+### Fixed
+
+- History updates no longer wipe existing entries when the model returns only
+  newly extracted bullets; existing bullets are preserved automatically.
+- History rotation now drops the oldest bullets first by keeping the most
+  recent entries when the file exceeds the configured limit.
+
+### Changed
+
+- `HISTORY_MAX_BULLETS` default increased to `100`.
+- History extraction now sends only the most recent 80% of existing bullets to
+  the model, reserving 20% capacity for new entries on each update.
+
+---
+
 ## [1.9.2] — 2026-03-15
 
 ### Fixed
