@@ -410,10 +410,12 @@ class TestRefineUserMessageFormat:
 
 
 class TestCompareModels:
-    """REFINE_COMPARE_MODELS=true runs the fallback after the primary succeeds.
+    """REFINE_COMPARE_MODELS=true runs the fallback in parallel with the primary.
 
-    The primary result is returned unchanged; the fallback is only printed to
-    stderr for display purposes.
+    Primary and fallback are launched simultaneously; the primary result is
+    returned and copied to clipboard; the fallback result is only shown for
+    comparison.  Model-aware mocks are used so tests are deterministic regardless
+    of thread scheduling.
     """
 
     def _load(self, monkeypatch, retries: int = 0):
@@ -425,26 +427,42 @@ class TestCompareModels:
         import src.refine as refine
         return refine
 
+    def _model_mock(self, refine, responses: dict):
+        """Build a requests.post mock that dispatches by model name.
+
+        ``responses`` maps model name → callable or response object.
+        This makes multi-threaded compare tests deterministic.
+        """
+        def fake_post(url, **kwargs):  # noqa: ARG001
+            model = kwargs["json"]["model"]
+            val = responses.get(model, _ok_response("Default."))
+            # MagicMock objects are callable but must be returned as-is;
+            # plain functions are factory callables that raise or build a response.
+            if isinstance(val, MagicMock):
+                return val
+            return val()
+        return fake_post
+
     def test_compare_mode_calls_both_models(self, monkeypatch):
         """When primary succeeds and REFINE_COMPARE_MODELS=true, fallback also runs."""
         refine = self._load(monkeypatch)
-        mock_post = MagicMock(side_effect=[
-            _ok_response("Primary result."),
-            _ok_response("Fallback result."),
-        ])
-        monkeypatch.setattr(requests, "post", mock_post)
+        called = []
+        def fake_post(url, headers, json, timeout):
+            called.append(json["model"])
+            return _ok_response("Result.")
+        monkeypatch.setattr(requests, "post", fake_post)
         result = refine.refine("uh so this is a test")
-        assert result == "Primary result."
-        assert mock_post.call_count == 2
+        assert result == "Result."
+        assert len(called) == 2
 
     def test_compare_mode_returns_primary_not_fallback(self, monkeypatch):
         """The return value is always the primary result, not the fallback."""
         refine = self._load(monkeypatch)
-        mock_post = MagicMock(side_effect=[
-            _ok_response("Primary only."),
-            _ok_response("Fallback ignored."),
-        ])
-        monkeypatch.setattr(requests, "post", mock_post)
+        fake_post = self._model_mock(refine, {
+            refine._MODEL_SHORT:          _ok_response("Primary only."),
+            refine._MODEL_SHORT_FALLBACK: _ok_response("Fallback ignored."),
+        })
+        monkeypatch.setattr(requests, "post", fake_post)
         assert refine.refine("test input") == "Primary only."
 
     def test_compare_mode_off_by_default(self, monkeypatch):
@@ -463,24 +481,82 @@ class TestCompareModels:
     def test_compare_mode_fallback_failure_does_not_affect_result(self, monkeypatch):
         """If fallback compare fails, the primary result is still returned cleanly."""
         refine = self._load(monkeypatch)
-        mock_post = MagicMock(side_effect=[
-            _ok_response("Primary result."),
-            requests.Timeout("compare timed out"),
-        ])
-        monkeypatch.setattr(requests, "post", mock_post)
+
+        def _raise_timeout():
+            raise requests.Timeout("compare timed out")
+
+        fake_post = self._model_mock(refine, {
+            refine._MODEL_SHORT:          _ok_response("Primary result."),
+            refine._MODEL_SHORT_FALLBACK: _raise_timeout,
+        })
+        monkeypatch.setattr(requests, "post", fake_post)
         result = refine.refine("test input")
         assert result == "Primary result."
 
-    def test_compare_mode_skipped_when_primary_fails(self, monkeypatch):
-        """If primary fails and fallback takes over, compare mode does not run again."""
+    def test_compare_primary_fails_fallback_used_as_actual(self, monkeypatch):
+        """When primary fails, fallback takes over as actual result; compare result discarded."""
+        # With parallel compare, the compare thread (fallback) starts before primary.
+        # When primary fails, the actual fallback also runs.  Both use the same model
+        # and get the same mock response.  The returned value is the actual fallback result.
         refine = self._load(monkeypatch)
-        mock_post = MagicMock(side_effect=[
-            _error_response(429),
-            _ok_response("Fallback took over."),
-        ])
-        monkeypatch.setattr(requests, "post", mock_post)
+        fake_post = self._model_mock(refine, {
+            refine._MODEL_SHORT:          _error_response(429),
+            refine._MODEL_SHORT_FALLBACK: _ok_response("Fallback result."),
+        })
+        monkeypatch.setattr(requests, "post", fake_post)
         result = refine.refine("test input")
-        # Only 2 calls: primary (failed) + fallback (succeeded as replacement).
-        # No 3rd call for compare because primary did not succeed.
-        assert result == "Fallback took over."
-        assert mock_post.call_count == 2
+        assert result == "Fallback result."
+
+
+class TestOutputProfile:
+    """OUTPUT_PROFILE injects a FORMAT block into medium/long tier system prompts."""
+
+    def _load(self, monkeypatch, profile: str = "plain"):
+        monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+        monkeypatch.setenv("REFINE_REQUEST_RETRIES", "0")
+        monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")
+        monkeypatch.setenv("OUTPUT_PROFILE", profile)
+        if "src.refine" in sys.modules:
+            del sys.modules["src.refine"]
+        import src.refine as refine
+        return refine
+
+    def _capture_system_prompt(self, monkeypatch, refine, text: str) -> str:
+        captured = {}
+
+        def fake_post(url, **kwargs):  # noqa: ARG001
+            captured["system"] = kwargs["json"]["messages"][0]["content"]
+            return _ok_response("ok")
+
+        monkeypatch.setattr(requests, "post", fake_post)
+        refine.refine(text)
+        return captured["system"]
+
+    def test_structured_profile_injects_format_block_for_medium(self, monkeypatch):
+        refine = self._load(monkeypatch, "structured")
+        system = self._capture_system_prompt(monkeypatch, refine, " ".join(["word"] * 100))
+        assert "FORMAT:" in system
+        assert "bullet" in system.lower()
+
+    def test_prose_profile_injects_format_block_for_long(self, monkeypatch):
+        refine = self._load(monkeypatch, "prose")
+        system = self._capture_system_prompt(monkeypatch, refine, " ".join(["word"] * 300))
+        assert "FORMAT:" in system
+        assert "paragraph" in system.lower()
+
+    def test_plain_profile_no_format_block_for_medium(self, monkeypatch):
+        refine = self._load(monkeypatch, "plain")
+        system = self._capture_system_prompt(monkeypatch, refine, " ".join(["word"] * 100))
+        assert "FORMAT:" not in system
+
+    def test_format_block_not_applied_to_short_tier(self, monkeypatch):
+        """Even with a non-plain profile, short texts never receive FORMAT."""
+        refine = self._load(monkeypatch, "structured")
+        system = self._capture_system_prompt(monkeypatch, refine, "hello world")
+        assert "FORMAT:" not in system
+
+    def test_unknown_profile_defaults_to_plain(self, monkeypatch):
+        """An unrecognised profile value falls back to no formatting."""
+        refine = self._load(monkeypatch, "nonexistent_profile")
+        system = self._capture_system_prompt(monkeypatch, refine, " ".join(["word"] * 100))
+        assert "FORMAT:" not in system

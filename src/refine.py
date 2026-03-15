@@ -20,9 +20,10 @@ import os
 import sys
 import time
 import math
+import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from dotenv import load_dotenv
@@ -55,6 +56,31 @@ _HISTORY_TIMEOUT_MULTIPLIER = float(os.environ.get("HISTORY_TIMEOUT_MULTIPLIER",
 # returned and copied to clipboard — this option only adds a display.
 _COMPARE_MODELS = os.environ.get("REFINE_COMPARE_MODELS", "false").lower() in ("true", "1", "yes")
 
+# Output formatting profile — only applied to MEDIUM and LONG tiers.
+# plain      : no structural formatting (default, preserves current behaviour)
+# prose      : clean paragraphs, no lists — best for general use and screen readers
+# structured : paragraphs + bullet points for key ideas — suited for developers
+# technical  : Markdown (headers, paragraphs, bullets) — for technical notes / AI chat
+_OUTPUT_PROFILE = os.environ.get("OUTPUT_PROFILE", "plain").lower()
+
+_FORMAT_INSTRUCTIONS: Dict[str, str] = {
+    "plain": "",
+    "prose": (
+        "FORMAT: Organize your output in well-separated paragraphs. "
+        "Do not use bullet points, numbered lists, or headers. "
+        "Suitable for general use and screen readers.\n\n"
+    ),
+    "structured": (
+        "FORMAT: Organize your output in clear paragraphs. "
+        "Use bullet points (- ) for key ideas, distinct actions, or enumerable items. "
+        "Keep bullets concise.\n\n"
+    ),
+    "technical": (
+        "FORMAT: Use Markdown: ## headers for major sections, paragraphs for explanations, "
+        "and - bullet points for lists, steps, or key items.\n\n"
+    ),
+}
+
 # Speed factors relative to a baseline standard model.
 # Reasoning models (magistral-*) generate a chain-of-thought before answering,
 # making them significantly slower than standard models for identical word counts.
@@ -79,6 +105,7 @@ _SECURITY_BLOCK = (
 )
 
 _PROMPT_FOOTER = (
+    "{format_block}"
     "CRITICAL: Never translate. Detect the language of the transcription and reply in that exact same language.\n"
     "\n"
     "<context>\n"
@@ -452,13 +479,37 @@ def refine(raw_text: str) -> str:
     context = _load_context()
     history = _load_history()
     history_section = _HISTORY_SECTION.format(history=history) if history else ""
-    system_prompt = prompt_template.format(context=context, history_section=history_section)
+    format_block = _FORMAT_INSTRUCTIONS.get(_OUTPUT_PROFILE, "") if tier != "short" else ""
+    system_prompt = prompt_template.format(context=context, history_section=history_section, format_block=format_block)
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"<transcription>\n{raw_text}\n</transcription>"},
     ]
 
     base_timeout, retry_delay = _refine_timing(word_count)
+
+    # ── Parallel compare: launch fallback thread immediately so primary and
+    # fallback run concurrently.  The compare result is collected after the
+    # primary loop and written to VOXTRAL_COMPARE_FILE only if primary succeeded.
+    _compare_thread: Optional[threading.Thread] = None
+    _compare_result: List[Optional[str]] = [None]
+    _compare_exc: List[Optional[BaseException]] = [None]
+
+    if _COMPARE_MODELS:
+        timeout_fb = _effective_timeout(base_timeout, fallback)
+        print(f"🔀 Comparing fallback ({fallback}, timeout {timeout_fb}s)...", file=sys.stderr)
+
+        def _run_compare() -> None:
+            try:
+                _compare_result[0] = _call_model(
+                    fallback, messages, api_key, timeout=timeout_fb, retry_delay=retry_delay
+                )
+            except Exception as exc:  # noqa: BLE001
+                _compare_exc[0] = exc
+
+        _compare_thread = threading.Thread(target=_run_compare, daemon=False)
+        _compare_thread.start()
+
     result = raw_text
     succeeded = False
     succeeded_model = None
@@ -489,21 +540,20 @@ def refine(raw_text: str) -> str:
     if not succeeded:
         print("⚠️  All models unavailable — returning raw transcription.", file=sys.stderr)
 
-    # Compare mode: run the fallback independently and print its output to stderr.
-    # The primary result is returned unchanged — clipboard behaviour is unaffected.
-    if _COMPARE_MODELS and succeeded_model == primary:
-        try:
-            timeout_fb = _effective_timeout(base_timeout, fallback)
-            print(f"🔀 Comparing fallback ({fallback}, timeout {timeout_fb}s)...", file=sys.stderr)
-            compare_result = _call_model(fallback, messages, api_key, timeout=timeout_fb, retry_delay=retry_delay)
-            compare_file = os.environ.get("VOXTRAL_COMPARE_FILE")
-            if compare_file:
-                Path(compare_file).write_text(compare_result, encoding="utf-8")
-            else:
-                sep = "─" * 68
-                print(f"{sep}\n{compare_result}\n{sep}", file=sys.stderr)
-        except Exception as exc:  # noqa: BLE001
-            print(f"⚠️  Fallback compare failed: {exc}", file=sys.stderr)
+    # Collect compare result — join thread (it may still be running) then write output.
+    # Compare display is skipped when primary failed (succeeded_model != primary).
+    if _compare_thread is not None:
+        _compare_thread.join()
+        if succeeded_model == primary:
+            if _compare_result[0] is not None:
+                compare_file = os.environ.get("VOXTRAL_COMPARE_FILE")
+                if compare_file:
+                    Path(compare_file).write_text(_compare_result[0], encoding="utf-8")
+                else:
+                    sep = "─" * 68
+                    print(f"{sep}\n{_compare_result[0]}\n{sep}", file=sys.stderr)
+            elif _compare_exc[0] is not None:
+                print(f"⚠️  Fallback compare failed: {_compare_exc[0]}", file=sys.stderr)
 
     # Write model names so the shell can label the [2]/[3] display blocks.
     models_file = os.environ.get("VOXTRAL_MODELS_FILE")

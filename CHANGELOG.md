@@ -13,6 +13,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.1.0] — 2026-03-15
+
+### Added
+
+- **Parallel compare mode**: primary and fallback models now run simultaneously
+  when `REFINE_COMPARE_MODELS=true`. Total wall-clock time is `max(primary, fallback)`
+  instead of `primary + fallback`. Compare result is displayed only if primary
+  succeeded; if primary fails the compare thread result is discarded.
+- **Output formatting profiles** (`OUTPUT_PROFILE` env var): four named profiles
+  inject a `FORMAT:` instruction into the system prompt for MEDIUM and LONG tiers.
+  Short texts are always plain regardless of the setting.
+  - `plain` (default) — no change, current behaviour preserved
+  - `prose` — clean paragraphs, no lists; best for general use and screen readers
+  - `structured` — paragraphs + bullet points for key ideas; best for developers
+  - `technical` — Markdown (headers, paragraphs, bullets); best for docs / AI chat
+- `OUTPUT_PROFILE` documented in `.env.example` with descriptions of each profile.
+
+### Changed
+
+- `_PROMPT_FOOTER` now includes a `{format_block}` placeholder rendered at
+  runtime from `_FORMAT_INSTRUCTIONS[OUTPUT_PROFILE]`; all three prompt
+  templates are updated accordingly.
+
+---
+
 ## [2.0.0] — 2026-03-15
 
 ### Fixed
