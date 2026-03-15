@@ -33,7 +33,7 @@ One API key. No complex UI. Just speak → paste.
 2. Recording starts immediately
 3. You speak
 4. You stop the recording (**Ctrl+C**)
-5. The recording is captured to a temporary WAV, sanity-checked, then processed locally (tempo adjustment × 1.5 by default, configurable via `AUDIO_TEMPO`, silence removal, MP3 conversion)
+5. The recording is captured to a temporary WAV, sanity-checked, then processed locally (silence removal, tempo adjustment, MP3 conversion). The speed multiplier is `×1.25` by default in `.env` (safer for fast speakers), `×1.5` if `AUDIO_TEMPO` is unset — see `.env.example` for guidance.
 6. **Step 1 — Transcription:** the audio is sent to **Mistral Voxtral** for speech-to-text
 7. **Step 2 — Refinement _(optional, on by default)_:** the raw transcription is passed to a **Mistral chat model** which:
    - removes hesitations, filler words and repetitions
@@ -52,16 +52,36 @@ One API key. No complex UI. Just speak → paste.
 
 The refinement step automatically selects the right model based on the length of the transcription:
 
-| Transcription length | Primary model           | Fallback                  |
-| -------------------- | ----------------------- | ------------------------- |
-| < 80 words           | `mistral-small-latest`  | `devstral-small-latest`   |
-| 80 – 240 words       | `mistral-medium-latest` | `magistral-small-latest`  |
-| > 240 words          | `mistral-medium-latest` | `magistral-medium-latest` |
+| Transcription length | Primary model              | Fallback                   |
+| -------------------- | -------------------------- | -------------------------- |
+| < 80 words           | `devstral-small-latest`    | `mistral-small-latest`     |
+| 80 – 240 words       | `magistral-small-latest`   | `mistral-medium-latest`    |
+| > 240 words          | `magistral-medium-latest`  | `mistral-medium-latest`    |
+
+Magistral models (reasoning) are used as primary because they follow instructions more
+faithfully — they won't add content, answer questions or deviate from the transcription.
+Mistral models serve as fast emergency fallbacks.
 
 If a model is unavailable (rate limit, timeout), the next one is tried automatically.
 If all models fail, the raw Voxtral transcription is returned — the tool never crashes.
 
-The threshold and models are fully configurable via `.env`.
+Thresholds and models are fully configurable via `.env`.
+
+---
+
+## Output formatting profiles
+
+For medium and long transcriptions (≥ 80 words), VoxRefiner can structure the output.
+Set `OUTPUT_PROFILE` in your `.env`:
+
+| Profile       | Format                              | Best for                                  |
+| ------------- | ----------------------------------- | ----------------------------------------- |
+| `plain`       | Flowing text (default)              | Quick messages, form fields               |
+| `prose`       | Clean paragraphs, no lists          | General use, accessibility, screen readers|
+| `structured`  | Paragraphs + bullet points          | Developers, meeting notes, chatbot input  |
+| `technical`   | Markdown (## headers + bullets)     | Documentation, AI chat prompts            |
+
+Short transcriptions (< 80 words) are always `plain`, regardless of this setting.
 
 ---
 
@@ -96,23 +116,6 @@ parameters (`HISTORY_MAX_BULLETS`, `HISTORY_EXTRACTION_MODEL`, `HISTORY_TIMEOUT_
 
 ## Advanced options
 
-### Recording safeguards
-
-To reduce failures caused by interrupted sessions or corrupted audio artifacts,
-the recorder now applies defensive checks before transcription:
-
-- Existing `local_audio.wav` / `local_audio.mp3` files are removed before a new recording.
-- Capture is written to a temporary file in `/tmp` and promoted to `local_audio.wav` only after validation.
-- A maximum WAV size guard rejects abnormally large/corrupted files before `ffmpeg`.
-
-You can override the WAV size limit with:
-
-```dotenv
-MAX_WAV_BYTES=100000000
-```
-
-Default is `100000000` bytes (100 MB).
-
 ### Voxtral-only mode (no AI refinement)
 
 Set `ENABLE_REFINE=false` in `.env` to skip the refinement step entirely.
@@ -121,14 +124,15 @@ Useful if you want maximum speed or are testing Voxtral output in isolation.
 
 ### Side-by-side comparison
 
-Set `REFINE_COMPARE_MODELS=true` in `.env` to run both the primary and fallback model on every
-transcription and display their outputs in the terminal.
+Set `REFINE_COMPARE_MODELS=true` in `.env` to run the primary and fallback model
+**in parallel** on every transcription and display their outputs in the terminal.
 
 - The **primary result is copied to clipboard immediately** — behaviour is unchanged.
+- Both models run simultaneously: total time is `max(primary, fallback)` instead of `primary + fallback`.
 - The terminal shows a **3-way view** in order:
   1. `[1] Raw Voxtral` — unmodified speech-to-text output
-  2. `[2] Primary (model-name) — copied to clipboard` — exact model name shown
-  3. `[3] Fallback (model-name)` — exact model name shown
+  2. `[2] Primary (model-name) — copied to clipboard`
+  3. `[3] Fallback (model-name)`
 
 This mode is useful for evaluating model quality and tuning your routing configuration.
 

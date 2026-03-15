@@ -40,9 +40,9 @@ fi
 # Lower values reduce transcription errors (1.0 = no change, 1.5 = default).
 AUDIO_TEMPO="${AUDIO_TEMPO:-1.5}"
 
-# Validate AUDIO_TEMPO is a number in [0.5, 2.0]
-if ! awk -v v="$AUDIO_TEMPO" 'BEGIN{exit !(v+0 >= 0.5 && v+0 <= 2.0)}'; then
-    echo "❌ AUDIO_TEMPO must be between 0.5 and 2.0 (got: $AUDIO_TEMPO). Check your .env."
+# Validate AUDIO_TEMPO is a number in [1.0, 2.0]
+if ! awk -v v="$AUDIO_TEMPO" 'BEGIN{exit !(v+0 >= 1.0 && v+0 <= 2.0)}'; then
+    echo "❌ AUDIO_TEMPO must be between 1.0 and 2.0 (got: $AUDIO_TEMPO). Check your .env."
     exit 1
 fi
 

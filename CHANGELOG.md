@@ -13,6 +13,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.1.1] — 2026-03-16
+
+### Fixed
+
+- `.env.example`: model routing was inverted for all three tiers — primary and
+  fallback were swapped. Corrected to match the code defaults and the decisions
+  documented in `[1.4.0]` (magistral/devstral as primary, mistral as fallback).
+
+### Changed
+
+- `AUDIO_TEMPO` accepted range narrowed from `[0.5, 2.0]` to `[1.0, 2.0]` in
+  `record_and_transcribe_local.sh` — values below 1.0 slow down transcription
+  without meaningful quality gain.
+- `.env.example` `AUDIO_TEMPO` default set to `1.25` (conservative starting point
+  for fast speakers or strong accents); the code default remains `1.5` when
+  `AUDIO_TEMPO` is not defined in `.env`.
+- `.env.example` reorganised into three tiers: **Required** / **Features**
+  (`OUTPUT_PROFILE`, `ENABLE_HISTORY`, `AUDIO_TEMPO`) / **Advanced** (model
+  routing, history models, modes, resilience) — with clearer comments throughout.
+- `Readme.md` routing table corrected to show the actual default models.
+- `Readme.md` audio tempo description updated to reflect the `1.25` / `1.5`
+  distinction and added guidance for fast speakers.
+- `Readme.md` new **Output formatting profiles** section documents all four
+  `OUTPUT_PROFILE` values with their use cases.
+- `Readme.md` compare mode description updated to mention parallel execution.
+- `Readme.md` recording safeguards removed from Advanced options (implementation
+  detail not relevant to end-user configuration).
+
+---
+
 ## [2.1.0] — 2026-03-15
 
 ### Added
