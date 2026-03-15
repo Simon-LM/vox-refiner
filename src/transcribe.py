@@ -67,7 +67,13 @@ def _transcribe_single(audio_path: str, api_key: str) -> str:
                 timeout=timeout,
             )
             response.raise_for_status()
-            return response.json()["text"]
+            body = response.json()
+            text = body.get("text")
+            if not isinstance(text, str):
+                raise RuntimeError(
+                    f"Unexpected Voxtral response (missing 'text'): {body}"
+                )
+            return text
         except requests.HTTPError as exc:
             code = exc.response.status_code if exc.response is not None else None
             if code in _TRANSIENT_HTTP_CODES:
@@ -97,7 +103,16 @@ def _get_audio_duration(audio_path: str) -> float:
         capture_output=True,
         text=True,
     )
-    return float(result.stdout.strip())
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(
+            f"ffprobe failed on {audio_path!r}: {result.stderr.strip()}"
+        )
+    try:
+        return float(result.stdout.strip())
+    except ValueError as exc:
+        raise RuntimeError(
+            f"ffprobe returned invalid duration: {result.stdout.strip()!r}"
+        ) from exc
 
 
 def _detect_silences(audio_path: str) -> List[float]:
@@ -109,6 +124,13 @@ def _detect_silences(audio_path: str) -> List[float]:
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0:
+        print(
+            f"⚠️  ffmpeg silencedetect failed — will use hard cuts: "
+            f"{result.stderr.strip()[-200:]}",
+            file=sys.stderr,
+        )
+        return []
     silences = []
     for line in result.stderr.splitlines():
         if "silence_start:" in line:
@@ -146,12 +168,18 @@ def _split_audio(audio_path: str) -> List[str]:
         start = split_points[i]
         end = split_points[i + 1]
         chunk_path = str(tmp_dir / f"{base}_chunk_{i:03d}.mp3")
-        subprocess.run(
+        proc = subprocess.run(
             ["ffmpeg", "-y", "-i", audio_path,
              "-ss", str(start), "-to", str(end),
              "-c", "copy", chunk_path],
             capture_output=True,
         )
+        if proc.returncode != 0:
+            print(
+                f"⚠️  ffmpeg failed creating chunk {i + 1}: "
+                f"{proc.stderr.decode(errors='replace').strip()[-200:]}",
+                file=sys.stderr,
+            )
         chunks.append(chunk_path)
         print(f"✂️  Chunk {i + 1}/{len(split_points) - 1}: {start:.0f}s–{end:.0f}s", file=sys.stderr)
 

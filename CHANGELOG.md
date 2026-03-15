@@ -13,6 +13,50 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.0.0] — 2026-03-15
+
+### Fixed
+
+- `_get_audio_duration()` now raises `RuntimeError` instead of crashing with
+  `ValueError` when ffprobe returns an empty or invalid result.
+- `_detect_silences()` now logs a warning and returns an empty list (hard cuts)
+  when ffmpeg exits with a non-zero code, instead of silently proceeding.
+- ffmpeg chunk-creation in `_split_audio()` now logs a warning when a chunk
+  fails to encode.
+- `_transcribe_single()` now validates the Voxtral JSON response structure and
+  raises `RuntimeError` on a missing or non-string `"text"` field.
+- `_call_model()` now wraps nested JSON response access in a try/except and
+  raises `RuntimeError` on unexpected API response structure.
+- `history.txt` write is now atomic: written to `.tmp` then renamed via
+  `Path.replace()`, preventing corruption on interrupted writes.
+- `2>/dev/tty` replaced by `2>&3` (saved stderr FD) in all Python subprocess
+  calls in the shell script — avoids failure when no controlling terminal is
+  available (e.g. test sandboxes, systemd units).
+- Two integration tests (`test_recording_mode_cleans_and_rebuilds_audio_artifacts`,
+  `test_retry_mode_skips_recording_and_processing`) that were failing due to the
+  `/dev/tty` issue are now passing.
+
+### Added
+
+- `CLAUDE.md`: AI collaboration guide covering architecture, technical decisions,
+  commit rules, and deployment instructions.
+- `record_and_transcribe_local.sh`: cleanup trap (`trap _cleanup EXIT`) removes
+  temp files on any exit, preventing orphaned files in `/tmp`.
+- `record_and_transcribe_local.sh`: `AUDIO_TEMPO` is now validated at startup
+  (must be in `[0.5, 2.0]`); an informative error is shown if out of range.
+- `record_and_transcribe_local.sh`: xclip result is now checked; a warning is
+  shown if clipboard copy fails instead of silently reporting success.
+
+### Changed
+
+- `_SECURITY_BLOCK` and `_PROMPT_FOOTER` extracted as shared constants in
+  `refine.py`; the 3 system prompt templates are now built by concatenation,
+  eliminating duplicated security and footer blocks.
+- `requirements.txt`: dependencies pinned to exact versions for reproducibility
+  (`requests==2.32.5`, `python-dotenv==1.2.2`).
+
+---
+
 ## [1.9.3] — 2026-03-15
 
 ### Fixed

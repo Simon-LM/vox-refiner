@@ -10,6 +10,19 @@ if [ ! -x "$VENV_PYTHON" ]; then
     exit 1
 fi
 
+# ─── Cleanup trap — remove temp files on exit (normal or error) ───────────────
+_TMPFILES=()
+_cleanup() {
+    for f in "${_TMPFILES[@]:-}"; do
+        rm -f "$f"
+    done
+}
+trap _cleanup EXIT
+
+# Save stderr so Python progress messages reach the terminal even when stdout
+# is captured by $() substitution. Falls back gracefully in non-TTY contexts.
+exec 3>&2
+
 # ─── Mode ────────────────────────────────────────────────────────────────────────────────
 RETRY_MODE=false
 if [[ "${1:-}" == "--retry" || "${1:-}" == "-r" ]]; then
@@ -27,6 +40,12 @@ fi
 # Lower values reduce transcription errors (1.0 = no change, 1.5 = default).
 AUDIO_TEMPO="${AUDIO_TEMPO:-1.5}"
 
+# Validate AUDIO_TEMPO is a number in [0.5, 2.0]
+if ! awk -v v="$AUDIO_TEMPO" 'BEGIN{exit !(v+0 >= 0.5 && v+0 <= 2.0)}'; then
+    echo "❌ AUDIO_TEMPO must be between 0.5 and 2.0 (got: $AUDIO_TEMPO). Check your .env."
+    exit 1
+fi
+
 # ─── Recording / Audio processing ───────────────────────────────────────────
 
 if [ "$RETRY_MODE" = "false" ]; then
@@ -36,6 +55,7 @@ if [ "$RETRY_MODE" = "false" ]; then
 
     # Record into a temporary WAV and only promote it when sane.
     TMP_WAV=$(mktemp /tmp/local_audio_XXXXXX.wav)
+    _TMPFILES+=("$TMP_WAV")
 
     echo "=== Audio recording ==="
     echo "Press Ctrl+C to stop..."
@@ -90,7 +110,7 @@ fi
 
 # ─── Step 1: Speech-to-text (Voxtral) ───────────────────────────────────────
 
-raw_transcription=$("$VENV_PYTHON" src/transcribe.py local_audio.mp3 2>/dev/tty)
+raw_transcription=$("$VENV_PYTHON" src/transcribe.py local_audio.mp3 2>&3)
 
 if [ -z "$raw_transcription" ]; then
     echo "❌ Empty transcription."
@@ -104,11 +124,13 @@ if [ "${ENABLE_REFINE:-true}" = "true" ]; then
     # the primary, not during Python execution.
     if [ "${REFINE_COMPARE_MODELS:-false}" = "true" ]; then
         VOXTRAL_COMPARE_FILE=$(mktemp)
+        _TMPFILES+=("$VOXTRAL_COMPARE_FILE")
         export VOXTRAL_COMPARE_FILE
         VOXTRAL_MODELS_FILE=$(mktemp)
+        _TMPFILES+=("$VOXTRAL_MODELS_FILE")
         export VOXTRAL_MODELS_FILE
     fi
-    refined_text=$(printf '%s' "$raw_transcription" | "$VENV_PYTHON" src/refine.py 2>/dev/tty)
+    refined_text=$(printf '%s' "$raw_transcription" | "$VENV_PYTHON" src/refine.py 2>&3)
     # Graceful degradation: if refinement fails, fall back to raw transcription
     final_text="${refined_text:-$raw_transcription}"
 else
@@ -118,13 +140,18 @@ fi
 # ─── Clipboard copy ──────────────────────────────────────────────────────────
 
 if [ -n "$final_text" ]; then
-    printf '%s' "$final_text" | xclip -selection clipboard
-    printf '%s' "$final_text" | xclip -selection primary
-    echo ""
-    echo "✅ Text copied to BOTH clipboards!"
-    echo "   - Ctrl+V        → standard clipboard"
-    echo "   - Middle-click  → primary selection"
-    echo ""
+    if printf '%s' "$final_text" | xclip -selection clipboard && \
+       printf '%s' "$final_text" | xclip -selection primary; then
+        echo ""
+        echo "✅ Text copied to BOTH clipboards!"
+        echo "   - Ctrl+V        → standard clipboard"
+        echo "   - Middle-click  → primary selection"
+        echo ""
+    else
+        echo ""
+        echo "⚠️  Clipboard copy failed (is xclip installed and running under X11?)."
+        echo ""
+    fi
     if [ "${REFINE_COMPARE_MODELS:-false}" = "true" ] && [ "${ENABLE_REFINE:-true}" = "true" ]; then
         _primary_label="Primary"
         _fallback_label="Fallback"
@@ -164,7 +191,7 @@ if [ "${ENABLE_HISTORY:-false}" = "true" ] && [ -n "$final_text" ]; then
     word_count=$(printf '%s' "$raw_transcription" | wc -w)
     threshold="${REFINE_MODEL_THRESHOLD_SHORT:-90}"
     if [ "$word_count" -ge "$threshold" ]; then
-        printf '%s' "$final_text" | "$VENV_PYTHON" src/refine.py --update-history 2>/dev/tty &
+        printf '%s' "$final_text" | "$VENV_PYTHON" src/refine.py --update-history 2>&3 &
         echo "🔄 History context update running in background..."
     fi
 fi
