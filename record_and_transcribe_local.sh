@@ -153,6 +153,7 @@ if [ -n "$final_text" ]; then
         echo ""
     fi
     if [ "${REFINE_COMPARE_MODELS:-false}" = "true" ] && [ "${ENABLE_REFINE:-true}" = "true" ]; then
+        # Full 3-way view: Raw Voxtral + Primary + Fallback
         _primary_label="Primary"
         _fallback_label="Fallback"
         if [ -n "${VOXTRAL_MODELS_FILE:-}" ] && [ -s "$VOXTRAL_MODELS_FILE" ]; then
@@ -166,6 +167,14 @@ if [ -n "$final_text" ]; then
         echo "────────────────────────────────────────────────────────────────────"
         echo ""
         echo "📝 [2] ${_primary_label} — copied to clipboard:"
+    elif [ "${SHOW_RAW_VOXTRAL:-false}" = "true" ] && [ "${ENABLE_REFINE:-true}" = "true" ]; then
+        # 2-way view: Raw Voxtral + Primary (no fallback model call)
+        echo "📝 [1] Raw Voxtral:"
+        echo "────────────────────────────────────────────────────────────────────"
+        echo "$raw_transcription"
+        echo "────────────────────────────────────────────────────────────────────"
+        echo ""
+        echo "📝 [2] Result — copied to clipboard:"
     else
         echo "📝 Result:"
     fi

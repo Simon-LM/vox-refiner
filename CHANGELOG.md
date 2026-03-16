@@ -13,6 +13,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.1.2] — 2026-03-16
+
+### Added
+
+- `SHOW_RAW_VOXTRAL` env var: shows the raw Voxtral transcription alongside
+  the refined result without running a second model. Produces a 2-way view
+  (`[1] Raw Voxtral` / `[2] Result`) at no extra API cost or delay.
+  `REFINE_COMPARE_MODELS=true` continues to imply a 3-way view and supersedes
+  this option.
+
+---
+
 ## [2.1.1] — 2026-03-16
 
 ### Fixed
