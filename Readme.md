@@ -122,6 +122,19 @@ Set `ENABLE_REFINE=false` in `.env` to skip the refinement step entirely.
 The raw Voxtral transcription is copied to clipboard as-is — no Mistral chat call is made.
 Useful if you want maximum speed or are testing Voxtral output in isolation.
 
+### Show raw Voxtral output
+
+Set `SHOW_RAW_VOXTRAL=true` in `.env` to display the raw Voxtral transcription alongside
+the refined result — without running a second model.
+
+- **No extra API call**, no added cost or delay.
+- The terminal shows a **2-way view**:
+  1. `[1] Raw Voxtral` — unmodified speech-to-text output
+  2. `[2] Result — copied to clipboard`
+
+Useful to compare what Voxtral heard versus what the AI produced, or to quickly spot
+transcription errors in your audio setup.
+
 ### Side-by-side comparison
 
 Set `REFINE_COMPARE_MODELS=true` in `.env` to run the primary and fallback model

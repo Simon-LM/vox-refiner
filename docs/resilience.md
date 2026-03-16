@@ -65,8 +65,9 @@ Set to `0` to disable retries entirely.
 
 ## Voxtral — adaptive timeout by file size
 
-The audio file sent to Voxtral is MP3 @64 kbps, with speech accelerated ×1.5
-and long silences removed. File size is therefore a reliable proxy for audio duration.
+The audio file sent to Voxtral is MP3 @64 kbps, with speech accelerated (×1.25 by
+default in `.env.example`, ×1.5 if `AUDIO_TEMPO` is unset) and long silences removed.
+File size is therefore a reliable proxy for audio duration.
 
 The timeout is computed in `_get_timeout(file_size)`:
 
@@ -137,7 +138,7 @@ speed factor (see below).
 ## Per-model speed factors
 
 Magistral models produce chain-of-thought reasoning before their final answer,
-making them intrinsically 2.5–3× slower than plain completion models.
+making them intrinsically 3–4.5× slower than plain completion models.
 A per-model factor is applied to prevent premature timeouts:
 
 | Model                     | Factor | Notes                       |
@@ -145,14 +146,14 @@ A per-model factor is applied to prevent premature timeouts:
 | `devstral-small-latest`   | × 1.0  |                             |
 | `mistral-small-latest`    | × 1.0  |                             |
 | `mistral-medium-latest`   | × 1.2  | Slightly heavier than small |
-| `magistral-small-latest`  | × 2.5  | Chain-of-thought reasoning  |
-| `magistral-medium-latest` | × 3.0  | Chain-of-thought reasoning  |
+| `magistral-small-latest`  | × 3.0  | Chain-of-thought reasoning  |
+| `magistral-medium-latest` | × 4.5  | Chain-of-thought reasoning  |
 | `mistral-large-latest`    | × 1.5  |                             |
 
 Unknown models default to × 1.0.
 
-**Example:** 202 words → base = 8 s. With `magistral-medium-latest` (× 3.0)
-the effective timeout is **24 s**.
+**Example:** 202 words → base = 8 s. With `magistral-medium-latest` (× 4.5)
+the effective timeout is **36 s**.
 
 ---
 

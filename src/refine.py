@@ -6,7 +6,7 @@ Model routing (3 tiers):
   - Medium (≥ REFINE_MODEL_THRESHOLD_SHORT words) → magistral-small-latest
   - Long   (≥ REFINE_MODEL_THRESHOLD_LONG  words) → magistral-medium-latest
 
-Default thresholds: SHORT = 90, LONG = 240.
+Default thresholds: SHORT = 80, LONG = 240.
 
 Each tier has a fallback model. If all models are exhausted, the raw
 transcription is returned unchanged (graceful degradation).
@@ -34,7 +34,7 @@ _API_URL = "https://api.mistral.ai/v1/chat/completions"
 _CONTEXT_FILE = Path(__file__).resolve().parent.parent / "context.txt"
 _HISTORY_FILE = Path(__file__).resolve().parent.parent / "history.txt"
 
-_THRESHOLD_SHORT = int(os.environ.get("REFINE_MODEL_THRESHOLD_SHORT", "90"))
+_THRESHOLD_SHORT = int(os.environ.get("REFINE_MODEL_THRESHOLD_SHORT", "80"))
 _THRESHOLD_LONG = int(os.environ.get("REFINE_MODEL_THRESHOLD_LONG", "240"))
 _MODEL_SHORT = os.environ.get("REFINE_MODEL_SHORT", "devstral-small-latest")
 _MODEL_SHORT_FALLBACK = os.environ.get("REFINE_MODEL_SHORT_FALLBACK", "mistral-small-latest")
@@ -47,8 +47,8 @@ _REQUEST_RETRIES = int(os.environ.get("REFINE_REQUEST_RETRIES", "2"))
 
 _ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "false").lower() in ("true", "1", "yes")
 _HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "100"))
-_HISTORY_EXTRACTION_MODEL = os.environ.get("HISTORY_EXTRACTION_MODEL", "mistral-small-latest")
-_HISTORY_EXTRACTION_FALLBACK_MODEL = os.environ.get("HISTORY_EXTRACTION_FALLBACK_MODEL", "devstral-small-latest")
+_HISTORY_EXTRACTION_MODEL = os.environ.get("HISTORY_EXTRACTION_MODEL", "devstral-small-latest")
+_HISTORY_EXTRACTION_FALLBACK_MODEL = os.environ.get("HISTORY_EXTRACTION_FALLBACK_MODEL", "mistral-small-latest")
 _HISTORY_TIMEOUT_MULTIPLIER = float(os.environ.get("HISTORY_TIMEOUT_MULTIPLIER", "1.5"))
 
 # When true, the fallback model also runs after the primary and its result is
@@ -242,10 +242,14 @@ The history captures facts about the user's work: ongoing projects, tools, decis
 IMPORTANT: entries are INDEPENDENT — the user may work on several unrelated projects in parallel.
 Do not assume facts from different entries are related to each other.
 
+A permanent user context is provided in <user_context> tags. Use it to understand the user's domain
+and vocabulary — it helps you identify which facts from the voice note are genuinely relevant
+and worth keeping in history. Do not extract facts already fully covered by <user_context>.
+
 Your task:
 1. Read the existing history in <history> tags (may be empty on first use).
    Existing bullets already carry a [YYYY-MM-DD HH:MM:SS] date and time prefix — preserve them exactly as-is.
-2. Extract contextual facts from the new voice note in <text> tags.
+2. Extract contextual facts from the new voice note in <text> tags that add value beyond <user_context>.
 3. Merge new facts with existing history: avoid duplicates, update outdated facts, keep the most relevant.
 4. Return ONLY the updated bullet list, one fact per line, starting with "- ".
    Do NOT add date prefixes to new bullets — the application adds them automatically.
@@ -401,8 +405,10 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
     submission_limit = max(1, max_bullets - reserved_slots)
     existing_lines = _parse_history_lines(existing_content)
     model_history = "\n".join(existing_lines[-submission_limit:])
+    context = _load_context()
     system_prompt = _HISTORY_EXTRACTION_PROMPT.format(max_bullets=_HISTORY_MAX_BULLETS)
     user_content = (
+        f"<user_context>\n{context}\n</user_context>\n\n"
         f"<history>\n{model_history}\n</history>\n\n"
         f"<text>\n{refined_text}\n</text>"
     )

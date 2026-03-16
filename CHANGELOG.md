@@ -13,6 +13,43 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.1.3] — 2026-03-16
+
+### Fixed
+
+- `_THRESHOLD_SHORT` default corrected from `90` to `80` in `src/refine.py` — the
+  value had drifted during a refactor; 80 is the intended threshold documented in
+  `docs/model-selection.md`.
+
+### Changed
+
+- History extraction now injects `context.txt` as a `<user_context>` block alongside
+  the existing `<history>` and `<text>` blocks. The extraction model uses the user's
+  domain context to identify genuinely relevant facts and avoid re-extracting
+  information already covered by the permanent context.
+- `docs/model-selection.md` model tables corrected for SHORT and MEDIUM tiers
+  (primary/fallback were inverted), LONG tier fallback updated to `mistral-medium-latest`,
+  and rationale paragraphs updated to reflect actual decisions.
+- `docs/resilience.md` per-model speed factors corrected: `magistral-small-latest`
+  updated from × 2.5 to × 3.0, `magistral-medium-latest` updated from × 3.0 to × 4.5;
+  example recalculated accordingly. Audio tempo description updated to reflect the
+  `1.25` (`.env.example`) / `1.5` (code default) distinction.
+- `Readme.md` new **Show raw Voxtral output** section documents `SHOW_RAW_VOXTRAL`.
+- History extraction model changed from `magistral-small-latest` to
+  `devstral-small-latest` (primary) and `mistral-small-latest` (fallback).
+  Rationale: extraction is a structured instruction-following task, not a reasoning
+  task — devstral-small is better suited and avoids rate-limit contention with the
+  MEDIUM refinement tier (magistral-small) on the same quota.
+
+### Tests
+
+- Added `test_script_has_show_raw_voxtral_branch` (unit) to verify the
+  `SHOW_RAW_VOXTRAL` control flow is present in the shell script.
+- Added `test_show_raw_voxtral_displays_both_raw_and_refined` and
+  `test_show_raw_voxtral_false_shows_single_block` (integration sandbox tests).
+
+---
+
 ## [2.1.2] — 2026-03-16
 
 ### Added

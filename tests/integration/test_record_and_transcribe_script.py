@@ -184,3 +184,33 @@ def test_retry_mode_skips_recording_and_processing(tmp_path: Path):
     assert "Retry mode" in result.stdout
     assert not (sandbox / "rec.called").exists()
     assert not (sandbox / "ffmpeg.called").exists()
+
+
+def test_show_raw_voxtral_displays_both_raw_and_refined(tmp_path: Path):
+    """SHOW_RAW_VOXTRAL=true must show raw Voxtral output alongside refined result."""
+    sandbox, env = _build_sandbox(tmp_path)
+    (sandbox / "local_audio.mp3").write_text("existing-mp3", encoding="utf-8")
+    env["ENABLE_REFINE"] = "true"
+    env["SHOW_RAW_VOXTRAL"] = "true"
+
+    result = _run_script(sandbox, env, "--retry")
+
+    assert result.returncode == 0, result.stderr
+    assert "[1] Raw Voxtral" in result.stdout
+    assert "[2] Result" in result.stdout
+    # Both raw and refined text must appear
+    assert "raw transcription" in result.stdout
+    assert "raw transcription [refined]" in result.stdout
+
+
+def test_show_raw_voxtral_false_shows_single_block(tmp_path: Path):
+    """Without SHOW_RAW_VOXTRAL, output must show a single 'Result' block."""
+    sandbox, env = _build_sandbox(tmp_path)
+    (sandbox / "local_audio.mp3").write_text("existing-mp3", encoding="utf-8")
+    env["ENABLE_REFINE"] = "true"
+
+    result = _run_script(sandbox, env, "--retry")
+
+    assert result.returncode == 0, result.stderr
+    assert "[1] Raw Voxtral" not in result.stdout
+    assert "📝 Result:" in result.stdout

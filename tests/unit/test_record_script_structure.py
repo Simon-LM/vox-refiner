@@ -23,3 +23,12 @@ def test_script_has_configurable_wav_size_guard():
     text = _script_text()
     assert 'MAX_WAV_BYTES="${MAX_WAV_BYTES:-100000000}"' in text
     assert 'if [ "$wav_size" -gt "$MAX_WAV_BYTES" ]; then' in text
+
+
+def test_script_has_show_raw_voxtral_branch():
+    """SHOW_RAW_VOXTRAL=true must trigger a 2-way display without running fallback."""
+    text = _script_text()
+    assert 'SHOW_RAW_VOXTRAL:-false' in text
+    assert 'Raw Voxtral' in text
+    # Must be separate from the compare-models branch (independent elif)
+    assert 'elif' in text

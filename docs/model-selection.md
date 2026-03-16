@@ -32,14 +32,15 @@ LONG on genuine extended monologues).
 
 | Role     | Model                   |
 | -------- | ----------------------- |
-| Primary  | `mistral-small-latest`  |
-| Fallback | `devstral-small-latest` |
+| Primary  | `devstral-small-latest` |
+| Fallback | `mistral-small-latest`  |
 
-**Why mistral-small as default:**
-Devstral-small excels on technical short notes (code, paths, API names) but
-mistral-small is a safer default for general use (reminders, messages, mixed content).
-Devstral-small is still the recommended primary for developers — override via
-`REFINE_MODEL_SHORT=devstral-small-latest` in `.env`.
+**Why devstral-small as default:**
+The most important quality for VoxRefiner is strict instruction-following: the model
+must clean up the transcription without paraphrasing, adding content, or inventing
+details. Devstral-small excels at this regardless of content type — even on
+conversational or non-technical short notes. Mistral-small is available as a reliable
+fallback for general-purpose coverage.
 
 ---
 
@@ -47,15 +48,15 @@ Devstral-small is still the recommended primary for developers — override via
 
 | Role     | Model                    |
 | -------- | ------------------------ |
-| Primary  | `mistral-medium-latest`  |
-| Fallback | `magistral-small-latest` |
+| Primary  | `magistral-small-latest` |
+| Fallback | `mistral-medium-latest`  |
 
-**Why mistral-medium as default:**
-mistral-medium is fast, reliable and produces clean output without the chain-of-thought
-latency of magistral models. For medium texts (80–240 words) this is a good balance
-between quality and speed. Magistral-small remains available as fallback and as
-the recommended primary for users who prefer reasoning-model quality
-(`REFINE_MODEL_MEDIUM=magistral-small-latest`).
+**Why magistral-small as default:**
+Magistral models follow instructions more faithfully than standard completion models —
+they won't add content, answer questions embedded in the transcription, or deviate from
+the speaker's words. This matters most at medium length where the risk of AI
+paraphrasing or "helpfully" expanding the text is highest. Mistral-medium is a fast,
+reliable fallback with acceptable quality.
 
 ---
 
@@ -64,7 +65,7 @@ the recommended primary for users who prefer reasoning-model quality
 | Role     | Model                     |
 | -------- | ------------------------- |
 | Primary  | `magistral-medium-latest` |
-| Fallback | `mistral-large-latest`    |
+| Fallback | `mistral-medium-latest`   |
 
 **Why magistral-medium over mistral-large:**
 Both models were compared on the same extended transcription (~350 words, French,
@@ -82,22 +83,44 @@ architecture review with 3 distinct points). Key observations:
 
 **magistral-medium-latest confirmed as primary.**
 
-Mistral Large remains the fallback: when magistral-medium is unavailable, its output
-quality is still acceptable despite the "nous" drift.
+Mistral-medium is the recommended fallback: lighter and faster than mistral-large,
+with acceptable quality for extended transcriptions when magistral-medium is unavailable.
 
 > Further testing needed: mistral-large on English content (the "nous" phenomenon
 > may be specific to French); comparison with magistral-large-latest.
 
 ---
 
+## History extraction model
+
+| Role     | Model                   |
+| -------- | ----------------------- |
+| Primary  | `devstral-small-latest` |
+| Fallback | `mistral-small-latest`  |
+
+**Why devstral-small:**
+History extraction is a structured extraction task, not a reasoning task. The model must
+parse existing bullets, identify new facts from the voice note, merge/deduplicate, and
+respect strict output format rules (`- bullet`, no timestamps, max N entries). The
+critical quality is instruction-following discipline — not hallucinating, not inventing
+bullets, not drifting from the format. This is the same quality that makes devstral-small
+the primary for the SHORT tier.
+
+Using a reasoning model (magistral-small) here would create rate-limit contention with
+the MEDIUM refinement tier (80–240 words), which is the most frequent use case.
+Devstral-small runs on a separate quota, is faster (×1.0), and cheaper — all
+advantages for a background task where the user is not waiting.
+
+---
+
 ## Summary table (current defaults)
 
-| Tier    | Words  | Primary                  | Fallback                  | Status       |
-| ------- | ------ | ------------------------ | ------------------------- | ------------ |
-| SHORT   | < 80   | `mistral-small-latest`   | `devstral-small-latest`   | ✅ Confirmed |
-| MEDIUM  | 80–240 | `mistral-medium-latest`  | `magistral-small-latest`  | ✅ Confirmed |
-| LONG    | > 240  | `mistral-medium-latest`  | `magistral-medium-latest` | ✅ Confirmed |
-| HISTORY | any    | `magistral-small-latest` | `mistral-medium-latest`   | ✅ Confirmed |
+| Tier    | Words  | Primary                   | Fallback                 | Status       |
+| ------- | ------ | ------------------------- | ------------------------ | ------------ |
+| SHORT   | < 80   | `devstral-small-latest`   | `mistral-small-latest`   | ✅ Confirmed |
+| MEDIUM  | 80–240 | `magistral-small-latest`  | `mistral-medium-latest`  | ✅ Confirmed |
+| LONG    | > 240  | `magistral-medium-latest` | `mistral-medium-latest`  | ✅ Confirmed |
+| HISTORY | any    | `devstral-small-latest`   | `mistral-small-latest`   | ✅ Confirmed |
 
 All values are overridable via `.env` — see `.env.example` for the full list of
 configurable parameters.
