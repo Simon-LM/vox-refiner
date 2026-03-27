@@ -13,6 +13,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.3.1] — 2026-03-27
+
+### Fixed
+
+- **`.directory` added to `.gitignore`:** KDE/Dolphin auto-generated file was
+  tracked by git, causing `vox-refiner-update.sh --apply` to fail with
+  "Local tracked changes detected" on installations where the file manager
+  had modified or deleted it.
+
+---
+
 ## [2.3.0] — 2026-03-27
 
 ### Added
