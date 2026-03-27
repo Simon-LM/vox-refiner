@@ -13,6 +13,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [2.4.4] — 2026-03-28
+
+### Fixed
+
+- **Mic health check false positive:** removed file-size check that triggered
+  even when the mic was working (SoX buffers audio data for ~2s before writing
+  to disk). The check now only verifies that the `rec` process is still alive.
+
+---
+
 ## [2.4.3] — 2026-03-28
 
 ### Improved

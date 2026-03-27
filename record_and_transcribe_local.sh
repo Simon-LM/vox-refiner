@@ -70,14 +70,11 @@ if [ "$RETRY_MODE" = "false" ]; then
     REC_PID=$!
 
     # ── A. Post-launch mic health check ──────────────────────────────────────────
-    # Wait briefly then verify rec is alive and the file is growing.
-    # If the mic is broken, rec dies or produces an empty file — restart PipeWire
-    # and relaunch. This avoids a blocking pre-check (~2.5s SoX init overhead).
+    # Wait briefly then verify rec is still alive. When the mic is inaccessible,
+    # rec dies immediately — no need to check file size (SoX buffers audio data
+    # and the file stays header-only for ~2s even when recording normally).
     sleep 0.3
-    WAV_HEADER_SIZE=44
-    if ! kill -0 "$REC_PID" 2>/dev/null || \
-       [ "$(stat -c%s "$TMP_WAV" 2>/dev/null || echo 0)" -le "$WAV_HEADER_SIZE" ]; then
-        kill "$REC_PID" 2>/dev/null; wait "$REC_PID" 2>/dev/null
+    if ! kill -0 "$REC_PID" 2>/dev/null; then
         echo "⚠️  Microphone inaccessible, attempting audio reset..."
         systemctl --user restart pipewire pipewire-pulse 2>/dev/null || true
         sleep 1
