@@ -53,22 +53,23 @@ if [ "$RETRY_MODE" = "false" ]; then
     # after an interrupted/incorrect shutdown.
     rm -f local_audio.wav local_audio.mp3
 
+    echo "🎙️ Initializing microphone..."
+
     # ── B. Kill orphan VoxRefiner rec processes from previous interrupted runs ──
     # Pattern is specific enough to never match visio/webcam/other apps.
     pkill -f "rec.*local_audio" 2>/dev/null || true
-    sleep 0.2
 
     # ── A. Pre-check microphone access ─────────────────────────────────────────
-    # Test with a 0.1s recording to a temp WAV file (rec cannot write to /dev/null
-    # because it infers the output format from the file extension).
+    # Quick 10ms recording to verify the audio path works (rec cannot write to
+    # /dev/null because it infers the output format from the file extension).
     MIC_TEST=$(mktemp /tmp/mic_test_XXXXXX.wav)
     _TMPFILES+=("$MIC_TEST")
-    if ! timeout 3 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.1 2>/dev/null; then
+    if ! timeout 0.5 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.01 2>/dev/null; then
         echo "⚠️  Microphone inaccessible, attempting audio reset..."
         # Restart PipeWire (works on modern Linux); falls back silently if unavailable.
         systemctl --user restart pipewire pipewire-pulse 2>/dev/null || true
         sleep 1
-        if ! timeout 3 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.1 2>/dev/null; then
+        if ! timeout 0.5 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.01 2>/dev/null; then
             echo "❌ Microphone still inaccessible after reset. Check your audio settings."
             exit 1
         fi
