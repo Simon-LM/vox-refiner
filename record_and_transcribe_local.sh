@@ -59,18 +59,22 @@ if [ "$RETRY_MODE" = "false" ]; then
     sleep 0.2
 
     # ── A. Pre-check microphone access ─────────────────────────────────────────
-    # Test with a 0.1s silent recording; if it fails, attempt a PulseAudio reset.
-    if ! timeout 3 rec -c 1 -r 16000 /dev/null trim 0 0.1 2>/dev/null; then
+    # Test with a 0.1s recording to a temp WAV file (rec cannot write to /dev/null
+    # because it infers the output format from the file extension).
+    MIC_TEST=$(mktemp /tmp/mic_test_XXXXXX.wav)
+    _TMPFILES+=("$MIC_TEST")
+    if ! timeout 3 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.1 2>/dev/null; then
         echo "⚠️  Microphone inaccessible, attempting audio reset..."
-        pactl suspend-sink 1 2>/dev/null;   pactl suspend-sink 0 2>/dev/null
-        pactl suspend-source 1 2>/dev/null; pactl suspend-source 0 2>/dev/null
-        sleep 0.5
-        if ! timeout 3 rec -c 1 -r 16000 /dev/null trim 0 0.1 2>/dev/null; then
+        # Restart PipeWire (works on modern Linux); falls back silently if unavailable.
+        systemctl --user restart pipewire pipewire-pulse 2>/dev/null || true
+        sleep 1
+        if ! timeout 3 rec -c 1 -r 16000 "$MIC_TEST" trim 0 0.1 2>/dev/null; then
             echo "❌ Microphone still inaccessible after reset. Check your audio settings."
             exit 1
         fi
         echo "✅ Microphone recovered."
     fi
+    rm -f "$MIC_TEST"
 
     # Record into a temporary WAV and only promote it when sane.
     TMP_WAV=$(mktemp /tmp/local_audio_XXXXXX.wav)
