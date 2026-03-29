@@ -65,7 +65,7 @@ while allowing natural lexical diversity. Fallback uses Mistral defaults for rel
 | Role     | Model                     | Parameters                   |
 | -------- | ------------------------- | ---------------------------- |
 | Primary  | `magistral-medium-latest` | `temperature=0.4, top_p=0.9` |
-| Fallback | `mistral-large-latest`    | Mistral defaults             |
+| Fallback | `mistral-medium-latest`   | Mistral defaults             |
 
 **Why magistral-medium over mistral-large:**
 Both models were compared on the same extended transcription (~350 words, French,
@@ -117,7 +117,7 @@ cost. Upgrade to `devstral-latest` via `.env` if extraction quality proves insuf
 | --- | --- | --- | --- | --- | --- |
 | SHORT | < 80 | `mistral-small-latest` | `mistral-medium-latest` | temp=0.2, top_p=0.85 | Confirmed |
 | MEDIUM | 80-240 | `mistral-small-latest` | `mistral-medium-latest` | temp=0.3, top_p=0.9, reasoning=high | Confirmed |
-| LONG | > 240 | `magistral-medium-latest` | `mistral-large-latest` | temp=0.4, top_p=0.9 | Confirmed |
+| LONG | > 240 | `magistral-medium-latest` | `mistral-medium-latest` | temp=0.4, top_p=0.9 | Confirmed |
 | HISTORY | any | `mistral-small-latest` | `mistral-medium-latest` | reasoning=high | Confirmed |
 
 All model and parameter values are overridable via `.env` — see `.env.example` for the

@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Name=VoxRefiner
-Comment=Start audio recording and transcription
+Comment=Voice-to-text and voice translation
 Exec=/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
 Path=/home/your-username/.local/bin/vox-refiner
 Icon=/home/your-username/.local/bin/vox-refiner/Logo/VoxRefiner_Logo.svg

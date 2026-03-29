@@ -13,6 +13,61 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [3.0.0] — 2026-03-29
+
+### Added — Voice Translate
+
+- **Voice Translate mode:** speak in one language, get an audio translation
+  in your own voice. Full pipeline: mic → Voxtral STT → Mistral chat
+  (clean + adapt for speech + translate) → Voxtral TTS with voice cloning
+  → auto-play via mpv.
+- **Interactive menu** (`vox-refiner-menu.sh`): launched from the Ubuntu app
+  menu, offers Speech-to-Text, Voice Translate, and Settings. The keyboard
+  shortcut continues to launch direct Speech-to-Text as before.
+- **Language selection sub-menu:** 9 languages (en, fr, de, es, pt, it, nl,
+  hi, ar) with `►` marker on the default and Enter to keep it.
+- **`src/voice_rewrite.py`:** new module that cleans, restructures for spoken
+  delivery (short sentences, spoken connectors), and translates in a single
+  Mistral chat call. Prompt optimised for TTS output, not screen reading.
+  Tiered reasoning: short texts (<120 words) use fast params, longer texts
+  enable `reasoning_effort=high` for complex restructuring.
+- **`src/tts.py`:** Voxtral TTS API module with voice cloning support.
+  Extracts a 15s voice sample from the original WAV (preserving natural
+  pitch/timbre). Falls back to preset voice for short recordings.
+- **`src/common.py`:** shared utilities extracted from `refine.py`
+  (`call_model`, `SECURITY_BLOCK`, `load_context`, timing helpers).
+- **EBU R128 loudness normalization:** TTS output is normalized to -16 LUFS
+  (podcast standard) with configurable volume boost on top (`TTS_LOUDNESS`,
+  `TTS_VOLUME`).
+- **Post-action menus:** `[r] Replay` and `[n] New recording` after Voice
+  Translate; `[n] New recording` after Speech-to-Text — stay in the same
+  mode without returning to the main menu.
+- **Translation failure detection:** shows "TRANSLATION FAILED" header when
+  both models fail, instead of silently returning raw text as if translated.
+- **New `.env` variables:** `TRANSLATE_TARGET_LANG`, `TTS_MODEL`,
+  `TTS_DEFAULT_VOICE_ID`, `TTS_LOUDNESS`, `TTS_VOLUME`, `TTS_PLAYER`,
+  `TTS_VOICE_SKIP_SECONDS`, `TTS_VOICE_SAMPLE_DURATION`,
+  `VOICE_REWRITE_MODEL`, `VOICE_REWRITE_MODEL_FALLBACK`,
+  `VOICE_REWRITE_RETRIES`.
+- **`mpv` added to system dependencies** in `install.sh` for TTS playback.
+- **Architecture document:** `docs/voice-translate-architecture.md`.
+
+### Changed
+
+- **Recordings directory:** all audio files moved from `/tmp/` and project
+  root to `recordings/` with sub-folders per mode (`stt/` for Speech-to-Text,
+  `voice-translate/` for Voice Translate). Fixed filenames, overwritten each
+  run. No more temp files in `/tmp/`.
+- **Launcher** (`launch-vox-refiner.example.sh`): defaults to interactive
+  menu for .desktop/app launcher; `--direct` flag launches direct STT for
+  keyboard shortcuts. Added `INSTALL_DIR` variable for easy configuration.
+- **License:** changed from MIT to AGPL-3.0 to protect against commercial
+  exploitation while keeping the project fully open source.
+- **LONG tier fallback:** `mistral-large-latest` → `mistral-medium-latest`
+  (aligned code, docs, and `.env.example`).
+
+---
+
 ## [2.4.4] — 2026-03-28
 
 ### Fixed
@@ -29,7 +84,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - **Zero-delay microphone start:** recording starts immediately instead of
   waiting for a blocking pre-check (~2.5s SoX init overhead). The health
-  check now runs *after* launch — if the mic is broken, PipeWire is restarted
+  check now runs _after_ launch — if the mic is broken, PipeWire is restarted
   and recording is relaunched automatically.
 - **Removed unnecessary delay:** dropped the 200ms sleep after orphan cleanup.
 
@@ -97,7 +152,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   (it infers format from the file extension); replaced with a temp `.wav` file.
 - **Audio reset now uses PipeWire:** replaced `pactl suspend-source/sink`
   (requires `pulseaudio-utils`) with `systemctl --user restart pipewire
-  pipewire-pulse`, which works on modern Linux without extra packages.
+pipewire-pulse`, which works on modern Linux without extra packages.
 
 ---
 

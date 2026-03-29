@@ -15,6 +15,7 @@ context.txt
 # Audio files (temporary, generated at runtime)
 *.wav
 *.mp3
+recordings/
 
 # Python
 __pycache__/

@@ -5,10 +5,19 @@
 # This script opens a new terminal window and runs VoxRefiner.
 # Copy it to launch-vox-refiner.sh and customize it for your setup.
 #
-# Usage:
+# Two launch modes:
+#   - Interactive menu (vox-refiner-menu.sh):
+#       Speech-to-Text, Voice Translate, Settings — best for the app launcher.
+#   - Direct recording (record_and_transcribe_local.sh):
+#       Speak → clipboard instantly — best for a keyboard shortcut.
+#
+# Recommended setup:
 #   1. cp launch-vox-refiner.example.sh launch-vox-refiner.sh
-#   2. Edit SCRIPT_PATH and the terminal command below
-#   3. Bind launch-vox-refiner.sh to a keyboard shortcut in your OS
+#   2. Edit INSTALL_DIR below to match your installation path
+#   3. .desktop file  → launches the interactive menu (SCRIPT_PATH below)
+#   4. Keyboard shortcut → bind directly to:
+#        ~/.local/bin/vox-refiner/launch-vox-refiner.sh --direct
+#      or bind record_and_transcribe_local.sh in your own terminal wrapper.
 #
 # Terminal examples:
 #   MATE:    mate-terminal -- bash -c "\"$SCRIPT_PATH\"; exec bash"
@@ -17,8 +26,14 @@
 #   XFCE:    xfce4-terminal -e "bash -c \"\\\"$SCRIPT_PATH\\\"; exec bash\""
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Path to the main script (adjust to your installation)
-SCRIPT_PATH="$HOME/.local/bin/vox-refiner/record_and_transcribe_local.sh"
+INSTALL_DIR="$HOME/.local/bin/vox-refiner"
+
+# --direct flag: skip the menu, record immediately (ideal for keyboard shortcut)
+if [[ "${1:-}" == "--direct" ]]; then
+    SCRIPT_PATH="$INSTALL_DIR/record_and_transcribe_local.sh"
+else
+    SCRIPT_PATH="$INSTALL_DIR/vox-refiner-menu.sh"
+fi
 
 # Optional terminal override.
 # Examples:

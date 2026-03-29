@@ -8,7 +8,7 @@
   <img src="Logo/VoxRefiner_Logo_subtitle.avif"g alt="VoxRefiner logo" width="360" />
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
 **VoxRefiner — Speak naturally. AI refines it. Just paste.**
 
@@ -178,7 +178,7 @@ bash record_and_transcribe_local.sh --retry
 bash record_and_transcribe_local.sh -r
 ```
 
-This skips the recording and audio processing steps and reuses the existing `local_audio.mp3`.
+This skips the recording and audio processing steps and reuses the existing `recordings/stt/source.mp3`.
 The command is also printed at the end of each run as a reminder.
 
 ---
@@ -395,47 +395,12 @@ These limitations are **known and accepted** for the current stage.
 
 ---
 
-## Roadmap
-
-### Desktop application (cross-platform)
-
-The next major step is a real desktop application with:
-
-- A minimal window with Start / Stop buttons
-- Clear visual feedback (recording / processing / done)
-- Global keyboard shortcut (works outside the terminal)
-- Cross-platform: Linux, Windows, macOS
-
-**Stack under consideration:**
-
-#### Option A — Tauri (Rust + React / TypeScript)
-
-- Lightweight native app
-- Web-oriented development workflow (React / TypeScript)
-- Same model as VS Code, Obsidian, etc.
-- Easy to distribute and open source
-- Requires learning Rust for the backend layer
-
-#### Option B — Electron (Node.js + React / TypeScript)
-
-- Full JavaScript/TypeScript stack
-- Larger binary size, higher memory usage
-- Same cross-platform reach
-
-#### Option C — Python + Qt (PyQt6 / PySide6)
-
-- Same language as the existing pipeline
-- Native desktop look
-- Good fit if you are already comfortable with Python
-
----
-
 ## Status
 
 VoxRefiner is an **open source personal utility**, shared as-is.
 
 It is functional, minimal, and intentionally simple.
-The core pipeline is stable. The graphical interface is the next planned step.
+The core pipeline is stable and actively maintained.
 
 ---
 
@@ -459,8 +424,8 @@ Built by **[Simon LM](https://simon-lm.dev)** · [GitHub](https://github.com/Sim
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)** — see the [LICENSE](LICENSE) file for details.
 
 Copyright © 2026 Simon LM — LostInTab
 
-You are free to use, modify, and distribute this software. If you do, **you must keep the copyright notice and license file** in all copies or substantial portions of the code. Attribution is required.
+You are free to use, modify, and distribute this software under the terms of the AGPL-3.0. If you modify VoxRefiner and make it available over a network (e.g. as a web service), you must publish the source code of your modified version. See the license for full terms.

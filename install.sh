@@ -9,7 +9,7 @@ if [ "${1:-}" = "--install-system-deps" ]; then
 fi
 
 missing_cmds=()
-for cmd in python3 ffmpeg rec xclip; do
+for cmd in python3 ffmpeg rec xclip mpv; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         missing_cmds+=("$cmd")
     fi
@@ -34,7 +34,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
         if command -v apt-get >/dev/null 2>&1; then
             echo "🔧 Installing system dependencies via apt..."
             sudo apt-get update
-            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip xterm
+            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm
         else
             echo "❌ --install-system-deps is only supported automatically on apt-based systems."
             exit 1
@@ -42,7 +42,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
     else
         echo "Install them manually, for example on Ubuntu:"
         echo "  sudo apt-get update"
-        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip"
+        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv"
         echo ""
         echo "Then run: ./install.sh"
         exit 1
@@ -84,7 +84,7 @@ if [ ! -f "launch-vox-refiner.sh" ]; then
     echo "🧩 Created launch-vox-refiner.sh from template"
 fi
 
-chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-update.sh install.sh
+chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-menu.sh vox-refiner-update.sh install.sh
 
 echo ""
 echo "✅ Installation complete."

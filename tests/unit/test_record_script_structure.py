@@ -10,13 +10,13 @@ def _script_text() -> str:
 
 def test_script_cleans_old_audio_artifacts_before_recording():
     text = _script_text()
-    assert "rm -f local_audio.wav local_audio.mp3" in text
+    assert 'rm -f "$REC_DIR/source.wav" "$REC_DIR/source.mp3"' in text
 
 
-def test_script_uses_temp_wav_and_promotes_after_validation():
+def test_script_uses_recordings_stt_directory():
     text = _script_text()
-    assert "TMP_WAV=$(mktemp /tmp/local_audio_XXXXXX.wav)" in text
-    assert "mv \"$TMP_WAV\" local_audio.wav" in text
+    assert 'REC_DIR="$SCRIPT_DIR/recordings/stt"' in text
+    assert 'mkdir -p "$REC_DIR"' in text
 
 
 def test_script_has_configurable_wav_size_guard():

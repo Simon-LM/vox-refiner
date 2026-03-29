@@ -41,7 +41,7 @@ _MODEL_SHORT_FALLBACK = os.environ.get("REFINE_MODEL_SHORT_FALLBACK", "mistral-m
 _MODEL_MEDIUM = os.environ.get("REFINE_MODEL_MEDIUM", "mistral-small-latest")
 _MODEL_MEDIUM_FALLBACK = os.environ.get("REFINE_MODEL_MEDIUM_FALLBACK", "mistral-medium-latest")
 _MODEL_LONG = os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
-_MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-large-latest")
+_MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-medium-latest")
 
 _REQUEST_RETRIES = int(os.environ.get("REFINE_REQUEST_RETRIES", "2"))
 

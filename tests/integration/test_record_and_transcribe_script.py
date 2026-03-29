@@ -83,12 +83,13 @@ if models_file:
     fake_bin = sandbox / "fake-bin"
     fake_bin.mkdir()
 
-    # rec: writes a WAV payload to the destination file (last positional arg).
+    # rec: writes a WAV payload then stays alive briefly (the post-launch
+    # health check needs the process alive after 0.3s). Exits on SIGINT or
+    # after 1s — fast enough for tests, long enough for the health check.
     _write_executable(
         fake_bin / "rec",
         """
 #!/usr/bin/env bash
-set -euo pipefail
 out="${@: -1}"
 size="${FAKE_WAV_SIZE:-64}"
 python3 - "$out" "$size" <<'PY'
@@ -100,6 +101,9 @@ size = int(sys.argv[2])
 dest.write_bytes(b"W" * size)
 PY
 touch "${SANDBOX_DIR}/rec.called"
+trap 'exit 0' INT TERM
+sleep 1 &
+wait $!
 """.strip()
         + "\n",
     )
@@ -152,19 +156,27 @@ def _run_script(sandbox: Path, env: dict[str, str], *args: str) -> subprocess.Co
     )
 
 
+def _rec_dir(sandbox: Path) -> Path:
+    """Return the recordings/stt/ directory inside the sandbox, creating it."""
+    d = sandbox / "recordings" / "stt"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def test_recording_mode_cleans_and_rebuilds_audio_artifacts(tmp_path: Path):
     sandbox, env = _build_sandbox(tmp_path)
-    (sandbox / "local_audio.wav").write_text("stale-wav", encoding="utf-8")
-    (sandbox / "local_audio.mp3").write_text("stale-mp3", encoding="utf-8")
+    rec = _rec_dir(sandbox)
+    (rec / "source.wav").write_text("stale-wav", encoding="utf-8")
+    (rec / "source.mp3").write_text("stale-mp3", encoding="utf-8")
 
     result = _run_script(sandbox, env)
 
     assert result.returncode == 0, result.stderr
     assert (sandbox / "rec.called").exists()
     assert (sandbox / "ffmpeg.called").exists()
-    assert (sandbox / "local_audio.wav").exists()
-    assert (sandbox / "local_audio.wav").read_bytes() == b"W" * 64
-    assert (sandbox / "local_audio.mp3").read_text(encoding="utf-8") == "new-mp3"
+    assert (rec / "source.wav").exists()
+    assert (rec / "source.wav").read_bytes() == b"W" * 64
+    assert (rec / "source.mp3").read_text(encoding="utf-8") == "new-mp3"
 
 
 def test_oversized_temp_wav_is_rejected_before_ffmpeg(tmp_path: Path):
@@ -174,15 +186,17 @@ def test_oversized_temp_wav_is_rejected_before_ffmpeg(tmp_path: Path):
 
     result = _run_script(sandbox, env)
 
+    rec = _rec_dir(sandbox)
     assert result.returncode == 1
     assert "abnormally large" in result.stdout
     assert not (sandbox / "ffmpeg.called").exists()
-    assert not (sandbox / "local_audio.wav").exists()
+    assert not (rec / "source.wav").exists()
 
 
 def test_retry_mode_skips_recording_and_processing(tmp_path: Path):
     sandbox, env = _build_sandbox(tmp_path)
-    (sandbox / "local_audio.mp3").write_text("existing-mp3", encoding="utf-8")
+    rec = _rec_dir(sandbox)
+    (rec / "source.mp3").write_text("existing-mp3", encoding="utf-8")
 
     result = _run_script(sandbox, env, "--retry")
 
@@ -195,15 +209,16 @@ def test_retry_mode_skips_recording_and_processing(tmp_path: Path):
 def test_show_raw_voxtral_displays_both_raw_and_refined(tmp_path: Path):
     """SHOW_RAW_VOXTRAL=true must show raw Voxtral output alongside refined result."""
     sandbox, env = _build_sandbox(tmp_path)
-    (sandbox / "local_audio.mp3").write_text("existing-mp3", encoding="utf-8")
+    rec = _rec_dir(sandbox)
+    (rec / "source.mp3").write_text("existing-mp3", encoding="utf-8")
     env["ENABLE_REFINE"] = "true"
     env["SHOW_RAW_VOXTRAL"] = "true"
 
     result = _run_script(sandbox, env, "--retry")
 
     assert result.returncode == 0, result.stderr
-    assert "[1] Raw Voxtral" in result.stdout
-    assert "[2] fake-primary-model" in result.stdout
+    assert "RAW TRANSCRIPTION" in result.stdout
+    assert "REFINED TEXT" in result.stdout
     # Both raw and refined text must appear
     assert "raw transcription" in result.stdout
     assert "raw transcription [refined]" in result.stdout
@@ -212,11 +227,12 @@ def test_show_raw_voxtral_displays_both_raw_and_refined(tmp_path: Path):
 def test_show_raw_voxtral_false_shows_single_block(tmp_path: Path):
     """Without SHOW_RAW_VOXTRAL, output must show a single 'Result' block."""
     sandbox, env = _build_sandbox(tmp_path)
-    (sandbox / "local_audio.mp3").write_text("existing-mp3", encoding="utf-8")
+    rec = _rec_dir(sandbox)
+    (rec / "source.mp3").write_text("existing-mp3", encoding="utf-8")
     env["ENABLE_REFINE"] = "true"
 
     result = _run_script(sandbox, env, "--retry")
 
     assert result.returncode == 0, result.stderr
-    assert "[1] Raw Voxtral" not in result.stdout
-    assert "📝 fake-primary-model:" in result.stdout
+    assert "RAW TRANSCRIPTION" not in result.stdout
+    assert "REFINED TEXT" in result.stdout

@@ -23,7 +23,7 @@ vox-refiner/
 ├── requirements.txt
 ├── CHANGELOG.md            # Version history — update on every release
 ├── CONTRIBUTING.md         # This file
-├── LICENSE                 # MIT
+├── LICENSE                 # AGPL-3.0
 └── Readme.md               # User-facing documentation
 ```
 
