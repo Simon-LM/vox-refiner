@@ -64,6 +64,134 @@ _crucial() { printf "  ${C_BCYAN}%b${C_RESET}\n" "$1"; }
 _stop() { printf "  ${C_BBLUE}%b${C_RESET}\n" "$1"; }
 _sep()     { printf "${C_DIM}%s${C_RESET}\n" "──────────────────────────────────────────────────────────────────"; }
 
+# ─── API key helpers ─────────────────────────────────────────────────────────
+
+_set_env_var() {
+    # Write or update a variable in .env: _set_env_var KEY VALUE
+    local key="$1" value="$2"
+    if [ ! -f .env ]; then touch .env; fi
+    if grep -q "^${key}=" .env; then
+        sed -i "s|^${key}=.*|${key}=${value}|" .env
+    else
+        printf '\n%s=%s\n' "$key" "$value" >> .env
+    fi
+}
+
+_mask_key() {
+    # Show only last 4 chars: sk-...xxxx
+    local key="$1"
+    if [ -z "$key" ]; then echo "(not set)"; return; fi
+    local len="${#key}"
+    if [ "$len" -le 4 ]; then echo "****"; return; fi
+    printf '...%s' "${key: -4}"
+}
+
+_test_mistral_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        _error "No API key to test."
+        return 1
+    fi
+    printf "  ${C_CYAN}⚡ Testing Mistral API key...${C_RESET}\n"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $key" \
+        "https://api.mistral.ai/v1/models" 2>/dev/null)
+    case "$http_code" in
+        200) _success "API key is valid." ; return 0 ;;
+        401) _error  "Invalid API key (401 Unauthorized)." ; return 1 ;;
+        429) _warn   "Rate limited (429) — key exists but quota exceeded." ; return 1 ;;
+        000) _error  "No network response — check your internet connection." ; return 1 ;;
+        *)   _error  "Unexpected response: HTTP $http_code" ; return 1 ;;
+    esac
+}
+
+_submenu_api_keys() {
+    while true; do
+        _header "API KEYS" "🔑"
+        echo ""
+        printf "  Mistral API key: ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${MISTRAL_API_KEY:-}")"
+        echo ""
+        printf "  ${C_BOLD}[t]${C_RESET}  Test key\n"
+        printf "  ${C_BOLD}[e]${C_RESET}  Edit key\n"
+        echo ""
+        printf "  ${C_DIM}Press Enter to return...${C_RESET} "
+        read -r _key_action
+        case "$_key_action" in
+            t|T)
+                echo ""
+                _test_mistral_key "${MISTRAL_API_KEY:-}"
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            e|E)
+                echo ""
+                printf "  Enter new Mistral API key: "
+                read -rs _new_key
+                echo ""
+                if [ -z "$_new_key" ]; then
+                    _warn "No key entered — unchanged."
+                else
+                    _set_env_var "MISTRAL_API_KEY" "$_new_key"
+                    export MISTRAL_API_KEY="$_new_key"
+                    # Reload .env
+                    set -a; source .env; set +a
+                    _success "Key saved."
+                    echo ""
+                    _test_mistral_key "$_new_key"
+                fi
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            *) break ;;
+        esac
+    done
+}
+
+_check_api_key_at_startup() {
+    if [ -z "${MISTRAL_API_KEY:-}" ]; then
+        clear
+        echo ""
+        printf "${C_BYELLOW}╔══════════════════════════════════════════════════════════════════╗${C_RESET}\n"
+        printf "${C_BYELLOW}║${C_RESET}  ${C_BOLD}⚠  API key required${C_RESET}                                              ${C_BYELLOW}║${C_RESET}\n"
+        printf "${C_BYELLOW}║${C_RESET}  No MISTRAL_API_KEY found in .env.                               ${C_BYELLOW}║${C_RESET}\n"
+        printf "${C_BYELLOW}║${C_RESET}  VoxRefiner cannot function without it.                          ${C_BYELLOW}║${C_RESET}\n"
+        printf "${C_BYELLOW}╚══════════════════════════════════════════════════════════════════╝${C_RESET}\n"
+        echo ""
+        printf "  Configure it now? ${C_BOLD}[Y/n]${C_RESET} "
+        read -r _api_prompt
+        case "$_api_prompt" in
+            n|N) ;;
+            *) _submenu_api_keys ;;
+        esac
+    else
+        # Key is present — test it silently in background, warn if invalid
+        local http_code
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${MISTRAL_API_KEY}" \
+            "https://api.mistral.ai/v1/models" \
+            --max-time 5 2>/dev/null)
+        if [ "$http_code" = "401" ]; then
+            clear
+            echo ""
+            printf "${C_RED}╔══════════════════════════════════════════════════════════════════╗${C_RESET}\n"
+            printf "${C_RED}║${C_RESET}  ${C_BOLD}✗  Invalid Mistral API key${C_RESET}                                       ${C_RED}║${C_RESET}\n"
+            printf "${C_RED}║${C_RESET}  The key in .env was rejected (401 Unauthorized).                ${C_RED}║${C_RESET}\n"
+            printf "${C_RED}║${C_RESET}  VoxRefiner will not work until a valid key is set.             ${C_RED}║${C_RESET}\n"
+            printf "${C_RED}╚══════════════════════════════════════════════════════════════════╝${C_RESET}\n"
+            echo ""
+            printf "  Update it now? ${C_BOLD}[Y/n]${C_RESET} "
+            read -r _api_prompt
+            case "$_api_prompt" in
+                n|N) ;;
+                *) _submenu_api_keys ;;
+            esac
+        fi
+    fi
+}
+
 # ─── Menu ─────────────────────────────────────────────────────────────────────
 
 show_menu() {
@@ -83,6 +211,7 @@ show_menu() {
     printf "║  ${C_DIM}[c]${C_RESET}  Context             ${C_DIM}edit context.txt${C_RESET}                            ║\n"
     printf "║  ${C_DIM}[h]${C_RESET}  History             ${C_DIM}edit history.txt${C_RESET}                            ║\n"
     printf "║  ${C_DIM}[u]${C_RESET}  Update                                                     ║\n"
+    printf "║  ${C_DIM}[?]${C_RESET}  Help                                                       ║\n"
     printf "║  ${C_DIM}[q]${C_RESET}  Quit                                                       ║\n"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
@@ -453,6 +582,8 @@ voice_translate() {
 
 # ─── Main loop ────────────────────────────────────────────────────────────────
 
+_check_api_key_at_startup
+
 while true; do
     show_menu
     printf "  ${C_BGREEN}▸${C_RESET} "
@@ -478,11 +609,27 @@ while true; do
             voice_translate
             ;;
         s|S)
-            ${EDITOR:-nano} .env
-            # Reload .env after editing
-            if [ -f .env ]; then
-                set -a; source .env; set +a
-            fi
+            while true; do
+                _header "SETTINGS" "⚙"
+                echo ""
+                printf "  ${C_BOLD}[k]${C_RESET}  API Keys\n"
+                printf "  ${C_BOLD}[e]${C_RESET}  Edit .env\n"
+                echo ""
+                printf "  ${C_DIM}Press Enter to return...${C_RESET} "
+                read -r _set_action
+                case "$_set_action" in
+                    k|K)
+                        _submenu_api_keys
+                        ;;
+                    e|E)
+                        ${EDITOR:-nano} .env
+                        if [ -f .env ]; then
+                            set -a; source .env; set +a
+                        fi
+                        ;;
+                    *) break ;;
+                esac
+            done
             ;;
         c|C)
             if [ ! -f context.txt ]; then
@@ -507,6 +654,7 @@ while true; do
                 echo ""
                 printf "  ${C_BOLD}[c]${C_RESET}  Check for updates\n"
                 printf "  ${C_BOLD}[a]${C_RESET}  Apply update\n"
+                printf "  ${C_BOLD}[?]${C_RESET}  Troubleshooting\n"
                 echo ""
                 printf "  ${C_DIM}Press Enter to return...${C_RESET} "
                 read -r _upd_action
@@ -520,9 +668,21 @@ while true; do
                         ;;
                     a|A)
                         echo ""
-                        ./vox-refiner-update.sh --apply
+                        if ./vox-refiner-update.sh --apply; then
+                            echo ""
+                            _success "Restart VoxRefiner to use the new version."
+                        fi
+                        printf "  ${C_DIM}Press Enter to return...${C_RESET}"
+                        read -r
+                        ;;
+                    '?')
                         echo ""
-                        _success "Restart VoxRefiner to use the new version."
+                        if [ -f docs/troubleshooting-update.md ]; then
+                            cat docs/troubleshooting-update.md
+                        else
+                            _warn "docs/troubleshooting-update.md not found."
+                        fi
+                        echo ""
                         printf "  ${C_DIM}Press Enter to return...${C_RESET}"
                         read -r
                         ;;
@@ -548,6 +708,17 @@ while true; do
                 _info "Set ENABLE_HISTORY=true in .env to start building it."
                 sleep 1.5
             fi
+            ;;
+        '?')
+            echo ""
+            if [ -f docs/troubleshooting.md ]; then
+                cat docs/troubleshooting.md
+            else
+                _warn "docs/troubleshooting.md not found."
+            fi
+            echo ""
+            printf "  ${C_DIM}Press Enter to return...${C_RESET}"
+            read -r
             ;;
         q|Q)
             printf "\n  ${C_DIM}Bye!${C_RESET}\n\n"

@@ -13,6 +13,36 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [3.2.0] — 2026-03-31
+
+### Added
+
+- **Settings submenu (`[s]`):** replaces the direct `nano .env` shortcut with a
+  sub-menu offering `[k] API Keys` and `[e] Edit .env`.
+- **API key management (`[k]`):** displays the Mistral key masked (last 4 chars),
+  allows editing via hidden input (`read -rs`), and runs a live API test
+  automatically after saving.
+- **API key validation at startup:** on every launch, VoxRefiner checks the
+  `MISTRAL_API_KEY` in `.env`:
+  - Key absent → yellow warning box, offer to configure it.
+  - Key present but invalid (HTTP 401) → red warning box, offer to update it.
+  - Key valid or no network → silent, no delay beyond 5s max timeout.
+- **Help menu (`[?]`)** in the main menu: displays `docs/troubleshooting.md`
+  directly in the terminal.
+- **`docs/troubleshooting.md`:** covers microphone, clipboard, TTS, voice
+  cloning, and empty transcription issues.
+- **`docs/troubleshooting-update.md`:** covers update-specific issues (blocked
+  update, not a git repo, update without effect). Displayed via `[?]` in the
+  Update submenu.
+
+### Fixed
+
+- **Update submenu:** `✓ Restart VoxRefiner to use the new version.` now only
+  appears when `vox-refiner-update.sh --apply` exits successfully (was always
+  shown even on error).
+
+---
+
 ## [3.1.0] — 2026-03-31
 
 ### Added
