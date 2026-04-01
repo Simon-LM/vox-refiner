@@ -247,6 +247,7 @@ if [ "${ENABLE_HISTORY:-false}" = "true" ] && [ -n "$final_text" ]; then
     threshold="${REFINE_MODEL_THRESHOLD_SHORT:-90}"
     if [ "$word_count" -ge "$threshold" ]; then
         printf '%s' "$final_text" | "$VENV_PYTHON" src/refine.py --update-history 2>&3 &
+        echo ""
         echo "🔄 History context update running in background..."
     fi
 fi

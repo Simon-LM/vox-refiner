@@ -13,6 +13,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [3.4.0] — 2026-04-01
+
+### Added
+
+- **Speak & Translate submenu (`[2]`):** dedicated interactive sub-menu with live status
+  header showing voice profile state (recorded date or "not recorded") and use-profile
+  on/off toggle.
+  - `[Enter]` Start translation (launches `voice_translate.sh`).
+  - `[p]` Record a 30-second voice profile (launches `voice_translate.sh --record-profile`).
+  - `[u]` Toggle use of voice profile for the session (`TTS_USE_VOICE_PROFILE`).
+  - `[m]` Back to main menu.
+- **Voice profile pre-recording (`voice_translate.sh --record-profile`):** records 30 s
+  at 48 kHz, trims seconds 0–5 and 25–30, exports a 20 s / 128 kbps MP3 to
+  `recordings/voice-profile/sample.mp3` — optimal quality for Mistral TTS voice cloning.
+  Displays a predefined French text to guide the recording.
+- **Voice profile auto-use in `_translate_and_speak()`:** when a profile file exists and
+  `TTS_USE_VOICE_PROFILE` is not `false`, it is passed directly to the TTS step instead
+  of extracting a sample from the current recording.
+
+### Changed
+
+- **`voice_translate.sh` entry point:** now handles `--record-profile` flag; routes to
+  `_record_voice_profile()` and exits, leaving the translate pipeline unchanged for
+  normal invocations.
+
+---
+
 ## [3.3.0] — 2026-04-01
 
 ### Added

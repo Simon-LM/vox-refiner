@@ -71,6 +71,120 @@ choose_language() {
     export TRANSLATE_TARGET_LANG
 }
 
+# ─── Voice profile ───────────────────────────────────────────────────────────
+
+VOICE_PROFILE_FILE="$SCRIPT_DIR/recordings/voice-profile/sample.mp3"
+
+_VOICE_PROFILE_TEXT="Bonjour. Je lis ce texte pour enregistrer ma voix.
+Les phrases sont courtes, claires et naturelles.
+Voici quelques sons variés : le ciel est bleu,
+les oiseaux chantent, le jardin fleurit au printemps.
+J'articule bien chaque mot, sans précipitation.
+Ma voix est posée, à volume normal.
+Merci pour votre écoute."
+
+_record_voice_profile() {
+    local profile_dir="$SCRIPT_DIR/recordings/voice-profile"
+    local tmp_wav="$profile_dir/source.wav"
+    local final_mp3="$profile_dir/sample.mp3"
+
+    mkdir -p "$profile_dir"
+    rm -f "$tmp_wav"
+    pkill -f "rec.*source.wav" 2>/dev/null || true
+
+    _header "VOICE PROFILE RECORDING" "🎙"
+    echo ""
+    _info "Read the following text aloud at a natural pace:"
+    echo ""
+    printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+    while IFS= read -r _line; do
+        printf "  ${C_BOLD}%s${C_RESET}\n" "$_line"
+    done <<< "$_VOICE_PROFILE_TEXT"
+    printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+    echo ""
+    _info "Recording: 30 seconds total — first and last 5s are trimmed automatically."
+    _info "Press Ctrl+C to stop early if needed."
+    echo ""
+    printf "  ${C_DIM}Press Enter when ready...${C_RESET}"
+    read -r
+    echo ""
+    printf "  ${C_BGREEN}🎙  RECORDING (30s)${C_RESET}\n"
+    echo ""
+
+    # Record at high quality (48kHz) for better voice cloning
+    rec -c 1 -r 48000 "$tmp_wav" &
+    REC_PID=$!
+
+    # Post-launch mic health check
+    sleep 0.3
+    if ! kill -0 "$REC_PID" 2>/dev/null; then
+        _warn "Microphone inaccessible, attempting audio reset..."
+        systemctl --user restart pipewire pipewire-pulse 2>/dev/null || true
+        sleep 1
+        rm -f "$tmp_wav"
+        rec -c 1 -r 48000 "$tmp_wav" &
+        REC_PID=$!
+        sleep 0.3
+        if ! kill -0 "$REC_PID" 2>/dev/null; then
+            _error "Microphone still inaccessible after reset."
+            return 1
+        fi
+        _success "Microphone recovered."
+    fi
+
+    # Auto-stop after 30 seconds
+    _PROFILE_TIMER_PID=""
+    (
+        sleep 28
+        if kill -0 "$REC_PID" 2>/dev/null; then
+            echo ""
+            _crucial "  ⏱  2 seconds remaining..."
+        fi
+        sleep 2
+        if kill -0 "$REC_PID" 2>/dev/null; then
+            echo ""
+            kill -INT "$REC_PID" 2>/dev/null
+        fi
+    ) &
+    _PROFILE_TIMER_PID=$!
+
+    stop_profile_recording() {
+        echo ""
+        printf "  ${C_DIM}⏹  Stopping recording...${C_RESET}\n"
+        kill -INT "$REC_PID" 2>/dev/null
+        wait "$REC_PID" 2>/dev/null
+    }
+
+    trap stop_profile_recording SIGINT
+    wait "$REC_PID" 2>/dev/null
+    trap - SIGINT
+
+    kill "$_PROFILE_TIMER_PID" 2>/dev/null
+    wait "$_PROFILE_TIMER_PID" 2>/dev/null
+
+    if [ ! -f "$tmp_wav" ]; then
+        _error "No audio recorded."
+        return 1
+    fi
+
+    echo ""
+    _process "Processing voice profile..."
+
+    # Extract 5s–25s → 20s at 128kbps (skip hesitation at start and end)
+    ffmpeg -y -i "$tmp_wav" -ss 5 -t 20 \
+        -codec:a libmp3lame -b:a 128k "$final_mp3" 2>/dev/null
+
+    rm -f "$tmp_wav"
+
+    if [ -f "$final_mp3" ]; then
+        _success "Voice profile saved (20s sample, 128 kbps)."
+        _info "It will be used automatically for voice cloning."
+    else
+        _error "Failed to process voice profile."
+        return 1
+    fi
+}
+
 # ─── Save audio to Downloads/VoxRefiner/ ────────────────────────────────────
 
 _save_audio() {
@@ -149,34 +263,42 @@ _translate_and_speak() {
         _warn "Clipboard copy failed (is xclip installed and running under X11?)"
     fi
 
-    # ── Extract voice sample from original WAV ────────────────────────
-    # Use the ORIGINAL WAV (before silence removal + speed-up) to preserve
-    # natural voice pitch and timbre for cloning.
+    # ── Voice sample for cloning ──────────────────────────────────────
+    # Prefer pre-recorded voice profile; fall back to extracting from WAV.
 
-    VOICE_SKIP="${TTS_VOICE_SKIP_SECONDS:-3}"
-    VOICE_DURATION="${TTS_VOICE_SAMPLE_DURATION:-15}"
-    VOICE_MIN_SECONDS=10  # Voxtral TTS recommends 10-20s for voice cloning
     VOICE_SAMPLE=""
-
-    # Get original WAV duration
-    wav_duration=$(ffprobe -v error -show_entries format=duration \
-        -of default=noprint_wrappers=1:nokey=1 "$REC_SOURCE_WAV" 2>/dev/null || echo "0")
-
-    # Calculate usable duration after skipping the start
-    usable_duration=$(awk -v d="$wav_duration" -v s="$VOICE_SKIP" 'BEGIN{print d - s}')
-
     echo ""
-    if awk -v u="$usable_duration" -v m="$VOICE_MIN_SECONDS" 'BEGIN{exit !(u >= m)}'; then
-        # Enough audio for voice cloning — extract from WAV and convert to MP3
-        ffmpeg -y -i "$REC_SOURCE_WAV" -ss "$VOICE_SKIP" -t "$VOICE_DURATION" \
-            -codec:a libmp3lame -b:a 128k "$REC_VOICE_SAMPLE" 2>/dev/null
-        VOICE_SAMPLE="$REC_VOICE_SAMPLE"
-        _info "🎤 Voice cloning — using YOUR voice (${VOICE_DURATION}s sample)"
+
+    if [ "${TTS_USE_VOICE_PROFILE:-true}" = "true" ] && [ -f "$VOICE_PROFILE_FILE" ]; then
+        VOICE_SAMPLE="$VOICE_PROFILE_FILE"
+        _info "🎤 Voice cloning — using pre-recorded voice profile"
         echo ""
     else
-        _warn "Default voice — recording too short (${wav_duration%.*}s, need ≥15s)"
-        _info "   Speak longer next time to clone your own voice."
-        echo ""
+        # Extract from the ORIGINAL WAV (before silence removal + speed-up) to
+        # preserve natural voice pitch and timbre for cloning.
+        VOICE_SKIP="${TTS_VOICE_SKIP_SECONDS:-3}"
+        VOICE_DURATION="${TTS_VOICE_SAMPLE_DURATION:-15}"
+        VOICE_MIN_SECONDS=10  # Voxtral TTS recommends 10-20s for voice cloning
+
+        # Get original WAV duration
+        wav_duration=$(ffprobe -v error -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 "$REC_SOURCE_WAV" 2>/dev/null || echo "0")
+
+        # Calculate usable duration after skipping the start
+        usable_duration=$(awk -v d="$wav_duration" -v s="$VOICE_SKIP" 'BEGIN{print d - s}')
+
+        if awk -v u="$usable_duration" -v m="$VOICE_MIN_SECONDS" 'BEGIN{exit !(u >= m)}'; then
+            # Enough audio for voice cloning — extract from WAV and convert to MP3
+            ffmpeg -y -i "$REC_SOURCE_WAV" -ss "$VOICE_SKIP" -t "$VOICE_DURATION" \
+                -codec:a libmp3lame -b:a 128k "$REC_VOICE_SAMPLE" 2>/dev/null
+            VOICE_SAMPLE="$REC_VOICE_SAMPLE"
+            _info "🎤 Voice cloning — using YOUR voice (${VOICE_DURATION}s sample)"
+            echo ""
+        else
+            _warn "Default voice — recording too short (${wav_duration%.*}s, need ≥15s)"
+            _info "   Record a voice profile [p] for better cloning."
+            echo ""
+        fi
     fi
 
     # ── TTS (Voxtral TTS + voice clone) ──────────────────────────────
@@ -397,6 +519,11 @@ voice_translate() {
 }
 
 # ─── Entry point ─────────────────────────────────────────────────────────────
+
+if [ "${1:-}" = "--record-profile" ]; then
+    _record_voice_profile
+    exit $?
+fi
 
 choose_language
 voice_translate

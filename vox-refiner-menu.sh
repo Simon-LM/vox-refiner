@@ -469,7 +469,54 @@ while true; do
             done
             ;;
         2)
-            ./voice_translate.sh
+            # ── Speak & Translate submenu ─────────────────────────────────
+            while true; do
+                # Resolve profile status
+                _vt_profile_file="$SCRIPT_DIR/recordings/voice-profile/sample.mp3"
+                if [ -f "$_vt_profile_file" ]; then
+                    _vt_profile_date="$(date -r "$_vt_profile_file" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "recorded")"
+                    _vt_profile_status="${C_BGREEN}recorded $_vt_profile_date${C_RESET}"
+                else
+                    _vt_profile_status="${C_DIM}not recorded${C_RESET}"
+                fi
+                if [ "${TTS_USE_VOICE_PROFILE:-true}" = "true" ]; then
+                    _vt_use_status="${C_BGREEN}on${C_RESET}"
+                else
+                    _vt_use_status="${C_DIM}off${C_RESET}"
+                fi
+
+                clear
+                _header "SPEAK & TRANSLATE" "🎙→🔊"
+                echo ""
+                printf "  ${C_DIM}Voice profile:${C_RESET} %b   ${C_DIM}Use profile:${C_RESET} %b\n" "$_vt_profile_status" "$_vt_use_status"
+                echo ""
+                _sep
+                echo ""
+                printf "  ${C_BOLD}[Enter]${C_RESET} Start translation\n"
+                printf "  ${C_BOLD}[p]${C_RESET}     Record voice profile (30s)\n"
+                printf "  ${C_BOLD}[u]${C_RESET}     Toggle use profile (session)\n"
+                printf "  ${C_BOLD}[m]${C_RESET}     Back to menu\n"
+                echo ""
+                _sep
+                printf "  Choice: "
+                read -r _vt_action
+                case "$_vt_action" in
+                    "")
+                        ./voice_translate.sh
+                        ;;
+                    p|P)
+                        ./voice_translate.sh --record-profile
+                        ;;
+                    u|U)
+                        if [ "${TTS_USE_VOICE_PROFILE:-true}" = "true" ]; then
+                            export TTS_USE_VOICE_PROFILE="false"
+                        else
+                            export TTS_USE_VOICE_PROFILE="true"
+                        fi
+                        ;;
+                    m|M) break ;;
+                esac
+            done
             ;;
         3)
             _coming_soon "Speak & Post" \
