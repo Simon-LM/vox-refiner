@@ -6,8 +6,10 @@ Calls the Mistral audio.speech API with an optional voice sample for cloning.
 
 import base64
 import os
+import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
@@ -47,6 +49,154 @@ _REQUEST_RETRIES = int(os.environ.get("TTS_REQUEST_RETRIES", "2"))
 _RETRY_DELAY = 2.0
 
 _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
+
+_CHUNK_MAX_CHARS = int(os.environ.get("TTS_CHUNK_SIZE", "800"))
+
+
+_AI_CLEAN_SYSTEM = (
+    "Tu es un assistant d'accessibilité pour malvoyants. Tu reçois un texte brut copié-collé depuis "
+    "une page web (article de presse, blog, etc.) et tu dois le préparer pour une lecture vocale "
+    "complète par un moteur TTS.\n\n"
+    "OBJECTIF ABSOLU : que l'utilisateur entende TOUT le contenu éditorial, sans rien sauter.\n\n"
+    "CONSERVER ET ADAPTER :\n"
+    "- Titre principal (tel quel, en premier)\n"
+    "- Sous-titres ou intertitres de sections (garder leur texte intégralement)\n"
+    "- Corps de l'article dans son intégralité, tous les paragraphes sans exception\n"
+    "- Citations et discours rapportés\n"
+    "- Légendes de photos ou d'images : l'utilisateur peut voir les images mais a du mal à lire ; "
+    "introduire chaque légende par 'Photo : ' suivi de son texte\n\n"
+    "SUPPRIMER UNIQUEMENT (jamais le contenu éditorial) :\n"
+    "- Boutons et éléments UI : 'Partager', 'Tweeter', 'Lire plus tard', compteurs de commentaires\n"
+    "- Métadonnées techniques : auteur, date de publication, temps de lecture, crédit photo seul (ex: 'AFP')\n"
+    "- Navigation : 'Lire aussi', 'Sur le même sujet', 'Newsletter', 'Accueil', fils d'Ariane\n"
+    "- Annotations de liens : '(Nouvelle fenêtre)', '(new window)'\n"
+    "- URLs brutes et adresses email\n\n"
+    "FORMAT de sortie :\n"
+    "- Texte brut uniquement, sans markdown (pas de **, *, #, listes à tirets)\n"
+    "- Paragraphes séparés par une seule ligne vide\n"
+    "- Ne pas ajouter de ponctuation artificielle entre les paragraphes\n"
+    "- Pas de commentaire ni d'explication de ta part, uniquement le texte nettoyé"
+)
+
+_AI_CLEAN_MODEL = "mistral-small-latest"
+
+
+def _clean_text(text: str) -> str:
+    """Minimal pre-filter: remove only unreadable binary artifacts."""
+    text = text.replace("\ufffc", "")  # Unicode object replacement char (icons/images)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{4,}", "\n\n\n", text)
+    return text.strip()
+
+
+def _strip_markdown(text: str) -> str:
+    """Remove markdown formatting that would be read aloud by TTS."""
+    text = re.sub(r"\*{1,3}([^*\n]+)\*{1,3}", r"\1", text)  # bold/italic
+    text = re.sub(r"#{1,6}\s+", "", text)                    # headings
+    text = re.sub(r"`+([^`\n]+)`+", r"\1", text)             # inline code
+    return text
+
+
+def _ai_clean_text(text: str) -> str:
+    """Use Mistral to extract clean editorial content from web-selected text.
+
+    Falls back to heuristic _clean_text() if the AI call fails.
+    """
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        print("\u26a0\ufe0f  No MISTRAL_API_KEY — skipping AI cleaning.", file=sys.stderr)
+        return _clean_text(text)
+
+    print("\U0001f9f9 Cleaning text via AI...", file=sys.stderr)
+    payload = {
+        "model": _AI_CLEAN_MODEL,
+        "messages": [
+            {"role": "system", "content": _AI_CLEAN_SYSTEM},
+            {"role": "user", "content": text},
+        ],
+        "max_tokens": 4096,
+        "temperature": 0.0,
+    }
+    try:
+        resp = requests.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        result = resp.json()["choices"][0]["message"]["content"].strip()
+        if result:
+            print(f"\u2705 AI cleaning done ({len(result)} chars).", file=sys.stderr)
+            return result
+    except Exception as exc:
+        print(f"\u26a0\ufe0f  AI cleaning failed ({exc}), using raw text.", file=sys.stderr)
+    return _clean_text(text)
+
+
+def _make_chunks(text: str, max_chars: int = _CHUNK_MAX_CHARS) -> list[str]:
+    """Split text into chunks of at most max_chars, breaking on sentence boundaries."""
+    # Normalize line endings: paragraph breaks and single newlines → space.
+    text = re.sub(r"\n+", " ", text)
+    text = re.sub(r" {2,}", " ", text).strip()
+
+    # Split on sentence boundaries: after .!?… optionally followed by a closing quote
+    sentences = re.split(r'(?<=[.!?…])\s+|(?<=[.!?…]["\u00BB\u201D)])\s+', text)
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return [text] if text else []
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        # Force-split sentences that exceed max_chars on their own
+        while len(sentence) > max_chars:
+            # Try to split on comma or semicolon
+            split_at = -1
+            for sep in [", ", "; ", " – ", " — "]:
+                pos = sentence.rfind(sep, 0, max_chars)
+                if pos > 0:
+                    split_at = pos + len(sep)
+                    break
+            # Fallback: split at last space before max_chars
+            if split_at <= 0:
+                split_at = sentence.rfind(" ", 0, max_chars)
+            if split_at <= 0:
+                split_at = max_chars
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(sentence[:split_at].rstrip())
+            sentence = sentence[split_at:].lstrip()
+        if not current:
+            current = sentence
+        elif len(current) + 1 + len(sentence) <= max_chars:
+            current += " " + sentence
+        else:
+            chunks.append(current)
+            current = sentence
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _resolve_voice_id() -> Optional[str]:
+    """Resolve voice ID from environment (TTS_LANG → map, TTS_VOICE_ID, or default)."""
+    tts_lang = os.environ.get("TTS_LANG", "")
+    tts_voice_id_env = os.environ.get("TTS_VOICE_ID", None)
+    if tts_lang and tts_lang in _LANG_VOICE_MAP:
+        resolved: Optional[str] = _LANG_VOICE_MAP[tts_lang]
+        print(f"\U0001f508 Voice: {tts_lang} preset ({resolved})", file=sys.stderr)
+    elif tts_voice_id_env is not None:
+        resolved = tts_voice_id_env or None
+        label = resolved or _DEFAULT_VOICE_ID or "none"
+        print(f"\U0001f508 Voice: {label}", file=sys.stderr)
+    else:
+        resolved = _DEFAULT_VOICE_ID or None
+        print(f"\U0001f508 Voice: {resolved or 'none (will fail)'}", file=sys.stderr)
+    return resolved
 
 
 def _encode_voice_sample(sample_path: str) -> str:
@@ -168,9 +318,95 @@ def synthesize(
 
 
 if __name__ == "__main__":
+    # ── Chunked mode: --chunked <output_dir> ──────────────────────────────────
+    # Splits text into sentence-boundary chunks, generates them with up to 2
+    # parallel workers, and prints each output file path to stdout as soon as
+    # it is ready — allowing the caller to start playback immediately.
+    if len(sys.argv) >= 3 and sys.argv[1] == "--chunked":
+        chunks_dir = sys.argv[2]
+        Path(chunks_dir).mkdir(parents=True, exist_ok=True)
+
+        text = sys.stdin.read().strip()
+        if not text:
+            print("\u274c No input text received.", file=sys.stderr)
+            sys.exit(1)
+
+        text = _strip_markdown(_ai_clean_text(text))
+        if not text:
+            print("\u274c Text is empty after cleaning.", file=sys.stderr)
+            sys.exit(1)
+
+        # Display cleaned text in terminal with blue background
+        _BG = "\033[44m\033[97m"
+        _RST = "\033[0m"
+        print(f"{_BG}{'─' * 64}{_RST}", file=sys.stderr)
+        print(f"{_BG}  Texte nettoyé — prêt pour la lecture vocale :{_RST}", file=sys.stderr)
+        print(f"{_BG}{'─' * 64}{_RST}", file=sys.stderr)
+        for _line in text.splitlines():
+            print(f"{_BG}{_line}{_RST}", file=sys.stderr)
+        print(f"{_BG}{'─' * 64}{_RST}", file=sys.stderr)
+
+        resolved_voice_id = _resolve_voice_id()
+        chunks = _make_chunks(text)
+        total = len(chunks)
+        print(
+            f"\U0001f50a Generating {total} chunk(s) via {_MODEL} ({len(text)} chars)...",
+            file=sys.stderr,
+        )
+
+        _CHUNK_MAX_ATTEMPTS = 5
+        _CHUNK_RETRY_DELAYS = [2, 4, 8, 15]  # escalating delays between retries
+        _MIN_AUDIO_BYTES = 1024  # valid mp3 should be > 1 KB
+
+        def _gen_chunk(idx_chunk: tuple[int, str]) -> str:
+            idx, chunk_text = idx_chunk
+            out = str(Path(chunks_dir) / f"chunk_{idx:03d}.mp3")
+            Path(chunks_dir, f"chunk_{idx:03d}.txt").write_text(chunk_text, encoding="utf-8")
+            last_exc: Exception = RuntimeError("unknown")
+            for attempt in range(_CHUNK_MAX_ATTEMPTS):
+                try:
+                    synthesize(chunk_text, out, voice_id=resolved_voice_id)
+                    out_size = Path(out).stat().st_size if Path(out).exists() else 0
+                    if out_size < _MIN_AUDIO_BYTES:
+                        raise RuntimeError(f"audio trop petit ({out_size} octets)")
+                    print(f"  \u2705 Passage {idx + 1}/{total} OK ({out_size:,} octets)", file=sys.stderr)
+                    return out
+                except Exception as exc:
+                    last_exc = exc
+                    delay = _CHUNK_RETRY_DELAYS[min(attempt, len(_CHUNK_RETRY_DELAYS) - 1)]
+                    print(
+                        f"  \u26a0\ufe0f  Passage {idx + 1}/{total} tentative {attempt + 1}/{_CHUNK_MAX_ATTEMPTS}"
+                        f" \u00e9chou\u00e9e: {exc}",
+                        file=sys.stderr,
+                    )
+                    if attempt < _CHUNK_MAX_ATTEMPTS - 1:
+                        print(f"     Nouvelle tentative dans {delay}s\u2026", file=sys.stderr)
+                        time.sleep(delay)
+            raise last_exc
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            # Submit with a slight stagger (0.5s between submissions) to avoid
+            # hitting Mistral rate limits while keeping 2-3 chunks pre-generating.
+            futures = []
+            for i, chunk in enumerate(chunks):
+                futures.append(executor.submit(_gen_chunk, (i, chunk)))
+                if i < len(chunks) - 1:
+                    time.sleep(0.5)
+            for i, fut in enumerate(futures):
+                try:
+                    print(fut.result(), flush=True)
+                except Exception as exc:
+                    # Signal bash that this position failed — bash will offer retry
+                    print(f"CHUNK_FAILED:{i}", flush=True)
+                    print(f"\u274c Chunk {i + 1}/{total} definitively failed: {exc}", file=sys.stderr)
+
+        sys.exit(0)
+
+    # ── Single-file mode (default) ────────────────────────────────────────────
     if len(sys.argv) < 2:
         print(
             "Usage: tts.py <output_mp3> [voice_sample]\n"
+            "       tts.py --chunked <output_dir>  (reads stdin, prints chunk paths)\n"
             "       Text is read from stdin.\n"
             "       voice_sample is optional (enables voice cloning).",
             file=sys.stderr,
@@ -189,24 +425,7 @@ if __name__ == "__main__":
     if sample_file and sample_file.endswith(".wav"):
         voice_fmt = "wav"
 
-    # Voice selection priority:
-    #   1. TTS_LANG env var → _LANG_VOICE_MAP lookup (e.g. TTS_LANG=fr → Luc)
-    #   2. TTS_VOICE_ID env var → explicit preset override
-    #   3. TTS_DEFAULT_VOICE_ID (module-level default, Paul if unset)
-    #   4. TTS_VOICE_ID="" or TTS_DEFAULT_VOICE_ID="" → auto mode (API decides)
-    tts_lang = os.environ.get("TTS_LANG", "")
-    tts_voice_id_env = os.environ.get("TTS_VOICE_ID", None)
-
-    if tts_lang and tts_lang in _LANG_VOICE_MAP:
-        resolved_voice_id: Optional[str] = _LANG_VOICE_MAP[tts_lang]
-        print(f"\U0001f508 Voice: {tts_lang} preset ({resolved_voice_id})", file=sys.stderr)
-    elif tts_voice_id_env is not None:
-        resolved_voice_id = tts_voice_id_env or None  # empty string → use default
-        label = resolved_voice_id or _DEFAULT_VOICE_ID or "none"
-        print(f"\U0001f508 Voice: {label}", file=sys.stderr)
-    else:
-        resolved_voice_id = _DEFAULT_VOICE_ID or None
-        print(f"\U0001f508 Voice: {resolved_voice_id or 'none (will fail)'}", file=sys.stderr)
+    resolved_voice_id = _resolve_voice_id()
 
     print(
         f"\U0001f50a Generating speech via {_MODEL} ({len(text)} chars)...",

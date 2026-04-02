@@ -13,6 +13,52 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [3.6.0] — 2026-04-02
+
+### Added
+
+- **`src/tts.py` — AI text cleaning (`_ai_clean_text`):** before chunked TTS,
+  the selected text is sent to `mistral-small-latest` with an accessibility-focused
+  prompt. Removes web UI noise (share buttons, metadata, nav links, `(Nouvelle
+  fenêtre)` annotations, agency credits) while preserving all editorial content,
+  section headings, and image captions (prefixed "Photo :"). Falls back to
+  minimal heuristic cleaning if the AI call fails.
+- **`src/tts.py` — cleaned text display:** the AI-cleaned text is printed to the
+  terminal with a blue background before TTS generation starts, so the user can
+  verify what will be read aloud.
+- **`src/tts.py` — `_strip_markdown`:** strips `**bold**`, `*italic*`, `# headings`
+  that Mistral sometimes emits in its output before the text reaches the TTS engine.
+- **`selection_to_voice.sh` — post-action menu always visible:** the
+  `[l] Réécouter / [d] Sauvegarder` menu now runs regardless of `VOXREFINER_MENU`,
+  so the user stays on the option-4 screen after playback even when launched from
+  the main menu.
+
+### Changed
+
+- **`src/tts.py` — chunked mode (`--chunked`):** complete rewrite of the pipeline.
+  - `max_workers` raised to **3** with a 0.5 s stagger between submissions to keep
+    2–3 chunks pre-generating without hammering the API.
+  - **5 retry attempts** per chunk (up from 3) with escalating delays (2 s, 4 s,
+    8 s, 15 s) before a chunk is declared failed.
+  - Output file validated after each synthesis call (≥ 1 KB); an empty or truncated
+    response is treated as a failure and retried automatically.
+- **`selection_to_voice.sh` — inline retry on failed chunks:** when a chunk fails
+  (Python sentinel `CHUNK_FAILED:<idx>` or empty file), bash retries it immediately
+  on the spot (up to 3 further attempts) before continuing. The listener sees
+  `⏳ Passage N en attente — tentative X/3…` in real time; playback of subsequent
+  chunks is held until the current one succeeds or is definitively abandoned.
+- **`selection_to_voice.sh` — `realpath` in concat list:** ffmpeg concat demuxer
+  now receives absolute paths, fixing the incomplete `[l]` replay issue.
+- **`_make_chunks`:** paragraph breaks (`\n+`) are now collapsed to a single space
+  (previously ` . `) so the TTS engine no longer reads an audible "point" between
+  paragraphs.
+- **`_clean_text`:** simplified to a minimal pre-filter (removes `\ufffc` icons and
+  excess whitespace only); full cleaning is now delegated to the AI step.
+- **`_AI_CLEAN_SYSTEM` prompt** updated for low-vision accessibility context
+  (malvoyants who can see images but find reading tiring).
+
+---
+
 ## [3.5.1] — 2026-04-01
 
 ### Changed
