@@ -13,6 +13,69 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [3.8.0] — 2026-04-07
+
+### Added
+
+- **`src/tts.py` — two-AI cleaning architecture:** content-type detection and text
+  cleaning are now two separate API calls. `mistral-small-latest` identifies the content
+  type in a single word (news_article, email, wikipedia, social_media, documentation,
+  assistant_response, generic); `devstral-latest` cleans with a focused, type-specific
+  prompt. All prompts use `textwrap.dedent("""...""")` for readability.
+- **`src/tts.py` — per-type AI cleaning rules (`_CLEAN_RULES`):** each content type
+  has dedicated instructions — news articles enforce media name + date → title →
+  chapeau → author → body output order; Wikipedia verbalises math formulas; emails
+  preserve Objet/Date/sender; social media keeps @handles and reply context;
+  documentation and assistant_response rewrite tables and code blocks for speech.
+- **`src/tts.py` — table verbalization (`_verbalize_tables`):** programmatic
+  conversion of tabular content to accessible spoken prose before the AI call.
+  Handles three formats: Markdown pipe tables (`| col |`), tab-separated tables, and
+  space-aligned tables (≥ 3 columns, ≥ 3 rows). Each data row becomes a sentence:
+  "Column A: value. Column B: value." Dash-only cells (—, –) are skipped. Space-aligned
+  detection requires at least 3 rows to limit false positives on prose.
+- **`src/tts.py` — math verbalization pipeline:** NFKC normalisation converts Unicode
+  math italic letters (𝐸→E); `_collapse_math_lines` collapses Wikipedia one-char-per-line
+  formula rendering; `_merge_split_identifiers` fuses `E v a l` → `Eval`; `_expand_math_symbols`
+  substitutes 28 symbols (×→"croix", ∈→"appartient à", etc.); `_expand_function_calls`
+  expands `f(x)` → "f de x" iteratively; colon verbalization on math lines: ` : ` →
+  "fonction de" (type signatures) or "," (other colons on math lines).
+- **`src/tts.py` — citation voice fallback:** after 3 failed attempts with the citation
+  voice, the system automatically falls back to the main reading voice for the same
+  chunk (attempts 4–5), reducing silent failures on quoted passages.
+- **`tests/unit/test_tts_tables.py`:** 12 unit tests covering pipe tables, tab tables,
+  space-aligned tables, false-positive guards, and `_clean_text` integration.
+- **`Readme.md` — Speak & Translate section:** new dedicated section documenting the
+  voice translation workflow (record → translate → play in your own voice).
+- **`Readme.md` — Selection to Voice section:** new section covering AI preprocessing,
+  table reading, math verbalization, quotation isolation, and dual-voice support.
+- **`Readme.md` — keyboard shortcut flags:** installation step 5 and the dedicated
+  shortcut section now document all four launch flags (`--speak-refine`,
+  `--speak-translate`, `--selection-voice`, no flag) with example commands and suggested
+  key bindings.
+
+### Changed
+
+- **`.env.example` — `SHOW_RAW_VOXTRAL=true` by default:** new users immediately see
+  the raw Voxtral output alongside the refined result, making the AI improvement
+  instantly visible. Was `false`.
+- **`Readme.md` — "Show raw Voxtral output" section** updated to reflect the new default.
+
+### Fixed
+
+- **`src/tts.py` — `_is_quoted_paragraph`:** detection was too strict (required both
+  opening and closing quote on the same line). Now triggers on any paragraph that starts
+  with `«`, `"` or `"`.
+- **`src/tts.py` — `_expand_math_symbols` — `×` (U+00D7) excluded by accented-letter
+  range:** the `_MATH_TOKEN_LINE` regex now excludes U+00C0–U+00D6 and U+00D8–U+00F6
+  and U+00F8–U+024F, intentionally keeping U+00D7 (×) and U+00F7 (÷).
+- **`src/tts.py` — NFKC applied too late:** `unicodedata.normalize("NFKC", text)` is
+  now called at the start of `_ai_clean_text`, before the API call, so Wikipedia math
+  italic letters are normalised before any processing.
+- **`vox-refiner-menu.sh` — `[q]` conflict in Settings:** the Citation voice shortcut
+  was `[q]` which conflicts with the quit key; changed to `[c]`.
+
+---
+
 ## [3.7.0] — 2026-04-03
 
 ### Added

@@ -132,6 +132,53 @@ parameters (`HISTORY_MAX_BULLETS`, `HISTORY_EXTRACTION_MODEL`, `HISTORY_TIMEOUT_
 
 ---
 
+## Speak & Translate
+
+Speak in your language, get an audio translation played back in your own cloned voice.
+
+1. Press your `--speak-translate` shortcut (or choose **Speak & Translate** from the menu)
+2. Speak — recording starts immediately
+3. Stop with **Ctrl+C**
+4. VoxRefiner transcribes, translates to the target language, synthesises the result in
+   your own voice, and plays it automatically
+
+The target language is configurable in `.env` (`TRANSLATE_TARGET_LANG=en` by default).
+You can also change it on the fly from the interactive settings menu.
+
+Your voice is cloned from a short audio sample captured at the start of recording —
+no pre-recording step required.
+
+---
+
+## Selection to Voice
+
+Read any selected text (or clipboard content) aloud in a chosen voice.
+
+1. Select text in any application (browser, editor, PDF viewer…)
+2. Press your `--selection-voice` shortcut (or choose **Selection to Voice** from the menu)
+3. VoxRefiner reads the selection out loud
+
+**AI-powered preprocessing** (enabled by default):
+
+Before reading, the text is cleaned for natural speech:
+
+- Detects content type (news article, Wikipedia, email, documentation…) and applies
+  type-specific rules
+- Removes navigation menus, breadcrumbs, cookie banners, and other web clutter
+- **Tables** are rewritten as spoken sentences: each row becomes
+  "Column A: value. Column B: value."
+- **Math formulas** (Wikipedia) are verbalised: `f(x)` → "f de x",
+  `∀x ∈ S` → "pour tout x appartenant à S"
+- **Quotations** are isolated into separate paragraphs so a distinct citation voice
+  can be applied
+
+**Dual-voice support:** configure `TTS_QUOTE_VOICE_ID` in `.env` to use a different
+voice for quoted passages (press articles, speeches, etc.).
+
+Both the reading voice and the citation voice are configurable from the settings menu.
+
+---
+
 ## Advanced options
 
 ### Voxtral-only mode (no AI refinement)
@@ -142,16 +189,15 @@ Useful if you want maximum speed or are testing Voxtral output in isolation.
 
 ### Show raw Voxtral output
 
-Set `SHOW_RAW_VOXTRAL=true` in `.env` to display the raw Voxtral transcription alongside
-the refined result — without running a second model.
+`SHOW_RAW_VOXTRAL=true` is **enabled by default** so you can immediately see the
+difference between what Voxtral heard and what the AI produced — without any extra
+API call, cost, or delay.
 
-- **No extra API call**, no added cost or delay.
 - The terminal shows a **2-way view**:
   1. `[1] Raw Voxtral` — unmodified speech-to-text output
   2. `[2] Result — copied to clipboard`
 
-Useful to compare what Voxtral heard versus what the AI produced, or to quickly spot
-transcription errors in your audio setup.
+Set `SHOW_RAW_VOXTRAL=false` in `.env` to hide the raw output once you no longer need it.
 
 ### Side-by-side comparison
 
@@ -246,14 +292,26 @@ cd ~/.local/bin/vox-refiner
 # 3. Configure your API key
 # Edit .env and set your MISTRAL_API_KEY
 
-# 4. Launch VoxRefiner
+# 4. Launch VoxRefiner (interactive menu)
 ./launch-vox-refiner.sh
 
-# 5. (Recommended) Configure a keyboard shortcut
-# Use this command for best compatibility :
-# /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
+# 5. (Recommended) Configure keyboard shortcuts
+# Each mode can have its own shortcut — use the full path with the matching flag:
+#
+#   Speak & Refine (record, AI cleans, paste):
+#   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-refine
+#
+#   Speak & Translate (record, translate, play in your voice):
+#   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-translate
+#
+#   Selection to Voice (read selected or clipboard text aloud):
+#   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --selection-voice
+#
+#   Interactive menu (all features):
+#   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
 
 # 6. (Optional) Create a desktop menu entry
+# The .desktop entry uses the plain launcher (interactive menu — no flag).
 cp vox-refiner.example.desktop ~/.local/share/applications/vox-refiner.desktop
 # Edit /home/your-username in that file, then validate:
 # desktop-file-validate ~/.local/share/applications/vox-refiner.desktop
@@ -288,13 +346,21 @@ chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh vox-refiner-update
 
 ### Keyboard shortcut (recommended)
 
-For the best experience, bind VoxRefiner to a keyboard shortcut so you can launch it with a single key press from anywhere.
-
-1. Bind `launch-vox-refiner.sh` to a keyboard shortcut in your desktop environment:
-
-The launcher auto-detects your terminal (`mate-terminal` → `gnome-terminal` → `xfce4-terminal` → `konsole` → `xterm`) and auto-detects the install directory — no configuration needed.
+For the best experience, bind each VoxRefiner mode to its own keyboard shortcut.
+The launcher auto-detects your terminal (`mate-terminal` → `gnome-terminal` → `xfce4-terminal` → `konsole` → `xterm`) and the install directory — no configuration needed.
 
 To force a specific terminal, set `VOXREFINER_TERMINAL` in your environment.
+
+**Available launch flags:**
+
+| Flag                | What it does                                              |
+| ------------------- | --------------------------------------------------------- |
+| `--speak-refine`    | Record, AI refines, copies to clipboard (most common)     |
+| `--speak-translate` | Record, translate, play in your own voice                 |
+| `--selection-voice` | Read selected or clipboard text aloud                     |
+| _(no flag)_         | Open the interactive menu                                 |
+
+**Configure your shortcuts:**
 
 | Desktop   | Where to configure                             |
 | --------- | ---------------------------------------------- |
@@ -303,19 +369,26 @@ To force a specific terminal, set `VOXREFINER_TERMINAL` in your environment.
 | **KDE**   | System Settings → Shortcuts → Custom Shortcuts |
 | **XFCE**  | Settings → Keyboard → Application Shortcuts    |
 
-Set the command to the full path of your launcher:
+Example commands to bind (replace `your-username` with your actual username):
 
 ```text
-/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh
+# Speak & Refine — bind to e.g. Super+V
+/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-refine
+
+# Speak & Translate — bind to e.g. Super+T
+/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-translate
+
+# Selection to Voice — bind to e.g. Super+R
+/home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --selection-voice
 ```
 
 Compatibility note:
 
-- Ubuntu MATE 24.04: bind the keyboard shortcut directly to `launch-vox-refiner.sh`.
-- Ubuntu Budgie 24.04: both `launch-vox-refiner.sh` and `vox-refiner.desktop` may work,
+- Ubuntu MATE 24.04: bind keyboard shortcuts directly to the launcher script.
+- Ubuntu Budgie 24.04: both the launcher and `vox-refiner.desktop` may work,
   but the direct launcher script remains the recommended default.
 
-1. Press your shortcut -> speak -> stop (Ctrl+C) -> paste anywhere.
+Press your shortcut → speak → stop (Ctrl+C) → paste anywhere.
 
 ### Desktop menu entry (.desktop, optional)
 

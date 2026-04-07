@@ -8,6 +8,8 @@ import base64
 import os
 import re
 import sys
+import textwrap
+import unicodedata
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -53,196 +55,522 @@ _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
 _CHUNK_MAX_CHARS = int(os.environ.get("TTS_CHUNK_SIZE", "800"))
 
 
-_AI_CLEAN_SYSTEM = (
-    "Tu es un assistant d'accessibilité pour malvoyants. Tu reçois un texte brut copié-collé depuis "
-    "une page web et tu dois le préparer pour une lecture vocale complète par un moteur TTS.\n\n"
-    "ÉTAPE 1 — DÉTECTION DU TYPE DE CONTENU :\n"
-    "Identifie silencieusement le type parmi : news_article, email, wikipedia, social_media, generic.\n\n"
-    "ÉTAPE 2 — NETTOYAGE selon le type détecté :\n\n"
-    "RÈGLES COMMUNES à tous les types :\n"
-    "- OBJECTIF ABSOLU : que l'utilisateur entende TOUT le contenu éditorial, sans rien sauter\n"
-    "- Conserver : titre principal, sous-titres et intertitres (intégralement), corps complet "
-    "(tous les paragraphes sans exception), citations et discours rapportés\n"
-    "- Citations et discours directs (les passages avec «, \" ou \u201C) : "
-    "les conserver comme passages/paragraphes SÉPARÉS avec leur propre ligne vide avant et après, "
-    "ne jamais les fusionner avec le texte qui les précède ou suit. Les citations entre guillemets "
-    "doivent clairement être séparées du reste des paragraphes pour permettre une lecture avec une "
-    "autre voix si nécessaire.\n"
-    "- Légendes de photos : introduire chaque légende par 'Photo : ' suivi de son texte "
-    "(l'utilisateur voit les images mais a du mal à lire)\n"
-    "- Supprimer : boutons UI ('Partager', 'Tweeter', 'Lire plus tard', compteurs), "
-    "métadonnées (auteur, date, temps de lecture, crédit photo seul comme 'AFP'), "
-    "annotations de liens ('(Nouvelle fenêtre)', '(new window)'), URLs brutes, adresses email\n"
-    "- Format de sortie : texte brut sans markdown (pas de **, *, #, tirets), "
-    "paragraphes séparés par une seule ligne vide, aucun commentaire de ta part\n\n"
-    "RÈGLES SPÉCIFIQUES par type :\n"
-    "- news_article : supprimer aussi les encarts 'Lire aussi : [titre]', 'Sur le même sujet', "
-    "'À lire aussi', 'À voir aussi', les fils d'Ariane ('Accueil > Rubrique > ...'), "
-    "les blocs newsletter, et tous les liens inline éditoriaux insérés dans le corps\n"
-    "- wikipedia : supprimer les références numériques [1], [2], [note 1], les bandeaux "
-    "d'avertissement ('Cet article...', 'La neutralité de cet article est contestée'), "
-    "les boîtes d'information latérales répétées, les catégories en bas de page\n"
-    "- email : supprimer les en-têtes techniques (De :, À :, Cc :, Date :, Objet :), "
-    "les pieds de page automatiques ('Ce message a été envoyé par...', 'Se désabonner', "
-    "'Unsubscribe', 'Ce courriel est confidentiel'), les signatures automatiques d'entreprise\n"
-    "- social_media : supprimer les compteurs (likes, retweets, vues, partages), "
-    "les hashtags purs (#mot) s'ils n'apportent pas de sens, les mentions @user si ce sont "
-    "des artefacts de navigation plutôt que du contenu\n"
-    "- generic : appliquer uniquement les règles communes\n\n"
-    """
-EXEMPLE DÉTAILLÉ (news_article) — modèle à reproduire :
-AVANT : {
+# ── AI cleaning: two-call architecture ──────────────────────────────────────
+# Call 1 (mistral-small): detect content type — one-word response, fast/cheap.
+# Call 2 (devstral):      clean with a focused, type-specific prompt.
 
-«Aujourd’hui est votre dernier jour» : Oracle licencie des milliers de salariés par un simple e-mail
-Par Ségolène Forgar
-Il y a 1 jour
+_DETECT_MODEL = "mistral-small-latest"
+_CLEAN_MODEL  = "devstral-latest"
 
-Sujets
-Oracle
-￼
-Copier le lien
-￼
-Écouter cet article
-￼
-00:00/04:25
-￼
-L’entreprise du milliardaire Larry Ellison a procédé, ce mardi, à une vague de licenciements d’ampleur. En cause : sa réorientation stratégique vers l’intelligence artificielle.
+_DETECT_SYSTEM = textwrap.dedent("""
+    You receive raw text copied from a web page or application.
+    Identify the content type with a single word from:
 
-PASSER LA PUBLICITÉ
-PASSER LA PUBLICITÉ
-Un e-mail laconique, envoyé aux aurores. Ce mardi 31 mars, des milliers de salariés d’Oracle ont découvert, avec stupeur, que leur poste avait tout bonnement été supprimé. Le géant de l’informatique à distance (cloud), fondé par le milliardaire Larry Ellison et basé à Austin (Texas), a en effet procédé à une vague de licenciements d’ampleur, qui toucherait près de 10.000 personnes selon un employé interrogé par la BBC. L’entreprise, qui comptait 162.000 salariés en mai 2025 d’après un document déposé auprès de la Securities and Exchange Commission (SEC), justifie ces départs par «les besoins actuels de l’entreprise».
+      news_article       — press article or blog post
+      email              — email message or newsletter
+      wikipedia          — encyclopedic article (Wikipedia, Vikidia…)
+      social_media       — social network post or thread
+      documentation      — technical doc, README, manual, API reference
+      assistant_response — AI assistant response (ChatGPT, Claude, Gemini…)
+      generic            — any other type
 
-Emploi & EntrepriseNewsletter
-Tous les lundis
+    Reply with the exact word only, no punctuation or explanation.
+""").strip()
 
-Recevez tous les lundis l’actualité de l’Entreprise : emploi, formation, vie de bureau, entrepreneurs, social…
+_CLEAN_COMMON = textwrap.dedent("""
+    You are an accessibility assistant for visually impaired users.
+    You receive raw text copied from a web page and must prepare it
+    for complete audio playback by a TTS engine.
 
-Adresse e-mail
-￼￼S'INSCRIRE
-Le message adressé aux licenciés, révélé par Business Insider, ne laisse aucune place à l’ambiguïté. «Après un examen attentif des besoins actuels d’Oracle, nous avons pris la décision de supprimer votre poste dans le cadre d’une réorganisation plus large. Par conséquent, aujourd’hui est votre dernier jour de travail», peut-on y lire.
+    ABSOLUTE GOAL: the user must hear ALL editorial content, nothing skipped.
 
-PASSER LA PUBLICITÉ
-Publicité
-Les employés congédiés ont été informés que leur accès aux outils informatiques, à leur messagerie et à leurs fichiers serait désactivé dans les heures suivantes. Ils se sont, par ailleurs, vu proposer une indemnité de départ équivalente à un mois de salaire, selon la BBC.
+    ══════════════════════════════════════════════
+    CRITICAL RULE — QUOTATION ISOLATION
+    ══════════════════════════════════════════════
+    Every passage in quotation marks (« », " " or " ") must be isolated as a
+    SEPARATE paragraph, surrounded by a blank line before and after.
+    This applies even to a two-word quote. This rule is ABSOLUTE: no exceptions.
 
-Investissements massifs dans l’IA
-D’après les publications LinkedIn d’employés remerciés, les réductions d’effectifs concernent plusieurs départements : Oracle Health, Ventes, Cloud, Customer Success et NetSuite. Michael Shepard, cadre supérieur non touché par le plan, a précisé sur LinkedIn que des «ingénieurs seniors, architectes, responsables opérationnels, chefs de programme et spécialistes techniques» figuraient parmi les licenciés. Il a insisté sur le fait que cette «coupe significative des effectifs» n’était pas liée à la performance individuelle. «Les personnes concernées n’ont pas été licenciées en raison de ce qu’elles ont fait ou n’ont pas fait (...) Ceci est la fin d’un chapitre, pas de votre histoire», a-t-il ajouté. Sollicité par la presse américaine, Oracle se refuse pour l’heure à tout commentaire.
+    ISOLATION EXAMPLES (reproduce systematically):
 
-Il n’empêche, ces suppressions de postes interviennent alors qu’Oracle investit massivement dans l’intelligence artificielle (IA). Cette année, l’entreprise prévoit de consacrer au moins 50 milliards de dollars (43,2 milliards d’euros) au développement de ses infrastructures IA. L’objectif ? «Pouvoir répondre à la demande qu’il a déjà contractée auprès de clients tels que Nvidia, Meta Platforms, TikTok, OpenAI, xAI d’Elon Musk et le fabricant de puces Advanced Micro Devices», nous apprenaient nos confrères du Wall Street Journal  en février.
+    Example 1 — short embedded quote:
+      BEFORE: L'entreprise justifie ces départs par «les besoins actuels» selon un communiqué.
+      AFTER:
+        L'entreprise justifie ces départs par
 
-Oracle est par ailleurs partenaire du projet Stargate, une initiative à 500 milliards de dollars lancée aux côtés d’OpenAI, de SoftBank et de MGX, un fonds d’investissement soutenu par le président Donald Trump, et destinée à développer les capacités de centres de données aux États-Unis.
+        «les besoins actuels»
 
-Wall Street applaudit, la Silicon Valley tremble
-En interne, l’IA transforme déjà les méthodes de travail. «L’utilisation d’outils de codage par IA au sein d’Oracle permet à des équipes d’ingénieurs plus réduites de fournir des solutions plus complètes à nos clients, plus rapidement», déclarait Mike Sicilia, co-directeur général d’Oracle, au début du mois.
+        selon un communiqué.
 
-￼
-PASSER LA PUBLICITÉ
-Publicité
-En attendant, la Bourse de Wall Street a réagi favorablement. L’action Oracle a ainsi progressé de 2,5% mardi à la mi-journée, une éclaircie pour un titre qui a perdu plus de 27% depuis le début de l’année, note Forbes .
+    Example 2 — multiple quotes in one sentence:
+      BEFORE: Il a dit «oui» puis précisé «sous conditions» avant de partir.
+      AFTER:
+        Il a dit
 
-Oracle n’est pas un cas isolé. Ces licenciements s’inscrivent dans une tendance du secteur de la tech aux États-Unis. En janvier, Amazon avait annoncé la suppression de 16.000 postes. La conséquence d’une nouvelle stratégie consistant à «réduire les niveaux hiérarchiques et à supprimer la bureaucratie». Tandis qu’on apprenait encore la semaine dernière que Meta songeait à licencier au moins 20% de ses effectifs. La maison mère de Facebook, Instagram et WhatsApp - qui emploie 79.000 personnes dans le monde - chercherait à compenser l’augmentation de ses investissements en IA et à se préparer aux changements d’organisation apportés par les assistants conversationnels.
+        «oui»
 
-La rédaction vous conseille
-Cloud : l'américain Oracle veut lever jusqu'à 50 milliards de dollars en 2026
-«Le personnage me fait peur» : Larry Ellison, le puissant magnat de la tech qui murmure à l’oreille de Donald Trump 
-PASSER LA PUBLICITÉ
-Publicité
-«Aujourd’hui est votre dernier jour» : Oracle licencie des milliers de salariés par un simple e-mail
+        puis précisé
 
-￼
-124 commentaires
-￼
-S'ABONNER
-PASSER LA PUBLICITÉ
-PASSER LA PUBLICITÉ
-124 commentaires   }
+        «sous conditions»
 
-APRÈS : {
+        avant de partir.
 
-«Aujourd’hui est votre dernier jour»
+    Example 3 — long quote with trailing attribution:
+      BEFORE: La ministre a déclaré : «Nous allons augmenter le budget de 20%.», ajoutant que la décision était définitive.
+      AFTER:
+        La ministre a déclaré :
 
-Oracle licencie des milliers de salariés par un simple e-mail
+        «Nous allons augmenter le budget de 20%.»
 
-Article rédigé par Ségolène Forgar, il y a 1 jour.
+        ajoutant que la décision était définitive.
 
-Photo d’illustration: L’entreprise du milliardaire Larry Ellison a procédé, ce mardi, à une vague de licenciements d’ampleur. En cause : sa réorientation stratégique vers l’intelligence artificielle.
+    ══════════════════════════════════════════════
+    OTHER RULES
+    ══════════════════════════════════════════════
+    - Keep: main title, section headings and subheadings (verbatim),
+      full body text (every paragraph without exception).
+    - Photo captions: introduce each caption with "Photo d'illustration : " followed by its text.
+    - Remove: UI buttons, counters, technical metadata (reading time, standalone photo credit
+      such as "AFP/Reuters"), link annotations ("(Nouvelle fenêtre)", "(new window)"),
+      raw URLs, email addresses.
+    - Output format: plain text, no markdown (no **, *, #, bullet dashes),
+      paragraphs separated by a single blank line, no commentary from you.
+""").strip()
 
-Un e-mail laconique, envoyé aux aurores. Ce mardi 31 mars, des milliers de salariés d’Oracle ont découvert, avec stupeur, que leur poste avait tout bonnement été supprimé. Le géant de l’informatique à distance (cloud), fondé par le milliardaire Larry Ellison et basé à Austin (Texas), a en effet procédé à une vague de licenciements d’ampleur, qui toucherait près de 10.000 personnes selon un employé interrogé par la BBC. L’entreprise, qui comptait 162.000 salariés en mai 2025 d’après un document déposé auprès de la Securities and Exchange Commission (SEC), justifie ces départs par
+# Per-type rules appended to _CLEAN_COMMON for call 2.
+# Empty string for generic = common rules only.
+_CLEAN_RULES: dict[str, str] = {
+    "news_article": textwrap.dedent("""
+        DETECTED TYPE: press article
 
-«les besoins actuels de l’entreprise».
+        OUTPUT ORDER (strictly):
+        1. Media name and publication date, on one line, formatted as:
+           "[Media], publié le [date] à [heure]." — only if present in the selection.
+           If media name is absent: "Publié le [date] à [heure]."
+           If both published and updated times: "…publié le [date] à [heure], mis à jour à [heure]."
+           This gives essential context before anything else.
+        2. Main title (keep verbatim, mandatory)
+        3. Chapeau / lead paragraph: the short summary text that appears just below
+           the title and above the body — keep it verbatim, it is editorial content.
+        4. Author name, on its own line as "Par [name]." — only if present.
+        5. Full body text (all paragraphs without exception)
 
-Le message adressé aux licenciés, révélé par Business Insider, ne laisse aucune place à l’ambiguïté. 
+        REMOVE IN ADDITION:
+        - "Lire aussi : [title]", "Sur le même sujet", "À lire aussi", "À voir aussi" blocks
+        - Breadcrumbs ("Accueil > Rubrique > …") and navigation menus
+        - Newsletter blocks and subscription forms
+        - Ad blocks ("PASSER LA PUBLICITÉ", "Publicité", "ANNONCE")
+        - "La rédaction vous conseille" section and its links
+        - Comment counters, social buttons, share links
 
-«Après un examen attentif des besoins actuels d’Oracle, nous avons pris la décision de supprimer votre poste dans le cadre d’une réorganisation plus large. Par conséquent, aujourd’hui est votre dernier jour de travail»,
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        Press articles contain many source quotes. Each quote, even a short one,
+        must be on its own paragraph.
+          BEFORE: Le PDG a estimé que «la situation est sous contrôle», balayant les critiques.
+          AFTER:
+            Le PDG a estimé que
 
- peut-on y lire.
+            «la situation est sous contrôle»
 
-Les employés congédiés ont été informés que leur accès aux outils informatiques, à leur messagerie et à leurs fichiers serait désactivé dans les heures suivantes. Ils se sont, par ailleurs, vu proposer une indemnité de départ équivalente à un mois de salaire, selon la BBC.
+            balayant les critiques.
+    """).strip(),
 
-Investissements massifs dans l’IA
-D’après les publications LinkedIn d’employés remerciés, les réductions d’effectifs concernent plusieurs départements : Oracle Health, Ventes, Cloud, Customer Success et NetSuite. Michael Shepard, cadre supérieur non touché par le plan, a précisé sur LinkedIn que des
+    "email": textwrap.dedent("""
+        DETECTED TYPE: email or newsletter
 
-«ingénieurs seniors, architectes, responsables opérationnels, chefs de programme et spécialistes techniques»
+        KEEP AT THE TOP (if present in the selection) and present them as an introduction:
+        - Subject (Objet :) → "Objet : [subject]"
+        - Date (Date :) → "Reçu le [date]."
+        - Sender name (De :) → "De : [name]."
+        - Example intro: "De : Marie Dupont. Reçu le 6 avril 2026. Objet : Réunion de demain."
 
-figuraient parmi les licenciés. Il a insisté sur le fait que cette
+        REMOVE IN ADDITION:
+        - Technical header fields not listed above (À :, Cc :, Cci :, Message-ID…)
+        - Auto-footers ("Ce message a été envoyé par…", "Se désabonner",
+          "Unsubscribe", "Ce courriel est confidentiel")
+        - Automatic company signatures (address, phone, legal notices)
+    """).strip(),
 
-«coupe significative des effectifs»
+    "wikipedia": textwrap.dedent("""
+        DETECTED TYPE: encyclopedic article
 
-n’était pas liée à la performance individuelle.
+        REMOVE IN ADDITION:
+        - Numeric references [1], [2], [note 1], [réf. nécessaire]
+        - Warning banners ("Cet article…", "La neutralité de cet article est contestée")
+        - Infobox content duplicated in the body text
+        - Categories, "modifier" and "modifier le code" links
 
-«Les personnes concernées n’ont pas été licenciées en raison de ce qu’elles ont fait ou n’ont pas fait (...) Ceci est la fin d’un chapitre, pas de votre histoire»,
+        MATH VERBALIZATION:
+        Mathematical formulas must be rewritten as natural spoken French so the TTS
+        engine reads them intelligibly. Apply these substitutions:
+        - f(x)        → f de x
+        - f(x, y)     → f de x virgule y
+        - nested f(g(x)) → f de g de x
+        - X : A → B   → X, fonction de A vers B   (type signature: colon = "fonction de")
+        - A → B       → A vers B
+        - A = B       → A égal à B
+        - × (Cartesian product / type product) → croix
+        - ∀f ∈ F      → pour tout f appartenant à F
+        - ∃x          → il existe x
+        - ∈           → appartient à
+        - ∉           → n'appartient pas à
+        - ⊂           → est inclus dans
+        - ∩           → intersecté avec
+        - ∪           → uni à
 
-a-t-il ajouté. Sollicité par la presse américaine, Oracle se refuse pour l’heure à tout commentaire.
+        Examples:
+          BEFORE: K : N → PK × SK : la fonction de génération des clefs
+          AFTER:  K, fonction de N vers PK croix SK, la fonction de génération des clefs
 
-Il n’empêche, ces suppressions de postes interviennent alors qu’Oracle investit massivement dans l’intelligence artificielle (IA). Cette année, l’entreprise prévoit de consacrer au moins 50 milliards de dollars (43,2 milliards d’euros) au développement de ses infrastructures IA. L’objectif ? 
+          BEFORE: Eval : F × C × C → C : la fonction d'évaluation
+          AFTER:  Eval, fonction de F croix C croix C vers C, la fonction d'évaluation
 
-«Pouvoir répondre à la demande qu’il a déjà contractée auprès de clients tels que Nvidia, Meta Platforms, TikTok, OpenAI, xAI d’Elon Musk et le fabricant de puces Advanced Micro Devices»,
+          BEFORE: D(E(m)) = m
+          AFTER:  D de E de m, égal à m
 
-nous apprenaient nos confrères du Wall Street Journal  en février.
+          BEFORE: ∀f ∈ F, D(Eval(f, C1, C2)) = Eval(f, D(C1), D(C2))
+          AFTER:  pour tout f appartenant à F, D de Eval de f virgule C1 virgule C2, égal à Eval de f virgule D de C1 virgule D de C2
 
-Oracle est par ailleurs partenaire du projet Stargate, une initiative à 500 milliards de dollars lancée aux côtés d’OpenAI, de SoftBank et de MGX, un fonds d’investissement soutenu par le président Donald Trump, et destinée à développer les capacités de centres de données aux États-Unis.
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        Encyclopedic articles sometimes quote authors or sources.
+          BEFORE: Selon Darwin, «la sélection naturelle est le moteur de l'évolution» comme il l'explique dans son ouvrage.
+          AFTER:
+            Selon Darwin,
 
-Wall Street applaudit, la Silicon Valley tremble
-En interne, l’IA transforme déjà les méthodes de travail.
+            «la sélection naturelle est le moteur de l'évolution»
 
-«L’utilisation d’outils de codage par IA au sein d’Oracle permet à des équipes d’ingénieurs plus réduites de fournir des solutions plus complètes à nos clients, plus rapidement»,
+            comme il l'explique dans son ouvrage.
+    """).strip(),
 
-déclarait Mike Sicilia, co-directeur général d’Oracle, au début du mois.
+    "social_media": textwrap.dedent("""
+        DETECTED TYPE: social media post or thread
 
-En attendant, la Bourse de Wall Street a réagi favorablement. L’action Oracle a ainsi progressé de 2,5% mardi à la mi-journée, une éclaircie pour un titre qui a perdu plus de 27% depuis le début de l’année, note Forbes .
+        REMOVE IN ADDITION:
+        - Engagement counters (likes, retweets, shares, views, reply counts)
+        - Pure hashtags (#word) with no contextual value
+        - @user mentions that are navigation artefacts (buttons, links)
+        - Interaction buttons ("Répondre", "Retweeter", "J'aime") and standalone timestamps
 
-Oracle n’est pas un cas isolé. Ces licenciements s’inscrivent dans une tendance du secteur de la tech aux États-Unis. En janvier, Amazon avait annoncé la suppression de 16.000 postes. La conséquence d’une nouvelle stratégie consistant à
+        KEEP:
+        - @user mentions cited within the body of a comment or post (they are part of the content)
+        - When a comment is a reply to another user, indicate it explicitly:
+          "En réponse à @username :" followed by the reply text on a new paragraph.
 
-«réduire les niveaux hiérarchiques et à supprimer la bureaucratie».
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        Posts often quote other people or reproduce statements.
+          BEFORE: Il répond à la polémique : "Je n'ai jamais dit ça" et demande des excuses.
+          AFTER:
+            Il répond à la polémique :
 
-Tandis qu’on apprenait encore la semaine dernière que Meta songeait à licencier au moins 20% de ses effectifs. La maison mère de Facebook, Instagram et WhatsApp - qui emploie 79.000 personnes dans le monde - chercherait à compenser l’augmentation de ses investissements en IA et à se préparer aux changements d’organisation apportés par les assistants conversationnels.
+            "Je n'ai jamais dit ça"
 
-Fin de l’article.
+            et demande des excuses.
+    """).strip(),
 
-La rédaction vous conseille :
+    "documentation": textwrap.dedent("""
+        DETECTED TYPE: technical documentation
 
-Cloud : l'américain Oracle veut lever jusqu'à 50 milliards de dollars en 2026
+        ADAPT:
+        - Code blocks: introduce with "Exemple de code :" then read as plain text
+          (remove backticks and superfluous indentation).
+        - Remove line numbers from code excerpts.
+        - Remove badges (Build passing, Coverage 98%…) and decorative icons.
+        - Keep important notices (WARNING, NOTE, IMPORTANT).
 
-«Le personnage me fait peur» :
+        MATH VERBALIZATION (if mathematical notation is present):
+        Rewrite formulas as natural spoken language so the TTS reads them intelligibly.
+        - f(x)       → f de x
+        - X : A → B  → X, fonction de A vers B   (type signature: colon = "fonction de")
+        - A → B      → A vers B
+        - A = B      → A égal à B
+        - × (product/Cartesian) → croix
+        - ∀x ∈ S     → pour tout x appartenant à S
+        - ∈          → appartient à
+        - ∈        → appartient à
 
-Larry Ellison, le puissant magnat de la tech qui murmure à l’oreille de Donald Trump 
+        TABLES: rewrite each row as a sentence using the column header names.
+        Skip cells whose value is just a dash (—, –).
+          BEFORE:
+            | Length     | Primary model        | Fallback             |
+            |------------|----------------------|----------------------|
+            | <80 words  | mistral-small-latest | mistral-medium-latest|
+            | >240 words | magistral-medium     | mistral-medium-latest|
+          AFTER:
+            Length: less than 80 words. Primary model: mistral-small-latest. Fallback: mistral-medium-latest.
+            Length: more than 240 words. Primary model: magistral-medium. Fallback: mistral-medium-latest.
 
-«Aujourd’hui est votre dernier jour» :
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        Documentation may quote error messages or technical terms.
+          BEFORE: La fonction retourne «None» si aucune valeur n'est trouvée.
+          AFTER:
+            La fonction retourne
 
-Oracle licencie des milliers de salariés par un simple e-mail
+            «None»
 
+            si aucune valeur n'est trouvée.
+    """).strip(),
+
+    "assistant_response": textwrap.dedent("""
+        DETECTED TYPE: AI assistant response
+
+        TABLES: rewrite each row as a sentence using the column header names.
+        Skip cells whose value is just a dash (—, –).
+          BEFORE: | Step | Command | Effect |\\n| 1 | npm install | installs deps |
+          AFTER: Step: 1. Command: npm install. Effect: installs deps.
+
+        ADAPT:
+        - Convert markdown to readable text:
+          **bold** → bold,  *italic* → italic,  # Heading → read normally,
+          - item → read as a normal sentence without a dash.
+        - Code blocks: introduce with "Exemple de code :" then read as plain text.
+        - Remove interface metadata (token counter, model name, timestamp).
+        - Keep step numbering when it structures the content.
+
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        AI responses may quote source texts or examples.
+          BEFORE: Le texte original dit «le ciel est bleu» mais cette affirmation est simpliste.
+          AFTER:
+            Le texte original dit
+
+            «le ciel est bleu»
+
+            mais cette affirmation est simpliste.
+    """).strip(),
+
+    "generic": textwrap.dedent("""
+        DETECTED TYPE: generic content
+
+        TABLES: rewrite each row as a sentence using the column header names.
+        Skip cells whose value is just a dash (—, –).
+          BEFORE: | Name | Role | Status |\\n| Alice | Dev | Active |
+          AFTER: Name: Alice. Role: Dev. Status: Active.
+
+        QUOTATION ISOLATION REMINDER (see critical rule above):
+        Any text may contain quotes. Apply the isolation rule to every quoted
+        passage without exception.
+          BEFORE: Le rapport conclut que «des améliorations significatives sont nécessaires» dès 2025.
+          AFTER:
+            Le rapport conclut que
+
+            «des améliorations significatives sont nécessaires»
+
+            dès 2025.
+    """).strip(),
 }
 
-"""
-    "Retourne uniquement le texte nettoyé, rien d'autre."
-)
 
-_AI_CLEAN_MODEL = "devstral-latest"
+# Two or more spaces used as column separators in space-aligned tables.
+_RE_SPACE_SEP = re.compile(r'  +')
+
+# A line is a candidate math token if it is short (≤ 8 chars) and contains no
+# accented letters. We exclude U+00C0-U+00D6 (À…Ö) and U+00D8-U+00F6 (Ø…ö)
+# and U+00F8-U+024F, but intentionally keep U+00D7 (×) and U+00F7 (÷) which
+# are math symbols, not accented letters.
+_MATH_TOKEN_LINE = re.compile(r'^[^\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\s]{1,8}\s*$')
+
+
+def _verbalize_tables(text: str) -> str:
+    """Convert tabular content to accessible spoken prose.
+
+    Converts three table formats to one sentence per data row:
+      "Header1: value1. Header2: value2."
+
+    Handled formats:
+      - Markdown pipe tables  (| col | col |)
+      - Tab-separated tables  (col\\tcol\\tcol)
+      - Space-aligned tables  (col  col  col — ≥ 2 spaces as separator,
+                               requires ≥ 3 cols and ≥ 3 consecutive rows
+                               to keep false-positive rate low on prose)
+
+    Must be called BEFORE the multi-space collapsing step in _clean_text so
+    that space-aligned column boundaries are still intact.
+    """
+
+    def _pipe_cells(row: str) -> list[str]:
+        return [c.strip() for c in row.strip().strip('|').split('|')]
+
+    def _space_cells(row: str) -> list[str]:
+        return [c.strip() for c in _RE_SPACE_SEP.split(row.strip()) if c.strip()]
+
+    def _row_sentence(headers: list[str], cells: list[str]) -> str:
+        parts = []
+        for h, c in zip(headers, cells):
+            h, c = h.strip(), c.strip()
+            # Skip empty cells and pure-dash placeholders (—, –, -)
+            if h and c and c not in ('—', '–', '-', '·', '…'):
+                parts.append(f"{h}: {c}")
+        return ". ".join(parts) + "." if parts else ""
+
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+
+    while i < len(lines):
+        raw = lines[i]
+        s = raw.strip()
+
+        # ── Markdown pipe table ──────────────────────────────────────────────
+        if s and '|' in s and (s.startswith('|') or s.endswith('|') or ' | ' in s):
+            block: list[str] = []
+            j = i
+            while j < len(lines) and '|' in lines[j] and lines[j].strip():
+                block.append(lines[j])
+                j += 1
+            # Drop separator rows like |---|:--|:---:|
+            data = [r for r in block if not re.fullmatch(r'[\s|:\-]+', r.strip())]
+            if len(data) >= 2:
+                headers = _pipe_cells(data[0])
+                for row in data[1:]:
+                    sent = _row_sentence(headers, _pipe_cells(row))
+                    if sent:
+                        out.append(sent)
+                out.append("")
+                i = j
+                continue
+
+        # ── Tab-separated table ──────────────────────────────────────────────
+        if '\t' in s and s.count('\t') >= 1:
+            block = [s]
+            j = i + 1
+            while j < len(lines) and '\t' in lines[j] and lines[j].strip():
+                block.append(lines[j].strip())
+                j += 1
+            col_counts = [r.count('\t') + 1 for r in block]
+            mode = max(set(col_counts), key=col_counts.count)
+            if len(block) >= 2 and mode >= 2:
+                headers = [h.strip() for h in block[0].split('\t')]
+                for row in block[1:]:
+                    sent = _row_sentence(headers, [c.strip() for c in row.split('\t')])
+                    if sent:
+                        out.append(sent)
+                out.append("")
+                i = j
+                continue
+
+        # ── Space-aligned table (≥ 3 cols, ≥ 3 consecutive rows) ────────────
+        # Require at least 3 rows (header + 2 data rows) to limit false positives.
+        first_cols = _space_cells(s)
+        if (len(first_cols) >= 3
+                and s
+                and not s.startswith('#')
+                and not s.startswith('`')):
+            block_cols: list[list[str]] = [first_cols]
+            j = i + 1
+            while j < len(lines):
+                ns = lines[j].strip()
+                nc = _space_cells(ns) if ns else []
+                if ns and len(nc) >= 2:
+                    block_cols.append(nc)
+                    j += 1
+                else:
+                    break
+            if len(block_cols) >= 3:
+                headers = block_cols[0]
+                converted = [_row_sentence(headers, row) for row in block_cols[1:]]
+                converted = [sv for sv in converted if sv]
+                if converted:
+                    out.extend(converted)
+                    out.append("")
+                    i = j
+                    continue
+
+        out.append(raw)
+        i += 1
+
+    return '\n'.join(out)
+
+
+def _collapse_math_lines(text: str) -> str:
+    """Join sequences of math-token lines caused by Wikipedia formula rendering.
+
+    When a Wikipedia page is copy-pasted, each character of a math formula
+    (rendered as SVG) lands on its own line: "K\\n:\\nN\\n→\\nPK\\n×\\nSK".
+    A run of ≥ 3 consecutive math-token lines is collapsed when ≥ 50 % of its
+    tokens are single characters — the hallmark of a fragmented formula.
+    This prevents collapsing French text (e.g. "de la un le") which has no
+    single-char tokens to speak of.
+    """
+    lines = text.splitlines()
+    result: list[str] = []
+    i = 0
+    # Strip inline Wikipedia references like [2] or [note 1] that appear at the
+    # start of a line immediately after a math formula (e.g. "￼[2] tel que :").
+    _wiki_ref = re.compile(r'^\[\d+(?:\s+\w+)?\]\s*')
+
+    while i < len(lines):
+        stripped = lines[i].strip()
+        if _MATH_TOKEN_LINE.match(stripped):
+            j = i + 1
+            while j < len(lines) and _MATH_TOKEN_LINE.match(lines[j].strip()):
+                j += 1
+            if j - i >= 3:
+                tokens = [lines[k].strip() for k in range(i, j) if lines[k].strip()]
+                single_char = sum(1 for t in tokens if len(t) == 1)
+                if tokens and single_char / len(tokens) >= 0.5:
+                    collapsed = " ".join(tokens)
+                    # If the next line is "[N] some text", strip the reference
+                    # and append the remaining text so it stays with the formula.
+                    if j < len(lines):
+                        after = lines[j].strip()
+                        # Strip wiki reference [N] and attach the rest
+                        after_no_ref = _wiki_ref.sub("", after).strip()
+                        if after_no_ref != after:
+                            if after_no_ref:
+                                collapsed = collapsed + " " + after_no_ref
+                            j += 1
+                        # Attach continuation lines starting with ":" or ";"
+                        # (formula definitions like "￼ : la fonction de …")
+                        elif after.startswith(":") or after.startswith(";"):
+                            collapsed = collapsed + " " + after
+                            j += 1
+                    result.append(collapsed)
+                    i = j
+                    continue
+        result.append(lines[i])
+        i += 1
+    return "\n".join(result)
+
+
+def _merge_split_identifiers(text: str) -> str:
+    """Merge letter sequences that were split character-by-character.
+
+    After NFKC + _collapse_math_lines, math identifiers like 𝐸𝑣𝑎𝑙 become
+    "E v a l" (each letter space-separated). This step re-fuses them into "Eval".
+
+    Rule: a run of single letters separated by plain spaces (not commas or
+    operators) is merged into one word. Examples:
+      "E v a l"  → "Eval"
+      "m o d"    → "mod"
+      "K , E"    → unchanged (comma breaks the run)
+    """
+    # Match: uppercase or lowercase letter, followed by 1+ ( space + single letter )
+    # Negative lookbehind/ahead: not preceded/followed by comma, operator or word char.
+    # Merge runs of single letters: "E v a l" → "Eval"
+    text = re.sub(
+        r'(?<![,\w])([A-Za-z])( [A-Za-z])+(?![,\w])',
+        lambda m: m.group(0).replace(" ", ""),
+        text,
+    )
+    # Merge letter + digit: "C 1" → "C1", "C 2" → "C2"
+    text = re.sub(r'([A-Za-z]) (\d+)', r'\1\2', text)
+    return text
 
 
 def _clean_text(text: str) -> str:
-    """Minimal pre-filter: remove only unreadable binary artifacts."""
+    """Normalize Unicode, collapse math tokens, and remove unreadable artifacts."""
+    # NFKC: converts math italic letters (𝐸→E, 𝑣→v) and other compatibility
+    # characters to their ASCII equivalents — essential for Wikipedia formulas
+    # where each character arrives on its own line as a separate Unicode code point.
+    text = unicodedata.normalize("NFKC", text)
     text = text.replace("\ufffc", "")  # Unicode object replacement char (icons/images)
+    text = _verbalize_tables(text)     # must run before multi-space collapsing
+    text = _collapse_math_lines(text)
+    text = _merge_split_identifiers(text)
+    # Remove space between an uppercase math identifier and its opening paren:
+    # "D (E(m))" → "D(E(m))" so _expand_function_calls can match it.
+    text = re.sub(r'\b([A-Z][A-Za-z0-9]*)\s+\(', r'\1(', text)
+    # Normalize spaces around commas inside parenthesized lists: "( K , E )" → "(K, E)"
+    text = re.sub(r'\(\s*([^()]+?)\s*\)', lambda m: '(' + re.sub(r'\s*,\s*', ', ', m.group(1).strip()) + ')', text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r"\n{4,}", "\n\n\n", text)
     return text.strip()
@@ -257,33 +585,68 @@ def _strip_markdown(text: str) -> str:
 
 
 def _ai_clean_text(text: str) -> str:
-    """Use Mistral to extract clean editorial content from web-selected text.
+    """Detect content type then clean with a specialized prompt.
 
-    Falls back to heuristic _clean_text() if the AI call fails.
+    Two API calls:
+      1. mistral-small-latest : detect content type (one-word response)
+      2. devstral-latest      : clean with type-specific rules
+
+    Falls back to _clean_text() if any call fails.
     """
     api_key = os.environ.get("MISTRAL_API_KEY")
     if not api_key:
         print("\u26a0\ufe0f  No MISTRAL_API_KEY — skipping AI cleaning.", file=sys.stderr)
         return _clean_text(text)
 
+    # Normalize before sending to AI: NFKC + math-line collapsing so the AI
+    # receives "K : N → PK × SK" instead of "K\n:\nN\n→\nP\nK\n×\nS\nK".
+    text = _clean_text(text)
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    # ── Call 1: detect content type ──────────────────────────────────────────
+    content_type = "generic"
+    try:
+        print("\U0001f50d Detecting content type...", file=sys.stderr)
+        resp = requests.post(
+            "https://api.mistral.ai/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": _DETECT_MODEL,
+                "messages": [
+                    {"role": "system", "content": _DETECT_SYSTEM},
+                    {"role": "user",   "content": text[:2000]},  # sample is enough for detection
+                ],
+                "max_tokens": 10,
+                "temperature": 0.0,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        detected = resp.json()["choices"][0]["message"]["content"].strip().lower()
+        if detected in _CLEAN_RULES:
+            content_type = detected
+        print(f"\U0001f4c4 Type: {content_type}", file=sys.stderr)
+    except Exception as exc:
+        print(f"\u26a0\ufe0f  Type detection failed ({exc}), using generic.", file=sys.stderr)
+
+    # ── Call 2: clean with type-specific prompt ───────────────────────────────
     print("\U0001f9f9 Cleaning text via AI...", file=sys.stderr)
-    payload = {
-        "model": _AI_CLEAN_MODEL,
-        "messages": [
-            {"role": "system", "content": _AI_CLEAN_SYSTEM},
-            {"role": "user", "content": text},
-        ],
-        "max_tokens": 4096,
-        "temperature": 0.0,
-    }
+    specific = _CLEAN_RULES[content_type]
+    system_prompt = _CLEAN_COMMON + ("\n\n" + specific if specific else "")
     try:
         resp = requests.post(
             "https://api.mistral.ai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
+            headers=headers,
+            json={
+                "model": _CLEAN_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": text},
+                ],
+                "max_tokens": 4096,
+                "temperature": 0.0,
             },
-            json=payload,
             timeout=30,
         )
         resp.raise_for_status()
@@ -293,7 +656,163 @@ def _ai_clean_text(text: str) -> str:
             return result
     except Exception as exc:
         print(f"\u26a0\ufe0f  AI cleaning failed ({exc}), using raw text.", file=sys.stderr)
+
     return _clean_text(text)
+
+
+# ── Math symbol verbalization ────────────────────────────────────────────────
+# Simple substitutions applied as a safety net after AI cleaning.
+# The AI prompt handles complex formulas; this catches any survivors.
+_MATH_SYMBOLS: list[tuple[str, str]] = [
+    # Logic / set theory
+    ("∀",  "pour tout "),
+    ("∃",  "il existe "),
+    ("∈",  " appartient à "),
+    ("∉",  " n'appartient pas à "),
+    ("⊂",  " est inclus dans "),
+    ("⊆",  " est inclus ou égal à "),
+    ("∩",  " intersecté avec "),
+    ("∪",  " uni à "),
+    ("∅",  "l'ensemble vide"),
+    # Arrows
+    ("→",  " vers "),
+    ("←",  " depuis "),
+    ("↔",  " équivalent à "),
+    ("⇒",  " implique "),
+    ("⇔",  " si et seulement si "),
+    # Operators
+    # × in math context = Cartesian product / type product → "croix" (not "fois")
+    # "fois" is reserved for arithmetic multiplication (3 × 4).
+    ("×",  " croix "),
+    ("⋅",  " fois "),   # middle dot (arithmetic multiplication)
+    ("÷",  " divisé par "),
+    (" = ", " égal à "),   # spaced = to avoid replacing == in code or HTML
+    ("\n= ", "\négal à "), # = at start of a continuation line
+    ("^",  " exposant "),
+    ("≠",  " différent de "),
+    ("≤",  " inférieur ou égal à "),
+    ("≥",  " supérieur ou égal à "),
+    ("≈",  " environ égal à "),
+    ("±",  " plus ou moins "),
+    ("∞",  "l'infini"),
+    ("√",  "racine carrée de "),
+    ("∑",  "somme de "),
+    ("∏",  "produit de "),
+    ("∫",  "intégrale de "),
+    ("∂",  "dérivée partielle de "),
+]
+
+
+def _expand_math_symbols(text: str) -> str:
+    """Replace mathematical symbols with spoken French equivalents.
+
+    Acts as a safety net after AI cleaning: catches any symbols the AI missed.
+    Only replaces symbols when they appear outside of backtick code spans.
+    Also verbalizes colons in math formula lines: "K : N vers PK croix SK"
+    becomes "K, de N vers PK croix SK", only when the line contains a math
+    arrow or operator (to avoid touching normal prose like "Photo : ...").
+    """
+    # Split on code spans to avoid mangling inline code
+    parts = re.split(r"(`[^`\n]+`)", text)
+    result = []
+    for part in parts:
+        if part.startswith("`"):
+            result.append(part)
+        else:
+            for symbol, spoken in _MATH_SYMBOLS:
+                part = part.replace(symbol, spoken)
+            # Collapse multiple spaces that substitutions may create
+            part = re.sub(r" {2,}", " ", part)
+            result.append(part)
+    expanded = "".join(result)
+
+    # On formula lines (containing a math keyword), verbalize each " : ":
+    # - If followed by a math keyword (vers, croix, fois…) → ", fonction de "
+    #   e.g. "K : N vers PK croix SK" → "K, fonction de N vers PK croix SK"
+    # - Otherwise → ", "
+    #   e.g. "SK : la fonction de génération" → "SK, la fonction de génération"
+    _MATH_KEYWORD = re.compile(r'\b(vers|croix|fois|exposant|appartient|implique|inférieur|supérieur|racine)\b')
+    _COLON_MATH   = re.compile(r' : (?=[^:]*\b(?:vers|croix|fois|exposant|appartient)\b)')
+    _COLON_OTHER  = re.compile(r' : ')
+
+    lines_out = []
+    for line in expanded.splitlines():
+        if _MATH_KEYWORD.search(line) and " : " in line:
+            line = _COLON_MATH.sub(", fonction de ", line)
+            line = _COLON_OTHER.sub(", ", line)
+        lines_out.append(line)
+    return "\n".join(lines_out)
+
+
+# Matches uppercase-starting identifiers used as math function names (E, D, Eval, K…).
+# Lowercase-only words are excluded to avoid false matches on French words like "est(iment)".
+_FUNC_CALL_RE = re.compile(r'\b([A-Z][A-Za-z0-9_]{0,9})\(([^()]+)\)')
+
+
+def _expand_function_calls(text: str) -> str:
+    """Convert math function-call notation to spoken French.
+
+    Works iteratively (innermost parentheses first) so nested calls are
+    fully expanded:
+      D(E(m))            → D de E de m
+      Eval(f, C1, C2)    → Eval de f virgule C1 virgule C2
+      E(x) ⋅ E(y)        → E de x fois E de y   (after _expand_math_symbols)
+
+    Only matches identifiers starting with an uppercase letter to avoid
+    false positives on French words.
+    """
+    prev = None
+    while prev != text:
+        prev = text
+
+        def _replace(m: re.Match) -> str:
+            name = m.group(1)
+            args = re.sub(r"\s*,\s*", " virgule ", m.group(2).strip())
+            return f"{name} de {args}"
+
+        text = _FUNC_CALL_RE.sub(_replace, text)
+    return text
+
+
+# Matches «…» (French) and "…" (curly English). ASCII " is intentionally excluded
+# to avoid false positives on attribute values, code, or non-citation double quotes.
+_QUOTE_PATTERN = re.compile(r'(«[^»\n]+»|\u201C[^\u201D\n]+\u201D)')
+
+
+def _isolate_quotes(text: str) -> str:
+    """Post-process cleaned text to guarantee all quoted passages are isolated paragraphs.
+
+    Splits any paragraph that contains an embedded «…» or "…" quotation into
+    separate paragraphs, so _is_quoted_paragraph() can reliably detect them for
+    voice switching — regardless of how the AI formatted its output.
+
+    Example:
+        IN  : L'objectif est «de doubler la production» selon la direction.
+        OUT : L'objectif est\n\n«de doubler la production»\n\nseclon la direction.
+    """
+    paragraphs = re.split(r"\n\n+", text)
+    result: list[str] = []
+
+    for para in paragraphs:
+        para = para.strip()
+        if not para:
+            continue
+        # If the paragraph already starts with a quote, keep it as-is
+        if _is_quoted_paragraph(para):
+            result.append(para)
+            continue
+        # If no embedded citation, keep it as-is
+        if not _QUOTE_PATTERN.search(para):
+            result.append(para)
+            continue
+        # Split on citation boundaries; the capturing group keeps the citations
+        parts = _QUOTE_PATTERN.split(para)
+        for part in parts:
+            part = part.strip()
+            if part:
+                result.append(part)
+
+    return "\n\n".join(result)
 
 
 def _is_quoted_paragraph(para: str) -> bool:
@@ -552,7 +1071,7 @@ if __name__ == "__main__":
             print("\u274c No input text received.", file=sys.stderr)
             sys.exit(1)
 
-        text = _strip_markdown(_ai_clean_text(text))
+        text = _strip_markdown(_isolate_quotes(_expand_function_calls(_expand_math_symbols(_ai_clean_text(text)))))
         if not text:
             print("\u274c Text is empty after cleaning.", file=sys.stderr)
             sys.exit(1)
