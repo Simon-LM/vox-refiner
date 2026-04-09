@@ -164,11 +164,11 @@ _voice_picker() {
         if [ -n "$_vpreview_id" ]; then
             printf "  ${C_DIM}Last preview:${C_RESET} ${C_CYAN}%s${C_RESET}   ${C_BOLD}[s]${C_RESET} Select it" "$_vpreview_slug"
             [ "$_vp_allow_disable" = "1" ] && printf "  ${C_BOLD}[d]${C_RESET} Disable"
-            printf "  ${C_DIM}[Enter] Back${C_RESET}\n"
+            printf "  ${C_BOLD}[m]${C_RESET} Menu settings\n"
         else
             printf "  ${C_DIM}Type a number to listen"
             [ "$_vp_allow_disable" = "1" ] && printf "   ${C_BOLD}[d]${C_RESET} ${C_DIM}Disable"
-            printf "   ${C_BOLD}[Enter]${C_RESET} ${C_DIM}Back${C_RESET}\n"
+            printf "   ${C_BOLD}[m]${C_RESET} Menu settings\n"
         fi
         printf "  Choice: "
         read -r _vchoice
@@ -265,11 +265,13 @@ _submenu_api_keys() {
         printf "  ${C_DIM}Perplexity + xAI unlock [5] Selection to Insight${C_RESET}\n"
         echo ""
         printf "  ${C_BOLD}[t]${C_RESET}  Test Mistral key\n"
-        printf "  ${C_BOLD}[m]${C_RESET}  Edit Mistral key\n"
+        printf "  ${C_BOLD}[e]${C_RESET}  Edit Mistral key\n"
         printf "  ${C_BOLD}[p]${C_RESET}  Edit Perplexity key\n"
         printf "  ${C_BOLD}[x]${C_RESET}  Edit xAI / Grok key\n"
         echo ""
-        printf "  ${C_DIM}Press Enter to return...${C_RESET} "
+        printf "  ${C_BOLD}[m]${C_RESET}  Menu VoxRefiner\n"
+        echo ""
+        printf "  ${C_BGREEN}▸${C_RESET} "
         read -r _key_action
         case "$_key_action" in
             t|T)
@@ -279,7 +281,7 @@ _submenu_api_keys() {
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            m|M)
+            e|E)
                 echo ""
                 printf "  Enter new Mistral API key: "
                 _read_masked
@@ -332,27 +334,8 @@ _submenu_api_keys() {
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            # Keep backward compat: old [e] shortcut still edits Mistral
-            e|E)
-                echo ""
-                printf "  Enter new Mistral API key: "
-                _read_masked
-                _new_key="$_MASKED_INPUT"
-                if [ -z "$_new_key" ]; then
-                    _warn "No key entered — unchanged."
-                else
-                    _set_env_var "MISTRAL_API_KEY" "$_new_key"
-                    export MISTRAL_API_KEY="$_new_key"
-                    set -a; source .env; set +a
-                    _success "Key saved."
-                    echo ""
-                    _test_mistral_key "$_new_key"
-                fi
-                echo ""
-                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
-                read -r
-                ;;
-            *) break ;;
+            m|M) break ;;
+            *) ;;
         esac
     done
 }
@@ -497,7 +480,7 @@ while true; do
                 printf "║  ${C_BOLD}[i]${C_RESET}      Bullets injected for medium texts (permanent)          ║\n"
                 printf "║  ${C_BOLD}[v]${C_RESET}      View history                                           ║\n"
                 printf "║  ${C_BOLD}[e]${C_RESET}      Edit history                                           ║\n"
-                printf "║  ${C_BOLD}[m]${C_RESET}      Back to menu                                           ║\n"
+                printf "║  ${C_BOLD}[m]${C_RESET}      Menu VoxRefiner                                        ║\n"
                 echo "║                                                                  ║"
                 echo "╚══════════════════════════════════════════════════════════════════╝"
                 echo ""
@@ -510,7 +493,7 @@ while true; do
                         while true; do
                             echo ""
                             _sep
-                            printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[v]${C_RESET} View history  ${C_BOLD}[e]${C_RESET} Edit history  ${C_DIM}[Enter] Back${C_RESET}: "
+                            printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[v]${C_RESET} View history  ${C_BOLD}[e]${C_RESET} Edit history  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner: "
                             read -r _post_action
                             case "$_post_action" in
                                 r|R)
@@ -540,7 +523,8 @@ while true; do
                                         _info "Enable history with [h] in this submenu."
                                     fi
                                     ;;
-                                *) break ;;
+                                m|M) break ;;
+                                *) ;;
                             esac
                         done
                         ;;
@@ -733,7 +717,7 @@ while true; do
                 printf "  ${C_BOLD}[Enter]${C_RESET} Start translation\n"
                 printf "  ${C_BOLD}[p]${C_RESET}     Record voice profile (30s)\n"
                 printf "  ${C_BOLD}[u]${C_RESET}     Toggle use profile (session)\n"
-                printf "  ${C_BOLD}[m]${C_RESET}     Back to menu\n"
+                printf "  ${C_BOLD}[m]${C_RESET}     Menu VoxRefiner\n"
                 echo ""
                 _sep
                 printf "  Choice: "
@@ -761,7 +745,7 @@ while true; do
                 "Speak, then get a generated tweet or LinkedIn post — with context per platform."
             ;;
         4)
-            ./selection_to_voice.sh
+            VOXREFINER_MENU=0 ./selection_to_voice.sh
             ;;
         5)
             ./selection_to_insight.sh
@@ -783,7 +767,9 @@ while true; do
                 printf "  ${C_BOLD}[c]${C_RESET}  Citation voice (quoted paragraphs)\n"
                 printf "  ${C_BOLD}[e]${C_RESET}  Edit .env\n"
                 echo ""
-                printf "  ${C_DIM}Press Enter to return...${C_RESET} "
+                printf "  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner\n"
+                echo ""
+                printf "  ${C_BGREEN}▸${C_RESET} "
                 read -r _set_action
                 case "$_set_action" in
                     k|K)
@@ -801,7 +787,8 @@ while true; do
                             set -a; source .env; set +a
                         fi
                         ;;
-                    *) break ;;
+                    m|M) break ;;
+                    *) ;;
                 esac
             done
             ;;
@@ -830,7 +817,9 @@ while true; do
                 printf "  ${C_BOLD}[a]${C_RESET}  Apply update\n"
                 printf "  ${C_BOLD}[?]${C_RESET}  Troubleshooting\n"
                 echo ""
-                printf "  ${C_DIM}Press Enter to return...${C_RESET} "
+                printf "  ${C_BOLD}[m]${C_RESET}  Menu VoxRefiner\n"
+                echo ""
+                printf "  ${C_BGREEN}▸${C_RESET} "
                 read -r _upd_action
                 case "$_upd_action" in
                     c|C)
@@ -860,20 +849,32 @@ while true; do
                         printf "  ${C_DIM}Press Enter to return...${C_RESET}"
                         read -r
                         ;;
-                    *)  break ;;
+                    m|M) break ;;
+                    *) ;;
                 esac
             done
             ;;
         '?')
-            echo ""
-            if [ -f docs/troubleshooting.md ]; then
-                cat docs/troubleshooting.md
-            else
-                _warn "docs/troubleshooting.md not found."
-            fi
-            echo ""
-            printf "  ${C_DIM}Press Enter to return...${C_RESET}"
-            read -r
+            while true; do
+                _header "HELP" "?"
+                echo ""
+                if [ -f docs/troubleshooting.md ]; then
+                    cat docs/troubleshooting.md
+                else
+                    _warn "docs/troubleshooting.md not found."
+                fi
+                echo ""
+                _sep
+                echo ""
+                printf "  ${C_BOLD}[m]${C_RESET}  Menu VoxRefiner\n"
+                echo ""
+                printf "  ${C_BGREEN}▸${C_RESET} "
+                read -r _help_action
+                case "$_help_action" in
+                    m|M) break ;;
+                    *) ;;
+                esac
+            done
             ;;
         q|Q)
             printf "\n  ${C_DIM}Bye!${C_RESET}\n\n"

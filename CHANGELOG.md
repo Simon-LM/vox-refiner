@@ -13,6 +13,35 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.0.2] — 2026-04-10
+
+### Fixed
+
+- **`selection_to_voice.sh` — Feature 4 from main menu:** `VOXREFINER_MENU=0`
+  override added so the post-playback menu is shown when Feature 4 is launched
+  from the VoxRefiner main menu (was silently suppressed by the global
+  `VOXREFINER_MENU=1` export).
+- **Menu navigation — `[m]` harmonized:** `[m]` is now consistently labeled
+  `Menu VoxRefiner` in all feature menus that exit to the main menu; `Menu settings`
+  in the voice-picker sub-menu (returns to Settings).
+- **Menu navigation — `[Enter]` audit:** `[Enter]` is no longer used for navigation
+  or quit in any feature post-action menu. Each menu has an explicit key: `[m] Menu
+  VoxRefiner`, `[q] Quit`, or `[m] Back`. `[Enter]` remains valid only as a launch
+  action (e.g. `[Enter] Start translation` in Feature 2) and as `[Enter] Quit` in
+  the standalone `record_and_transcribe_local.sh` direct mode.
+- **`vox-refiner-menu.sh` — Settings menu:** `Press Enter to return...` replaced
+  with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now a no-op.
+- **`vox-refiner-menu.sh` — API Keys sub-menu:** `[m] Edit Mistral key` renamed to
+  `[e] Edit Mistral key`; `[m]` freed for `Menu VoxRefiner` navigation; `▸` prompt
+  added; `[Enter]` is now a no-op.
+- **`vox-refiner-menu.sh` — Update sub-menu:** `Press Enter to return...` replaced
+  with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now a no-op.
+- **`vox-refiner-menu.sh` — Help screen:** proper `HELP` header added; `Press Enter
+  to return...` replaced with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now
+  a no-op.
+
+---
+
 ## [4.0.1] — 2026-04-09
 
 ### Added

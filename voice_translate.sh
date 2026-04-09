@@ -450,7 +450,7 @@ voice_translate() {
     while true; do
         echo ""
         _sep
-        printf "  ${C_BOLD}[l]${C_RESET} Listen  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[d]${C_RESET} Save  ${C_BOLD}[n]${C_RESET} New (%s)  ${C_DIM}[Enter] Menu${C_RESET}: " "$TARGET_LANG"
+        printf "  ${C_BOLD}[l]${C_RESET} Listen  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[d]${C_RESET} Save  ${C_BOLD}[n]${C_RESET} New (%s)  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner: " "$TARGET_LANG"
         read -r _action
         case "$_action" in
             d|D)
@@ -479,7 +479,8 @@ voice_translate() {
                 voice_translate
                 return
                 ;;
-            *)  break ;;
+            m|M) break ;;
+            *)   ;;
         esac
     done
 }

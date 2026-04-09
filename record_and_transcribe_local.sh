@@ -289,7 +289,7 @@ if [ "${VOXREFINER_MENU:-}" != "1" ]; then
     while true; do
         echo ""
         printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
-        printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New recording  ${C_BOLD}[m]${C_RESET} Open menu  ${C_DIM}[Enter] Quit${C_RESET}: "
+        printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New recording  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner  ${C_DIM}[Enter] Quit${C_RESET}: "
         read -r _action
         case "$_action" in
             r|R) exec "$0" --retry ;;

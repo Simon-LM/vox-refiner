@@ -474,7 +474,7 @@ while true; do
     [ "$_search_done"   -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[e]${C_RESET} Replay search"
     [ "$_factcheck_done" -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[c]${C_RESET} Replay fact-check"
     [ "$_article_done"  -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[a]${C_RESET} Replay article"
-    _menu_line="$_menu_line  ${C_BOLD}[d]${C_RESET} Save  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} VoxRefiner menu"
+    _menu_line="$_menu_line  ${C_BOLD}[d]${C_RESET} Save  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner"
     printf "  %b: " "$_menu_line"
     read -r _main_action
     case "$_main_action" in

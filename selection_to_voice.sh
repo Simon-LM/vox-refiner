@@ -210,7 +210,7 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
         while true; do
             echo ""
             _sep
-            printf "  ${C_BOLD}[r]${C_RESET} Relancer  ${C_BOLD}[m]${C_RESET} Menu principal  ${C_DIM}[Entrée] Quitter${C_RESET} : "
+            printf "  ${C_BOLD}[r]${C_RESET} Relancer  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner  ${C_DIM}[Entrée] Quitter${C_RESET} : "
             read -r _fail_action
             case "$_fail_action" in
                 r|R)
@@ -281,7 +281,7 @@ if [ "${VOXREFINER_MENU:-}" != "1" ]; then
     while true; do
         echo ""
         _sep
-        printf "  ${C_BOLD}[l]${C_RESET} Réecouter  ${C_BOLD}[d]${C_RESET} Sauvegarder  ${C_DIM}[Entrée] Quitter${C_RESET} : "
+        printf "  ${C_BOLD}[l]${C_RESET} Réecouter  ${C_BOLD}[d]${C_RESET} Sauvegarder  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner : "
         read -r _action
         case "$_action" in
             l|L)
@@ -290,7 +290,8 @@ if [ "${VOXREFINER_MENU:-}" != "1" ]; then
             d|D)
                 _save_audio_to_downloads "$TTS_OUTPUT" "$selected_text" "selection-to-voice"
                 ;;
-            *) break ;;
+            m|M) exec "$SCRIPT_DIR/vox-refiner-menu.sh" ;;
+            *) ;;
         esac
     done
 fi
