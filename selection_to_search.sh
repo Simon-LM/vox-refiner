@@ -1,6 +1,7 @@
 #!/bin/bash
-# VoxRefiner — Selection to Insight
-# Summarise selected text, then offer search and fact-checking from the same session.
+# VoxRefiner — Selection to Search
+# Select text, then search directly — no summary generated upfront.
+# The original selection is preserved and can be read aloud or summarised on demand.
 # Can be launched standalone (keyboard shortcut) or called from the menu.
 
 cd "$(dirname "$0")"
@@ -27,8 +28,6 @@ if [ -f .env ]; then
     set -a; source .env; set +a
 fi
 
-# Save stderr so Python progress messages reach the terminal even when stdout
-# is captured by $() substitution.
 exec 3>&2
 
 # ─── Get selected text ───────────────────────────────────────────────────────
@@ -42,7 +41,7 @@ if [ -z "$(printf '%s' "$selected_text" | tr -d '[:space:]')" ]; then
 fi
 
 if [ -z "$(printf '%s' "$selected_text" | tr -d '[:space:]')" ]; then
-    _header "SELECTION TO INSIGHT" "⌨→💡"
+    _header "SELECTION TO SEARCH" "⌨→🔍"
     echo ""
     _error "No text found in primary selection or clipboard."
     _info "Select some text with your mouse, then run again."
@@ -50,9 +49,7 @@ if [ -z "$(printf '%s' "$selected_text" | tr -d '[:space:]')" ]; then
     exit 1
 fi
 
-# ─── Display + key warnings ──────────────────────────────────────────────────
-
-_header "SELECTION TO INSIGHT" "⌨→💡"
+_header "SELECTION TO SEARCH" "⌨→🔍"
 echo ""
 _info "Source: $_source  (${#selected_text} chars)"
 echo ""
@@ -62,7 +59,7 @@ _warn_missing_keys
 
 # ─── Temp files ──────────────────────────────────────────────────────────────
 
-INSIGHT_DIR="$SCRIPT_DIR/recordings/insight"
+INSIGHT_DIR="$SCRIPT_DIR/recordings/search"
 mkdir -p "$INSIGHT_DIR"
 
 INSIGHT_META_FILE="$INSIGHT_DIR/.meta"
@@ -83,7 +80,7 @@ TTS_VOLUME="${TTS_VOLUME:-2.0}"
 _search_done=0
 _factcheck_done=0
 _article_done=0
-_summary_done=1   # Summary is generated eagerly in F5
+_summary_done=0
 summary_text=""
 
 _SETTING_SUMMARY_REASONING="${INSIGHT_SUMMARY_REASONING:-standard}"
@@ -91,70 +88,47 @@ _SETTING_SEARCH_ENGINE="${INSIGHT_SEARCH_ENGINE:-auto}"
 _SETTING_FACTCHECK_ENGINE="${INSIGHT_FACTCHECK_ENGINE:-both}"
 _SETTING_SYNTHESIS_REASONING="${INSIGHT_SYNTHESIS_REASONING:-standard}"
 
-# ─── Step 1: Summarise ────────────────────────────────────────────────────────
+# ─── Step 1: Search directly ─────────────────────────────────────────────────
 
-_header "SUMMARY" "💡"
-echo ""
-_process "Analysing and summarising..."
-echo ""
-
-summary_text=$(printf '%s' "$selected_text" | \
-    INSIGHT_SUMMARY_REASONING="$_SETTING_SUMMARY_REASONING" \
-    "$VENV_PYTHON" -m src.insight summarize 2>&3)
-
-if [ -z "$summary_text" ]; then
-    _error "Summary failed — check your MISTRAL_API_KEY and connection."
-    exit 1
-fi
-
-content_type="generic"
-if [ -s "$INSIGHT_META_FILE" ]; then
-    content_type="$(cat "$INSIGHT_META_FILE")"
-fi
-
-_success "Type detected: $content_type"
-echo ""
-printf "${C_BG_BLUE} %s ${C_RESET}\n" "$summary_text"
-echo ""
-
-_process "Reading summary..."
-_tts_speak "$summary_text" "$SUMMARY_AUDIO"
+_search_flow "$selected_text"
 
 # ─── Main menu ────────────────────────────────────────────────────────────────
 
 while true; do
     echo ""
     _sep
-    _menu_line="  ${C_BOLD}[l]${C_RESET} Read full  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
-    _menu_line="$_menu_line  ${C_BOLD}[r]${C_RESET} Replay summary  ${C_BOLD}[g]${C_RESET} Re-read summary"
-    [ "$_search_done"    -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[e]${C_RESET} Replay search"
+    _menu_line="  ${C_BOLD}[p]${C_RESET} New search  ${C_BOLD}[f]${C_RESET} Fact-check  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[l]${C_RESET} Read full"
+    [ "$_search_done"    -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[r]${C_RESET} Replay search"
     [ "$_factcheck_done" -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[c]${C_RESET} Replay fact-check"
+    [ "$_summary_done"   -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[g]${C_RESET} Replay summary"
     [ "$_article_done"   -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[a]${C_RESET} Replay article"
     _menu_line="$_menu_line  ${C_BOLD}[d]${C_RESET} Save  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner"
     printf "  %b: " "$_menu_line"
     read -r _main_action
     case "$_main_action" in
+        p|P) _search_flow "$selected_text" ;;
+        f|F) _factcheck_flow "$selected_text" ;;
+        z|Z) _generate_summary ;;
         l|L) _read_full_article ;;
-        p|P) _search_flow "$summary_text" ;;
-        f|F) _factcheck_flow "$summary_text" ;;
-        r|R) _play_audio "$SUMMARY_AUDIO" ;;
-        g|G) _process "Re-generating summary audio..."; _tts_speak "$summary_text" "$SUMMARY_AUDIO" ;;
-        e|E) [ "$_search_done"    -eq 1 ] && _play_audio "$SEARCH_AUDIO" ;;
+        r|R) [ "$_search_done"    -eq 1 ] && _play_audio "$SEARCH_AUDIO" ;;
         c|C) [ "$_factcheck_done" -eq 1 ] && _play_audio "$FACTCHECK_AUDIO" ;;
+        g|G) [ "$_summary_done"   -eq 1 ] && _play_audio "$SUMMARY_AUDIO" ;;
         a|A) [ "$_article_done"   -eq 1 ] && _play_audio "$FULL_ARTICLE_AUDIO" ;;
         d|D)
             if   [ "$_article_done"   -eq 1 ] && [ -f "$FULL_ARTICLE_AUDIO" ]; then
-                _save_audio_to_downloads "$FULL_ARTICLE_AUDIO" "$selected_text" "insight-full-article"
+                _save_audio_to_downloads "$FULL_ARTICLE_AUDIO" "$selected_text" "search-full-article"
             elif [ "$_factcheck_done" -eq 1 ] && [ -f "$FACTCHECK_AUDIO" ]; then
-                _save_audio_to_downloads "$FACTCHECK_AUDIO" "$summary_text" "insight-factcheck"
+                _save_audio_to_downloads "$FACTCHECK_AUDIO" "$selected_text" "search-factcheck"
             elif [ "$_search_done"    -eq 1 ] && [ -f "$SEARCH_AUDIO" ]; then
-                _save_audio_to_downloads "$SEARCH_AUDIO" "$summary_text" "insight-search"
+                _save_audio_to_downloads "$SEARCH_AUDIO" "$selected_text" "search-result"
+            elif [ "$_summary_done"   -eq 1 ] && [ -f "$SUMMARY_AUDIO" ]; then
+                _save_audio_to_downloads "$SUMMARY_AUDIO" "$selected_text" "search-summary"
             else
-                _save_audio_to_downloads "$SUMMARY_AUDIO" "$summary_text" "insight-summary"
+                _warn "No audio to save yet."
             fi
             ;;
         s|S) _settings_flow ;;
         m|M) exec "$SCRIPT_DIR/vox-refiner-menu.sh" ;;
-        *)   ;;  # [Enter] and anything else: no-op, redisplay menu
+        *)   ;;
     esac
 done

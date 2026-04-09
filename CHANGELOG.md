@@ -13,6 +13,41 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.1.0] — 2026-04-10
+
+### Added
+
+- **`[6] Selection to Search`:** new feature — select any text, ask a question
+  (voice or text), get a web search result read aloud. The original selection is
+  preserved and can be read aloud (`[l]`), summarised on demand (`[z]`), or
+  fact-checked (`[f]`) from the same session.
+  - **`selection_to_search.sh`:** orchestration script. Captures selected text,
+    calls `_search_flow` directly (no upfront summary), then presents a main menu
+    with dynamic replay buttons.
+- **`[7] Selection to Fact-check`:** new feature — select any text, press
+  `[Enter]` to fact-check the whole text, or dictate/type a specific claim.
+  Result is read aloud. Search (`[p]`) and optional summary (`[z]`) available
+  from the same session.
+  - **`selection_to_factcheck.sh`:** orchestration script, symmetric to
+    `selection_to_search.sh` with fact-check as the primary entry point.
+- **`src/insight_common.sh`:** new shared library sourced by F5, F6, and F7.
+  Extracts: `_warn_missing_keys`, `_play_audio`, `_tts_speak`, `_show_and_speak`,
+  `_generate_summary`, `_read_full_article`, `_search_flow`, `_factcheck_flow`,
+  `_settings_flow`. Single point of change for all selection-based intelligence
+  features.
+
+### Changed
+
+- **`vox-refiner-menu.sh` — menu layout:** `[6]` and `[7]` (Screen features)
+  shifted to `[8]` and `[9]`; `[6] Selection to Search` and
+  `[7] Selection to Fact-check` added in the SELECTION section.
+- **`selection_to_insight.sh` — refactored:** now sources `src/insight_common.sh`
+  instead of defining helpers inline. `_search_flow` and `_factcheck_flow` now
+  receive context as a parameter (`$summary_text`) instead of relying on a
+  hardcoded global. All French error/warning strings replaced with English.
+
+---
+
 ## [4.0.2] — 2026-04-10
 
 ### Fixed

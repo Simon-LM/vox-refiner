@@ -413,14 +413,16 @@ show_menu() {
     echo "╠═══════════════════════════════════════════════════════════════════════╣"
     echo "║  ⌨  SELECTION                                                         ║"
     echo "║                                                                       ║"
-    printf "║  ${C_BOLD}[4]${C_RESET}  ⌨→🔊  ${C_BOLD}Selection to Voice${C_RESET}   ${C_DIM}selected text → read aloud instantly${C_RESET} ║\n"
-    printf "║  ${C_BOLD}[5]${C_RESET}  ⌨→💡  ${C_BOLD}Selection to Insight${C_RESET} ${C_DIM}summary + search${C_RESET}                     ║\n"
+    printf "║  ${C_BOLD}[4]${C_RESET}  ⌨→🔊  ${C_BOLD}Selection to Voice${C_RESET}      ${C_DIM}selected text → read aloud instantly${C_RESET}  ║\n"
+    printf "║  ${C_BOLD}[5]${C_RESET}  ⌨→💡  ${C_BOLD}Selection to Insight${C_RESET}    ${C_DIM}summary + search                      ${C_RESET}  ║\n"
+    printf "║  ${C_BOLD}[6]${C_RESET}  ⌨→🔍  ${C_BOLD}Selection to Search${C_RESET}     ${C_DIM}selected text → search directly       ${C_RESET}  ║\n"
+    printf "║  ${C_BOLD}[7]${C_RESET}  ⌨→🔬  ${C_BOLD}Selection to Fact-check${C_RESET} ${C_DIM}selected text → fact-check            ${C_RESET}  ║\n"
     echo "║                                                                       ║"
     echo "╠═══════════════════════════════════════════════════════════════════════╣"
     echo "║  🖼  SCREEN                                                            ║"
     echo "║                                                                       ║"
-    printf "║  ${C_BOLD}[6]${C_RESET}  🖼→📋  ${C_BOLD}Screen to Text${C_RESET}       ${C_DIM}screenshot → OCR → clipboard${C_RESET}         ║\n"
-    printf "║  ${C_BOLD}[7]${C_RESET}  🖼→🔊  ${C_BOLD}Screen to Voice${C_RESET}      ${C_DIM}screenshot → OCR → audio${C_RESET}             ║\n"
+    printf "║  ${C_BOLD}[8]${C_RESET}  🖼→📋  ${C_BOLD}Screen to Text${C_RESET}       ${C_DIM}screenshot → OCR → clipboard${C_RESET}         ║\n"
+    printf "║  ${C_BOLD}[9]${C_RESET}  🖼→🔊  ${C_BOLD}Screen to Voice${C_RESET}      ${C_DIM}screenshot → OCR → audio${C_RESET}             ║\n"
     echo "║                                                                       ║"
     echo "╠═══════════════════════════════════════════════════════════════════════╣"
     echo "║                                                                       ║"
@@ -751,10 +753,16 @@ while true; do
             ./selection_to_insight.sh
             ;;
         6)
+            ./selection_to_search.sh
+            ;;
+        7)
+            ./selection_to_factcheck.sh
+            ;;
+        8)
             _coming_soon "Screen to Text" \
                 "Take a screenshot, run OCR, copy the result to your clipboard."
             ;;
-        7)
+        9)
             _coming_soon "Screen to Voice" \
                 "Take a screenshot, run OCR, hear the content in your own voice."
             ;;
