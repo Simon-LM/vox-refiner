@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.3.2] — 2026-04-11
+
+### Fixed
+
+- **`docs/troubleshooting.md`:** added entry for "Fact-check fails — xai-sdk
+  package not installed" with fix (`./install.sh`).
+
+---
+
 ## [4.3.1] — 2026-04-11
 
 ### Fixed

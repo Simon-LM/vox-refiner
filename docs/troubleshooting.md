@@ -70,6 +70,23 @@ TTS_PLAYER="mpv --no-video"   # quotes required if the value contains spaces
 
 ---
 
+## Fact-check fails — "xai-sdk package not installed"
+
+**Cause:** `xai-sdk` (Grok / xAI) was added to `requirements.txt` after your
+initial install. The `.venv` was never updated because the update script
+(`--apply`) did not sync Python dependencies before v4.3.1.
+
+**Fix:**
+
+```bash
+cd ~/.local/bin/vox-refiner && ./install.sh
+```
+
+This re-runs `pip install -r requirements.txt` inside the `.venv` and installs
+the missing package. From v4.3.1 onwards, `--apply` does this automatically.
+
+---
+
 ## More help
 
 Report issues at: [github.com/Simon-LM/voxtral-paste/issues](https://github.com/Simon-LM/voxtral-paste/issues)
