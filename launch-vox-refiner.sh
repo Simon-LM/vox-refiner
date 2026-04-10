@@ -4,11 +4,14 @@
 # Bind this file to a keyboard shortcut or use it from the .desktop file.
 #
 # Launch modes:
-#   (no flag)             → interactive menu (vox-refiner-menu.sh)
-#   --speak-refine        → record & refine to clipboard (best for keyboard shortcut)
-#   --speak-translate     → record & translate to audio  (best for keyboard shortcut)
-#   --selection-voice     → read selected/clipboard text aloud (best for keyboard shortcut)
-#   --selection-insight   → summarise selected text, search, or fact-check
+#   (no flag)               → interactive menu (vox-refiner-menu.sh)
+#   --speak-transcribe      → record & raw Voxtral text to clipboard, refine on demand
+#   --speak-refine          → record & refine to clipboard (best for keyboard shortcut)
+#   --speak-translate       → record & translate to audio  (best for keyboard shortcut)
+#   --selection-voice       → read selected/clipboard text aloud
+#   --selection-insight     → summarise selected text, search, or fact-check
+#   --selection-search      → search directly from selected text
+#   --selection-factcheck   → fact-check selected text
 #
 # Optional: set VOXREFINER_TERMINAL in your environment to force a specific
 # terminal emulator (mate-terminal, gnome-terminal, xfce4-terminal, konsole, xterm).
@@ -24,7 +27,12 @@ export DISPLAY="${DISPLAY:-:0}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
 
 # ─── Mode selection ───────────────────────────────────────────────────────────
+SCRIPT_ENV=""
 case "${1:-}" in
+    --speak-transcribe)
+        SCRIPT_PATH="$INSTALL_DIR/record_and_transcribe_local.sh"
+        SCRIPT_ENV="ENABLE_REFINE=false ENABLE_HISTORY=false"
+        ;;
     --speak-refine)
         SCRIPT_PATH="$INSTALL_DIR/record_and_transcribe_local.sh"
         ;;
@@ -36,6 +44,12 @@ case "${1:-}" in
         ;;
     --selection-insight)
         SCRIPT_PATH="$INSTALL_DIR/selection_to_insight.sh"
+        ;;
+    --selection-search)
+        SCRIPT_PATH="$INSTALL_DIR/selection_to_search.sh"
+        ;;
+    --selection-factcheck)
+        SCRIPT_PATH="$INSTALL_DIR/selection_to_factcheck.sh"
         ;;
     *)
         SCRIPT_PATH="$INSTALL_DIR/vox-refiner-menu.sh"
@@ -56,18 +70,19 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 run_in_terminal() {
+    local _cmd="${SCRIPT_ENV:+$SCRIPT_ENV }\"$SCRIPT_PATH\""
     case "$1" in
         mate-terminal|gnome-terminal)
-            "$1" -- bash -c "\"$SCRIPT_PATH\"; exec bash" &
+            "$1" -- bash -c "${_cmd}; exec bash" &
             ;;
         xfce4-terminal)
-            "$1" -e "bash -c \"\"$SCRIPT_PATH\"; exec bash\"" &
+            "$1" -e "bash -c \"${_cmd}; exec bash\"" &
             ;;
         konsole)
-            "$1" -e bash -c "\"$SCRIPT_PATH\"; exec bash" &
+            "$1" -e bash -c "${_cmd}; exec bash" &
             ;;
         xterm)
-            "$1" -e bash -lc "\"$SCRIPT_PATH\"; exec bash" &
+            "$1" -e bash -lc "${_cmd}; exec bash" &
             ;;
         *)
             return 1

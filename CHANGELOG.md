@@ -13,6 +13,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.2.1] — 2026-04-10
+
+### Added
+
+- **`launch-vox-refiner.sh`:** three new launch modes for keyboard shortcuts:
+  - `--speak-transcribe` → F0 (`record_and_transcribe_local.sh` with
+    `ENABLE_REFINE=false ENABLE_HISTORY=false`)
+  - `--selection-search` → F6 (`selection_to_search.sh`)
+  - `--selection-factcheck` → F7 (`selection_to_factcheck.sh`)
+  - `SCRIPT_ENV` variable added so inline env overrides are passed correctly
+    into the terminal emulator command.
+
+---
+
 ## [4.2.0] — 2026-04-10
 
 ### Added
