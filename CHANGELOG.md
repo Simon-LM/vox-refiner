@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.3.1] — 2026-04-11
+
+### Fixed
+
+- **`vox-refiner-update.sh` — Python deps not synced after update:** `--apply`
+  now runs `pip install -q -r requirements.txt` in the `.venv` after every pull
+  (and even when already up to date). Fixes missing packages (e.g. `xai-sdk`)
+  after a git update that added new dependencies.
+- **`repair_exec_bits()` — incomplete script list:** `vox-refiner-menu.sh`,
+  `install.sh`, `voice_translate.sh`, `selection_to_voice.sh`,
+  `selection_to_search.sh`, `selection_to_factcheck.sh`, and `screen_to_text.sh`
+  were missing from the `chmod +x` list; added.
+
+---
+
 ## [4.3.0] — 2026-04-10
 
 ### Added

@@ -177,25 +177,38 @@ sync_env() {
 }
 
 repair_exec_bits() {
-    if [ -f "record_and_transcribe_local.sh" ]; then
-        chmod +x record_and_transcribe_local.sh
-    fi
+    local scripts=(
+        record_and_transcribe_local.sh
+        vox-refiner-update.sh
+        vox-refiner-menu.sh
+        launch-vox-refiner.sh
+        install.sh
+        uninstall.sh
+        voice_translate.sh
+        selection_to_voice.sh
+        selection_to_insight.sh
+        selection_to_search.sh
+        selection_to_factcheck.sh
+        screen_to_text.sh
+    )
+    for s in "${scripts[@]}"; do
+        [ -f "$s" ] && chmod +x "$s"
+    done
+}
 
-    if [ -f "vox-refiner-update.sh" ]; then
-        chmod +x vox-refiner-update.sh
+sync_python_deps() {
+    local venv_python="$(pwd)/.venv/bin/python"
+    if [ ! -x "$venv_python" ]; then
+        echo "⚠️  .venv not found — skipping Python dependency sync."
+        echo "   Run ./install.sh to create the virtual environment."
+        return
     fi
-
-    if [ -f "launch-vox-refiner.sh" ]; then
-        chmod +x launch-vox-refiner.sh
+    if [ ! -f "requirements.txt" ]; then
+        return
     fi
-
-    if [ -f "uninstall.sh" ]; then
-        chmod +x uninstall.sh
-    fi
-
-    if [ -f "selection_to_insight.sh" ]; then
-        chmod +x selection_to_insight.sh
-    fi
+    echo "📦 Syncing Python dependencies..."
+    "$venv_python" -m pip install -q -r requirements.txt
+    echo "✓  Python dependencies up to date."
 }
 
 run_check() {
@@ -219,6 +232,7 @@ run_apply() {
         echo "Already up to date."
         repair_exec_bits
         sync_env
+        sync_python_deps
         return
     fi
 
@@ -230,6 +244,7 @@ run_apply() {
 
     repair_exec_bits
     sync_env
+    sync_python_deps
     echo "Update applied successfully."
     print_status "$upstream" "$(count_behind "$upstream")"
 }
