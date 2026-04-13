@@ -13,6 +13,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.6.2] — 2026-04-14
+
+### Fixed
+
+- **`--loudness` binary artefact committed to repo:** a TTS pipeline bug
+  (wrong `--output` flag) created a file literally named `--loudness` (407 KB
+  audio). It was accidentally tracked and pushed in v4.6.0. Removed from git
+  history tracking and added to `.gitignore` alongside `--output` to prevent
+  recurrence.
+
+---
+
 ## [4.6.1] — 2026-04-14
 
 ### Fixed

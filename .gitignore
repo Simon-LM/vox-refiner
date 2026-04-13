@@ -15,6 +15,10 @@ context.txt
 *.mp3
 recordings/
 
+# Artefacts from TTS pipeline bugs (file named literally "--loudness" or "--output")
+--loudness
+--output
+
 # Python
 __pycache__/
 *.pyc
