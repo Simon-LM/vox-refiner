@@ -25,6 +25,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   across all text-based features and future workflows.
   All consumers (`selection_to_insight.sh`, `selection_to_search.sh`,
   `selection_to_factcheck.sh`) updated to source `src/text_flows.sh`.
+- **`launch-vox-refiner.sh`:** terminal window geometry set to `125x50` for
+  all supported emulators (mate-terminal, gnome-terminal, xfce4-terminal,
+  konsole, xterm).
+- **`vox-refiner-menu.sh`:** `[q] Quit` moved onto the same bottom bar as
+  Settings / Context / Update / Help — one line instead of two.
 
 ---
 

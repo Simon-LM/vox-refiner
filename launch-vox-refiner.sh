@@ -73,20 +73,22 @@ if [ -f "$PID_FILE" ]; then
     fi
 fi
 
+GEOMETRY="125x50"  
+
 run_in_terminal() {
     local _cmd="${SCRIPT_ENV:+$SCRIPT_ENV }\"$SCRIPT_PATH\""
     case "$1" in
         mate-terminal|gnome-terminal)
-            "$1" -- bash -c "${_cmd}; exec bash" &
+            "$1" --geometry="$GEOMETRY" -- bash -c "${_cmd}; exec bash" &
             ;;
         xfce4-terminal)
-            "$1" -e "bash -c \"${_cmd}; exec bash\"" &
+            "$1" --geometry="$GEOMETRY" -e "bash -c \"${_cmd}; exec bash\"" &
             ;;
         konsole)
-            "$1" -e bash -c "${_cmd}; exec bash" &
+            "$1" --geometry "$GEOMETRY" -e bash -c "${_cmd}; exec bash" &
             ;;
         xterm)
-            "$1" -e bash -lc "${_cmd}; exec bash" &
+            "$1" -geometry "$GEOMETRY" -e bash -lc "${_cmd}; exec bash" &
             ;;
         *)
             return 1
