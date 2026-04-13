@@ -128,6 +128,12 @@ _SETTING_SYNTHESIS_REASONING="${INSIGHT_SYNTHESIS_REASONING:-standard}"
 # ─── Post-action menu ────────────────────────────────────────────────────────
 
 while true; do
+    clear
+    echo ""
+    _header "SCREEN TO TEXT" "🖼→📋"
+    echo ""
+    printf "${C_BG_CYAN} %s ${C_RESET}\n" "$ocr_text"
+    echo ""
     _sep
     _menu_line="  ${C_BOLD}[r]${C_RESET} Retry OCR  ${C_BOLD}[n]${C_RESET} New capture  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
     [ "$_translate_done" -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[e]${C_RESET} Replay translation"

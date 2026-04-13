@@ -13,6 +13,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.6.3] — 2026-04-14
+
+### Fixed
+
+- **Screen to Text post-menu stacked visually after returning from subcommands:**
+  pressing `[z] Summarise`, `[p] Search`, `[f] Fact-check`, or `[l] Read aloud`
+  then `[m] Back` left the sub-feature output and the F9 menu stacked on screen
+  with no separator. The while loop now clears the screen and redisplays the
+  OCR header + extracted text before each menu prompt, so the context is always
+  visible regardless of which action was last taken.
+
+---
+
 ## [4.6.2] — 2026-04-14
 
 ### Fixed
