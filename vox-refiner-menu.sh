@@ -282,6 +282,51 @@ _test_eden_key() {
     esac
 }
 
+_test_xai_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        _error "No xAI key to test."
+        return 1
+    fi
+    printf "  ${C_CYAN}⚡ Testing xAI / Grok key...${C_RESET}\n"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer $key" \
+        "https://api.x.ai/v1/models" \
+        --max-time 15 2>/dev/null)
+    case "$http_code" in
+        200) _success "xAI key is valid." ; return 0 ;;
+        401) _error  "Invalid xAI key (401 Unauthorized)." ; return 1 ;;
+        429) _warn   "Rate limited (429) — key exists but quota exceeded." ; return 1 ;;
+        000) _error  "No network response — check your internet connection." ; return 1 ;;
+        *)   _error  "Unexpected response: HTTP $http_code" ; return 1 ;;
+    esac
+}
+
+_test_perplexity_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        _error "No Perplexity key to test."
+        return 1
+    fi
+    printf "  ${C_CYAN}⚡ Testing Perplexity key...${C_RESET}\n"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $key" \
+        -H "Content-Type: application/json" \
+        -d '{"model":"sonar","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+        "https://api.perplexity.ai/chat/completions" \
+        --max-time 15 2>/dev/null)
+    case "$http_code" in
+        200) _success "Perplexity key is valid." ; return 0 ;;
+        401) _error  "Invalid Perplexity key (401 Unauthorized)." ; return 1 ;;
+        429) _warn   "Rate limited (429) — key exists but quota exceeded." ; return 1 ;;
+        000) _error  "No network response — check your internet connection." ; return 1 ;;
+        *)   _error  "Unexpected response: HTTP $http_code" ; return 1 ;;
+    esac
+}
+
 _show_capability_status() {
     # Display which features are available/locked based on configured keys.
     # Intended for display inside _submenu_api_keys.
@@ -301,26 +346,25 @@ _show_capability_status() {
         printf "  ${C_RED}✗${C_RESET}  ${C_DIM}Speak & Refine / Transcription  — requires MISTRAL_API_KEY${C_RESET}\n"
     fi
 
-    # Web search & fact-check (web)
+    # Web search & fact-check (Perplexity)
     if [ -n "$_has_p" ]; then
         printf "  ${C_BGREEN}✓${C_RESET}  Web search & fact-check  (Perplexity direct)\n"
     elif [ -n "$_has_e" ]; then
-        printf "  ${C_CYAN}~${C_RESET}  Web search & fact-check  (Perplexity via Eden AI)\n"
-        printf "  ${C_DIM}     Tip: add PERPLEXITY_API_KEY for direct access (min ~50 € credit)${C_RESET}\n"
+        printf "  ${C_BGREEN}✓${C_RESET}  Web search & fact-check  (Perplexity via Eden AI)\n"
     else
-        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Web search / fact-check  — add PERPLEXITY_API_KEY (direct)${C_RESET}\n"
-        printf "  ${C_DIM}                             or EDENAI_API_KEY (Perplexity via Eden)${C_RESET}\n"
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Web search / fact-check  — add PERPLEXITY_API_KEY or EDENAI_API_KEY${C_RESET}\n"
     fi
 
-    # Fact-check X / Twitter (Grok)
+    # Grok web search (Eden or direct)
     if [ -n "$_has_x" ]; then
-        printf "  ${C_BGREEN}✓${C_RESET}  Fact-check X/Twitter     (Grok direct — native X/Twitter search)\n"
+        printf "  ${C_BGREEN}✓${C_RESET}  Grok web search          (direct)\n"
+        printf "  ${C_BGREEN}✓${C_RESET}  Fact-check X/Twitter     (native X/Twitter search via Grok direct)\n"
     elif [ -n "$_has_e" ]; then
-        printf "  ${C_CYAN}~${C_RESET}  Fact-check X/Twitter     (Grok via Eden AI — no native X search)\n"
-        printf "  ${C_DIM}     Tip: add XAI_API_KEY to unlock native X/Twitter search via Grok${C_RESET}\n"
+        printf "  ${C_BGREEN}✓${C_RESET}  Grok web search          (Grok via Eden AI)\n"
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Fact-check X/Twitter     — requires XAI_API_KEY (native X search not available via Eden)${C_RESET}\n"
     else
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Grok web search          — add XAI_API_KEY or EDENAI_API_KEY${C_RESET}\n"
         printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Fact-check X/Twitter     — add XAI_API_KEY (native X search)${C_RESET}\n"
-        printf "  ${C_DIM}                             or EDENAI_API_KEY (Grok via Eden, web only)${C_RESET}\n"
     fi
 
     # Eden AI (redundancy + OCR + Gemini)
@@ -339,33 +383,32 @@ _submenu_api_keys() {
         clear
         _header "API KEYS" "🔑"
         echo ""
-        printf "  ${C_BOLD}Mistral${C_RESET}    ${C_RED}(required)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${MISTRAL_API_KEY:-}")"
-        printf "  ${C_BOLD}Perplexity${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${PERPLEXITY_API_KEY:-}")"
-        printf "  ${C_BOLD}xAI / Grok${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${XAI_API_KEY:-}")"
-        printf "  ${C_BOLD}Eden AI${C_RESET}    ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${EDENAI_API_KEY:-}")"
+        printf "  ${C_BOLD}Mistral${C_RESET}    ${C_RED}(required)${C_RESET}  : ${C_CYAN}%s${C_RESET}  ${C_DIM}min. ~10 € HT${C_RESET}\n" "$(_mask_key "${MISTRAL_API_KEY:-}")"
+        printf "  ${C_BOLD}Eden AI${C_RESET}    ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}  ${C_DIM}min. ~5 € HT${C_RESET}\n"  "$(_mask_key "${EDENAI_API_KEY:-}")"
+        printf "  ${C_BOLD}xAI / Grok${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}  ${C_DIM}min. ~10 \$ HT${C_RESET}\n" "$(_mask_key "${XAI_API_KEY:-}")"
+        printf "  ${C_BOLD}Perplexity${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}  ${C_DIM}min. ~50 \$ HT${C_RESET}\n" "$(_mask_key "${PERPLEXITY_API_KEY:-}")"
+        printf "  ${C_DIM}${C_ITALIC}  (montants indicatifs, susceptibles d'évoluer)${C_RESET}\n"
         _show_capability_status
         _sep
         echo ""
-        printf "  ${C_BOLD}[t]${C_RESET}  Test Mistral key\n"
-        printf "  ${C_BOLD}[e]${C_RESET}  Edit Mistral key\n"
-        printf "  ${C_BOLD}[p]${C_RESET}  Edit Perplexity key\n"
-        printf "  ${C_BOLD}[x]${C_RESET}  Edit xAI / Grok key\n"
-        printf "  ${C_BOLD}[n]${C_RESET}  Edit Eden AI key\n"
-        printf "  ${C_BOLD}[v]${C_RESET}  Test Eden AI key\n"
+        printf "  ${C_BOLD}[t1]${C_RESET}  Test Mistral key       ${C_BOLD}[e1]${C_RESET}  Edit Mistral key\n"
+        printf "  ${C_BOLD}[t2]${C_RESET}  Test Eden AI key       ${C_BOLD}[e2]${C_RESET}  Edit Eden AI key\n"
+        printf "  ${C_BOLD}[t3]${C_RESET}  Test xAI / Grok key    ${C_BOLD}[e3]${C_RESET}  Edit xAI / Grok key\n"
+        printf "  ${C_BOLD}[t4]${C_RESET}  Test Perplexity key    ${C_BOLD}[e4]${C_RESET}  Edit Perplexity key\n"
         echo ""
         printf "  ${C_BOLD}[m]${C_RESET}  Menu VoxRefiner\n"
         echo ""
         printf "  ${C_BGREEN}▸${C_RESET} "
         read -r _key_action
         case "$_key_action" in
-            t|T)
+            t1|T1)
                 echo ""
                 _test_mistral_key "${MISTRAL_API_KEY:-}"
                 echo ""
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            e|E)
+            e1|E1)
                 echo ""
                 printf "  Enter new Mistral API key: "
                 _read_masked
@@ -384,41 +427,14 @@ _submenu_api_keys() {
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            p|P)
+            t2|T2)
                 echo ""
-                printf "  Enter new Perplexity API key: "
-                _read_masked
-                _new_key="$_MASKED_INPUT"
-                if [ -z "$_new_key" ]; then
-                    _warn "No key entered — unchanged."
-                else
-                    _set_env_var "PERPLEXITY_API_KEY" "$_new_key"
-                    export PERPLEXITY_API_KEY="$_new_key"
-                    set -a; source .env; set +a
-                    _success "Perplexity key saved."
-                fi
+                _test_eden_key "${EDENAI_API_KEY:-}"
                 echo ""
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            x|X)
-                echo ""
-                printf "  Enter new xAI / Grok API key: "
-                _read_masked
-                _new_key="$_MASKED_INPUT"
-                if [ -z "$_new_key" ]; then
-                    _warn "No key entered — unchanged."
-                else
-                    _set_env_var "XAI_API_KEY" "$_new_key"
-                    export XAI_API_KEY="$_new_key"
-                    set -a; source .env; set +a
-                    _success "xAI key saved."
-                fi
-                echo ""
-                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
-                read -r
-                ;;
-            n|N)
+            e2|E2)
                 echo ""
                 printf "  Enter new Eden AI key: "
                 _read_masked
@@ -437,9 +453,54 @@ _submenu_api_keys() {
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
                 ;;
-            v|V)
+            t3|T3)
                 echo ""
-                _test_eden_key "${EDENAI_API_KEY:-}"
+                _test_xai_key "${XAI_API_KEY:-}"
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            e3|E3)
+                echo ""
+                printf "  Enter new xAI / Grok API key: "
+                _read_masked
+                _new_key="$_MASKED_INPUT"
+                if [ -z "$_new_key" ]; then
+                    _warn "No key entered — unchanged."
+                else
+                    _set_env_var "XAI_API_KEY" "$_new_key"
+                    export XAI_API_KEY="$_new_key"
+                    set -a; source .env; set +a
+                    _success "xAI key saved."
+                    echo ""
+                    _test_xai_key "$_new_key"
+                fi
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            t4|T4)
+                echo ""
+                _test_perplexity_key "${PERPLEXITY_API_KEY:-}"
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            e4|E4)
+                echo ""
+                printf "  Enter new Perplexity API key: "
+                _read_masked
+                _new_key="$_MASKED_INPUT"
+                if [ -z "$_new_key" ]; then
+                    _warn "No key entered — unchanged."
+                else
+                    _set_env_var "PERPLEXITY_API_KEY" "$_new_key"
+                    export PERPLEXITY_API_KEY="$_new_key"
+                    set -a; source .env; set +a
+                    _success "Perplexity key saved."
+                    echo ""
+                    _test_perplexity_key "$_new_key"
+                fi
                 echo ""
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r

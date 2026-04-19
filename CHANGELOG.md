@@ -13,6 +13,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.8.1] — 2026-04-19
+
+### Added
+
+- **API Keys menu — numbered shortcuts and test for every provider.**
+  Actions renamed `[t1]/[e1]` … `[t4]/[e4]` (Mistral → Eden AI → xAI →
+  Perplexity). Two new test functions added: `_test_xai_key()` (GET
+  `api.x.ai/v1/models`) and `_test_perplexity_key()` (minimal POST to
+  `api.perplexity.ai/chat/completions`); both auto-run after a successful
+  key edit, consistent with the existing Mistral and Eden AI behaviour.
+  Key display reordered (Mistral, Eden AI, xAI, Perplexity) and minimum
+  top-up amounts shown inline for each provider (indicative, may change):
+  Mistral ~10 € HT, Eden AI ~5 € HT, xAI ~10 $ HT, Perplexity ~50 $ HT.
+
+### Fixed
+
+- **Capability status — accuracy fixes.**
+  Perplexity via Eden AI now shows `✓` (it is a working capability, not
+  degraded). Grok split into two lines: *Grok web search* (`✓` with either
+  xAI direct or Eden AI) and *Fact-check X/Twitter* (`✓` only with
+  `XAI_API_KEY` direct, `○` via Eden because native X/Twitter search is not
+  exposed through the Eden AI API). "Tip" hint for Perplexity removed.
+
+---
+
 ## [4.8.0] — 2026-04-19
 
 ### Added
@@ -29,6 +54,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
     `[1] Auto-translate : on/off` and `[2] Target language` (persisted to
     `.env` via the same `sed` pattern as the insight settings flow).
   - **`.env.example`** documents `TTS_AUTO_TRANSLATE` with rationale.
+
+### Fixed
+
+- **Fact-check result returned in English when input was non-English.**
+  `factcheck()` passed `_FACTCHECK_GROK_SYSTEM` to Grok but omitted the
+  system-prompt argument for Perplexity, causing `search_perplexity` to fall
+  back to `_SEARCH_SYSTEM` (which anchors language on the *question*, not the
+  *input summary*). The hardcoded English query `"Verify the main factual
+  claims in this content."` then forced English output regardless of the
+  selected text's language. Fixed by passing `_FACTCHECK_PERPLEXITY_SYSTEM`
+  as the third argument, consistent with the existing Grok call.
+- **`EDEN_MODEL_MAP` only covered Mistral, breaking Eden fallback for search /
+  fact-check when `PERPLEXITY_API_KEY` (or `XAI_API_KEY`) was absent but
+  `EDENAI_API_KEY` was set.** `_prepare_eden_opts()` could not translate the
+  canonical model name (e.g. `sonar-pro`) to the Eden identifier
+  (`perplexityai/sonar-pro`), so the payload went out with a name Eden
+  rejects with HTTP 400 "Model(s) not found or inactive". Added Perplexity
+  and xAI entries; contract tests added for both.
+- **Shell scripts invoked Python modules as files, breaking `from src.X`
+  imports at runtime.** All six call sites switched to `python -m src.X`.
 
 ---
 
@@ -325,8 +370,8 @@ Eden AI)"`; other providers → `" — {model} (via {display})"` with the
 - **Fact-check result returned in English when input was non-English.**
   `factcheck()` passed `_FACTCHECK_GROK_SYSTEM` to Grok but omitted the
   system-prompt argument for Perplexity, causing `search_perplexity` to fall
-  back to `_SEARCH_SYSTEM` (which anchors language on the _question_, not the
-  _input summary_). The hardcoded English query `"Verify the main factual
+  back to `_SEARCH_SYSTEM` (which anchors language on the *question*, not the
+  *input summary*). The hardcoded English query `"Verify the main factual
 claims in this content."` then forced English output regardless of the
   selected text's language. Fixed by passing `_FACTCHECK_PERPLEXITY_SYSTEM`
   as the third argument, consistent with the existing Grok call.
