@@ -671,7 +671,7 @@ def factcheck(
         tasks: dict = {}
         if _use_perplexity:
             tasks["perplexity"] = pool.submit(
-                search_perplexity, query, context_summary
+                search_perplexity, query, context_summary, _FACTCHECK_PERPLEXITY_SYSTEM
             )
         if _use_grok:
             tasks["grok"] = pool.submit(

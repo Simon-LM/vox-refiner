@@ -13,6 +13,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.8.0] — 2026-04-19
+
+### Added
+
+- **`TTS_AUTO_TRANSLATE` — auto-translate before reading aloud (Selection to
+  Voice).** When `TTS_AUTO_TRANSLATE=1`, `selection_to_voice.sh` translates
+  the selected text via `src.translate` before passing it to TTS, so the
+  audio is always in the user's preferred language regardless of the source
+  text. Target language = `TRANSLATE_TARGET_LANG` (or `OUTPUT_DEFAULT_LANG`
+  fallback) — the same variables already used by all other translation flows.
+  Default `0` (off) — no behaviour change for existing users.
+  - **Runtime settings mini-menu** (`[s] Settings`) added to the
+    Selection to Voice post-action menu. Exposes two toggleable options:
+    `[1] Auto-translate : on/off` and `[2] Target language` (persisted to
+    `.env` via the same `sed` pattern as the insight settings flow).
+  - **`.env.example`** documents `TTS_AUTO_TRANSLATE` with rationale.
+
+---
+
 ## [4.7.0] — 2026-04-19
 
 ### Added
@@ -212,7 +231,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `REFINED TEXT — mistral-small-latest` (happy path, direct provider),
   `REFINED TEXT — mistral/mistral-small-latest (via Eden AI)` (Eden
   pingpong fallback), `SUMMARY — magistral-small-latest (substituted from
-  mistral-small-latest)` (Eden substitution to an equivalent model).
+mistral-small-latest)` (Eden substitution to an equivalent model).
   Translate and OCR keep their hardcoded labels until their own migration
   steps — no placeholder plumbing introduced where it would be dead code.
 - **`src/insight.py` — `_write_model_meta(result)` helper** called from
@@ -236,14 +255,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   suffix (legacy look); provider name ends in `_direct` → `" — {model}"`
   (plus `"(substituted from ...)"` if a substitution flag was set but the
   model changed); provider name starts with `eden_` → `" — {model} (via
-  Eden AI)"`; other providers → `" — {model} (via {display})"` with the
+Eden AI)"`; other providers → `" — {model} (via {display})"` with the
   trailing `" (direct)"` stripped.
 - **`record_and_transcribe_local.sh`** uses the same internal-name-based
   branching as `_model_label_suffix` so the STT flow's "REFINED TEXT" header
   stays consistent with the insight flows.
 - **`selection_to_insight.sh` / `selection_to_search.sh` /
   `selection_to_factcheck.sh`** each export `INSIGHT_MODEL_META_FILE=
-  "$INSIGHT_DIR/.model_meta"` alongside the existing `INSIGHT_META_FILE`
+"$INSIGHT_DIR/.model_meta"` alongside the existing `INSIGHT_META_FILE`
   and friends.
 - **`tests/unit/test_model_meta.py`** (6 tests): locks the 5-line format
   written by `insight._write_model_meta` and the 6-line format written by
@@ -272,13 +291,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `MISTRAL_API_KEY` only → tiers 1+3; `EDENAI_API_KEY` only → tiers 2+4;
   both → all four in order. Cascade:
   (1) `mistral-ocr-latest` via `/v1/ocr` — provider `mistral_ocr`
-      (new registry entry, `MISTRAL_API_KEY`);
+  (new registry entry, `MISTRAL_API_KEY`);
   (2) Eden OCR async via `call_ocr_async()` — provider `eden_ocr_mistral`
-      (`EDENAI_API_KEY`);
+  (`EDENAI_API_KEY`);
   (3) `pixtral-large-latest` via chat completions — provider
-      `mistral_vision` (new registry entry, `MISTRAL_API_KEY`);
+  `mistral_vision` (new registry entry, `MISTRAL_API_KEY`);
   (4) `mistral/pixtral-large-latest` via Eden chat — provider
-      `eden_mistral` (`EDENAI_API_KEY`).
+  `eden_mistral` (`EDENAI_API_KEY`).
   Each successful tier writes a 5-line meta file to
   `VOXREFINER_OCR_META_FILE` (same format as `INSIGHT_MODEL_META_FILE`)
   so the shell header shows the actual provider that answered.
@@ -289,7 +308,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   `CAPABILITIES["ocr"]` updated to the ordered 4-provider list
   `["mistral_ocr", "eden_ocr_mistral", "mistral_vision", "eden_mistral"]`.
   `_dispatch_adapter()` raises `ProviderError` for `adapter_type =
-  "mistral_ocr"` (same guard as the existing `eden_ocr` case) to prevent
+"mistral_ocr"` (same guard as the existing `eden_ocr` case) to prevent
   accidental routing through `call()`.
 - **`screen_to_text.sh`** exports `VOXREFINER_OCR_META_FILE` and calls
   `_model_label_suffix` to build the `EXTRACTED TEXT` header suffix.
@@ -302,6 +321,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   pending→completed polling, job failure, no key, and missing `public_id`.
 
 ### Fixed
+
+- **Fact-check result returned in English when input was non-English.**
+  `factcheck()` passed `_FACTCHECK_GROK_SYSTEM` to Grok but omitted the
+  system-prompt argument for Perplexity, causing `search_perplexity` to fall
+  back to `_SEARCH_SYSTEM` (which anchors language on the _question_, not the
+  _input summary_). The hardcoded English query `"Verify the main factual
+claims in this content."` then forced English output regardless of the
+  selected text's language. Fixed by passing `_FACTCHECK_PERPLEXITY_SYSTEM`
+  as the third argument, consistent with the existing Grok call.
 
 - **`EDEN_MODEL_MAP` only covered Mistral, breaking Eden fallback for search /
   fact-check when `PERPLEXITY_API_KEY` (or `XAI_API_KEY`) was absent but
@@ -328,7 +356,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   points with `"$VENV_PYTHON" src/ocr.py` / `src/refine.py` / `src/transcribe.py`,
   which puts `src/` on `sys.path` but not the project root — so
   `from src.providers import ...` raised `ModuleNotFoundError: No module named
-  'src'`. OCR failed silently in the post-capture menu (stderr redirected via
+'src'`. OCR failed silently in the post-capture menu (stderr redirected via
   FD 3 but the exception was caught and returned as empty text), and refine
   failures were masked by the graceful-degradation fallback that returns the
   raw transcription on any error. All six shell call sites switched to

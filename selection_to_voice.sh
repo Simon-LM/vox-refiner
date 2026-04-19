@@ -29,6 +29,81 @@ fi
 # is captured by $() substitution.
 exec 3>&2
 
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+_lang_name() {
+    case "$1" in
+        en) echo "English" ;;  fr) echo "French" ;;   de) echo "German" ;;
+        es) echo "Spanish" ;;  pt) echo "Portuguese" ;; it) echo "Italian" ;;
+        nl) echo "Dutch" ;;    hi) echo "Hindi" ;;    ar) echo "Arabic" ;;
+        zh) echo "Chinese" ;;  ja) echo "Japanese" ;; ko) echo "Korean" ;;
+        ru) echo "Russian" ;;  pl) echo "Polish" ;;   sv) echo "Swedish" ;;
+        *) echo "$1" ;;
+    esac
+}
+
+# ─── Session state ────────────────────────────────────────────────────────────
+
+_SETTING_VOICE_AUTO_TRANSLATE="${TTS_AUTO_TRANSLATE:-0}"
+_SETTING_VOICE_LANG="${TRANSLATE_TARGET_LANG:-${OUTPUT_DEFAULT_LANG:-en}}"
+
+# ─── Voice settings mini-menu ────────────────────────────────────────────────
+
+_voice_settings_flow() {
+    while true; do
+        echo ""
+        _header "VOICE SETTINGS" "⚙"
+        echo ""
+        local _at_label="off"
+        [ "$_SETTING_VOICE_AUTO_TRANSLATE" = "1" ] && _at_label="on"
+        printf "  ${C_BOLD}[1]${C_RESET} Auto-translate before reading : ${C_BOLD}%s${C_RESET}  ${C_DIM}(on · off)${C_RESET}\n" "$_at_label"
+        printf "  ${C_BOLD}[2]${C_RESET} Translation target language   : ${C_BOLD}%s (%s)${C_RESET}  ${C_DIM}(type a code to change)${C_RESET}\n" \
+            "$(_lang_name "$_SETTING_VOICE_LANG")" "$_SETTING_VOICE_LANG"
+        echo ""
+        printf "  ${C_BOLD}[m]${C_RESET} Back\n"
+        printf "  ${C_BGREEN}▸${C_RESET} "
+        read -r _vs_choice
+        case "$_vs_choice" in
+            1)
+                if [ "$_SETTING_VOICE_AUTO_TRANSLATE" = "1" ]; then
+                    _SETTING_VOICE_AUTO_TRANSLATE="0"
+                else
+                    _SETTING_VOICE_AUTO_TRANSLATE="1"
+                fi
+                local _env_file="$SCRIPT_DIR/.env"
+                if [ -f "$_env_file" ]; then
+                    if grep -q "^TTS_AUTO_TRANSLATE=" "$_env_file"; then
+                        sed -i "s/^TTS_AUTO_TRANSLATE=.*/TTS_AUTO_TRANSLATE=$_SETTING_VOICE_AUTO_TRANSLATE/" "$_env_file"
+                    else
+                        printf '\nTTS_AUTO_TRANSLATE=%s\n' "$_SETTING_VOICE_AUTO_TRANSLATE" >> "$_env_file"
+                    fi
+                fi
+                local _new_label="off"
+                [ "$_SETTING_VOICE_AUTO_TRANSLATE" = "1" ] && _new_label="on"
+                _success "Auto-translate → $_new_label  (saved to .env)"
+                ;;
+            2)
+                printf "  Language code ${C_DIM}(en, fr, de, es, it, pt, nl, ru, zh, ja…)${C_RESET}: "
+                read -r _new_lang
+                if [ -n "$_new_lang" ]; then
+                    _SETTING_VOICE_LANG="$_new_lang"
+                    local _env_file="$SCRIPT_DIR/.env"
+                    if [ -f "$_env_file" ]; then
+                        if grep -q "^TRANSLATE_TARGET_LANG=" "$_env_file"; then
+                            sed -i "s/^TRANSLATE_TARGET_LANG=.*/TRANSLATE_TARGET_LANG=$_new_lang/" "$_env_file"
+                        else
+                            printf '\nTRANSLATE_TARGET_LANG=%s\n' "$_new_lang" >> "$_env_file"
+                        fi
+                    fi
+                    _success "Target language → $(_lang_name "$_new_lang") ($_new_lang)  (saved to .env)"
+                fi
+                ;;
+            m|M) return ;;
+            *) ;;
+        esac
+    done
+}
+
 # ─── Get selected text ───────────────────────────────────────────────────────
 
 # Try primary selection first (mouse highlight), then clipboard.
@@ -47,6 +122,26 @@ if [ -z "$(printf '%s' "$selected_text" | tr -d '[:space:]')" ]; then
     _info "Select some text with your mouse, then run again."
     echo ""
     exit 1
+fi
+
+# ─── Auto-translate ──────────────────────────────────────────────────────────
+
+if [ "$_SETTING_VOICE_AUTO_TRANSLATE" = "1" ]; then
+    clear
+    echo ""
+    _header "SELECTION TO VOICE" "⌨→🔊"
+    echo ""
+    _process "Translating to $(_lang_name "$_SETTING_VOICE_LANG") (${_SETTING_VOICE_LANG})..."
+    echo ""
+    _translated=$(printf '%s' "$selected_text" | \
+        TRANSLATE_TARGET_LANG="$_SETTING_VOICE_LANG" \
+        "$VENV_PYTHON" -m src.translate 2>&3)
+    if [ -n "$_translated" ]; then
+        selected_text="$_translated"
+        _source="$_source → $(_lang_name "$_SETTING_VOICE_LANG")"
+    else
+        _warn "Translation failed — reading original text."
+    fi
 fi
 
 # ─── Display ─────────────────────────────────────────────────────────────────
@@ -281,7 +376,7 @@ if [ "${VOXREFINER_MENU:-}" != "1" ]; then
     while true; do
         echo ""
         _sep
-        printf "  ${C_BOLD}[l]${C_RESET} Réecouter  ${C_BOLD}[d]${C_RESET} Sauvegarder  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner : "
+        printf "  ${C_BOLD}[l]${C_RESET} Réecouter  ${C_BOLD}[d]${C_RESET} Sauvegarder  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner : "
         read -r _action
         case "$_action" in
             l|L)
@@ -289,6 +384,9 @@ if [ "${VOXREFINER_MENU:-}" != "1" ]; then
                 ;;
             d|D)
                 _save_audio_to_downloads "$TTS_OUTPUT" "$selected_text" "selection-to-voice"
+                ;;
+            s|S)
+                _voice_settings_flow
                 ;;
             m|M) if [ -n "${VOXREFINER_MENU:-}" ]; then exit 0; fi; exec "$SCRIPT_DIR/vox-refiner-menu.sh" ;;
             *) ;;
