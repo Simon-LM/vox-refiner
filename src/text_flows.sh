@@ -28,6 +28,46 @@ _warn_missing_keys() {
     fi
 }
 
+# ─── Provider/model label helper ──────────────────────────────────────────────
+# Reads a meta file written by insight.py (INSIGHT_MODEL_META_FILE) with:
+#   line 1: requested_model       line 2: effective_model
+#   line 3: provider internal name (e.g. mistral_direct, eden_mistral)
+#   line 4: provider display name  line 5: substituted (1/0)
+# Prints a suffix string (empty when the file is absent/empty):
+#   " — {model}"                              (happy path: *_direct, no substitution)
+#   " — {model} (substituted from {req})"     (direct provider but Eden did substitute)
+#   " — {model} (via Eden AI)"                (Eden provider)
+#   " — {model} (via {display})"              (other providers, strips trailing " (direct)")
+# Usage: _model_label_suffix "$META_FILE"
+_model_label_suffix() {
+    local meta_file="$1"
+    [ -z "$meta_file" ] || [ ! -s "$meta_file" ] && return 0
+    local _req _eff _prov_name _prov_display _sub _display _clean
+    _req="$(sed -n '1p' "$meta_file")"
+    _eff="$(sed -n '2p' "$meta_file")"
+    _prov_name="$(sed -n '3p' "$meta_file")"
+    _prov_display="$(sed -n '4p' "$meta_file")"
+    _sub="$(sed -n '5p' "$meta_file")"
+    _display="${_eff:-$_req}"
+    [ -z "$_display" ] && return 0
+    case "$_prov_name" in
+        ""|*_direct)
+            if [ "$_sub" = "1" ] && [ -n "$_req" ] && [ "$_eff" != "$_req" ]; then
+                printf ' — %s (substituted from %s)' "$_display" "$_req"
+            else
+                printf ' — %s' "$_display"
+            fi
+            ;;
+        eden_*)
+            printf ' — %s (via Eden AI)' "$_display"
+            ;;
+        *)
+            _clean="${_prov_display% (direct)}"
+            printf ' — %s (via %s)' "$_display" "${_clean:-$_prov_name}"
+            ;;
+    esac
+}
+
 # ─── Language helper ──────────────────────────────────────────────────────────
 
 _lang_name() {
@@ -149,7 +189,9 @@ _show_and_speak() {
 
 _generate_summary() {
     if [ -n "${summary_text:-}" ]; then
-        _header "SUMMARY" "💡"
+        local _suffix=""
+        _suffix="$(_model_label_suffix "${INSIGHT_MODEL_META_FILE:-}")"
+        _header "SUMMARY${_suffix}" "💡"
         echo ""
         printf "${C_BG_BLUE} %s ${C_RESET}\n" "$summary_text"
         echo ""
@@ -255,7 +297,9 @@ _search_flow() {
         return
     fi
 
-    _show_and_speak "SEARCH RESULT" "🔍" "$search_result" "$SEARCH_AUDIO"
+    local _search_suffix=""
+    _search_suffix="$(_model_label_suffix "${INSIGHT_MODEL_META_FILE:-}")"
+    _show_and_speak "SEARCH RESULT${_search_suffix}" "🔍" "$search_result" "$SEARCH_AUDIO"
     _search_done=1
 }
 
@@ -383,7 +427,9 @@ _factcheck_flow() {
         return
     fi
 
-    _show_and_speak "FACT-CHECK RESULT" "🔬" "$factcheck_result" "$FACTCHECK_AUDIO"
+    local _fc_suffix=""
+    _fc_suffix="$(_model_label_suffix "${INSIGHT_MODEL_META_FILE:-}")"
+    _show_and_speak "FACT-CHECK RESULT${_fc_suffix}" "🔬" "$factcheck_result" "$FACTCHECK_AUDIO"
     _factcheck_done=1
 
     if [ -s "${INSIGHT_PERPLEXITY_FILE:-}" ] && [ -s "${INSIGHT_GROK_FILE:-}" ]; then

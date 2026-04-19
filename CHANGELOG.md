@@ -13,6 +13,333 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.7.0] — 2026-04-19
+
+### Added
+
+- **`src/providers.py` — provider resolution layer:** new central module
+  registering all AI providers (Mistral direct, Eden AI routes, xAI/Grok direct,
+  Perplexity direct) in a declarative table. Exposes `resolve(capability)` →
+  ordered list of available providers filtered by key presence, `is_available()`,
+  and `call()` with ping-pong retry/fallback (3 attempts per provider, backoff
+  2→4→8→15→30 s). Not yet wired into existing flows — migration is progressive.
+- **XDG key-validation cache** (`~/.local/share/vox-refiner/keys-cache.json`):
+  provider keys are validated on first use and re-validated only when the key
+  changes (SHA-256 prefix hash) or on live 401 (`mark_invalid()`). No periodic
+  TTL — revalidation is event-driven.
+- **`EDENAI_API_KEY` support:** Eden AI added as optional fallback provider for
+  Mistral, Grok, Perplexity, and OCR routes. Menu now shows the Eden AI key
+  with `[n]` edit / `[v]` test options.
+- **Capability status in the API Keys menu:** Settings → API Keys now shows a
+  live capability table after the key listing — each capability shows ✓ (direct
+  key), ~ (Eden route), or ○ (not available) with a pedagogical hint explaining
+  what each missing key would unlock.
+- **`docs/eden-ai-models.md`:** added OCR async endpoint section (separate
+  `/v3/universal-ai/async` path, job-creation flow, polling).
+- **`tests/ping_eden_models.py`:** added OCR async probe (`ocr/ocr_async/mistral`);
+  `--only ocr` filter; split into `_ping_chat()` and `_ping_ocr()` adapters.
+  Added `mistral/magistral-small-latest` to the probe list now that it is
+  actively used on Mistral direct (fallback for `mistral-small + reasoning_effort`).
+  Expanded catalog so every key and every fallback-target in
+  `EDEN_FALLBACK_CHAINS` is probeable — covers Grok 4.1 vs 4 endpoint variants
+  (`*-latest` suffix), Perplexity `sonar` / `sonar-reasoning-pro`, and Amazon
+  Bedrock fallback targets (`mistral-large-3`, `magistral-small-2509`,
+  `qwen3-next-80b`) plus `ovhcloud/gpt-oss-120b`.
+- **`XAI_FALLBACK_MAP` and `PERPLEXITY_FALLBACK_MAP`** in `src/providers.py`:
+  internal fallback tables for direct xAI / Perplexity APIs, mirroring
+  `MISTRAL_FALLBACK_MAP`. Used on retry when the sticky policy keeps the call
+  on a single provider (e.g. `fact_check_x` stays on Grok direct for native
+  X/Twitter search). Values use canonical API names (no `xai/` or
+  `perplexityai/` prefix — that's Eden's format). Both maps use cyclic chains
+  (no `""` terminal) so retries rotate between model tiers on 429; safe under
+  the `_MAX_ATTEMPTS = 6` hard cap.
+- **`CallResult` dataclass** in `src/providers.py`: `call()` now returns a
+  structured result exposing `text`, `provider`, `effective_model`,
+  `requested_model`, `substituted`, and `attempts`. Business code can display
+  the provider + actual model to the user even after a pingpong fallback or
+  an Eden-side substitution (e.g. `mistral-small + reasoning_effort` →
+  `mistral/magistral-small-latest`).
+- **`docs/eden-ai-models.md`:** documented `mistral/magistral-small-latest` as
+  the Eden substitute for `mistral-small-latest + reasoning_effort`.
+- **`tests/unit/test_providers.py`:** 79 unit tests covering PROVIDERS/CAPABILITIES
+  table invariants, `resolve()` filtering, `is_available()`, cache round-trip,
+  key-hash rotation detection, `mark_invalid()`, `call()` happy path, ping-pong
+  retry, sticky policy, Eden model mapping & substitution, `CallResult` fields,
+  non-429 immediate failure, and backoff timing.
+- **`.env.example`:** restructured API key section with priority rules, per-key
+  rationale, and `GEMINI_API_KEY` as a documented-but-inactive placeholder.
+
+### Changed
+
+- **xAI endpoints updated to Grok 4.20 generation:** `EDEN_FALLBACK_CHAINS` and
+  `XAI_FALLBACK_MAP` now reference the new xAI models
+  (`grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`,
+  `grok-4.20-multi-agent-0309`, `grok-4-1-fast-reasoning`,
+  `grok-4-1-fast-non-reasoning`). Note: direct xAI API dropped the `beta-`
+  prefix, but Eden AI still carries it (`xai/grok-4.20-beta-0309-*`) until
+  their catalog catches up — the two nomenclatures are intentionally kept in
+  sync with each provider's current naming.
+- **Default Grok model** in `_call_xai_adapter`: `grok-4-fast` →
+  `grok-4-1-fast-non-reasoning` (fallback when `INSIGHT_GROK_MODEL` is unset).
+- **`call()` now consumes the Layer-1 fallback maps** (`MISTRAL_FALLBACK_MAP`,
+  `XAI_FALLBACK_MAP`, `PERPLEXITY_FALLBACK_MAP`) via a new `_advance_cascade()`
+  helper. On each `RateLimitError` from a direct provider, the cascade walks
+  the map and the next retry uses the fallback model — per-provider state, so
+  each provider tracks its own chain independently. Compound keys
+  (`<model>+<option>`) strip unsupported options on fallback (e.g. a retry
+  after `mistral-small-latest + reasoning_effort` drops the effort flag and
+  swaps to `magistral-small-latest`). Reaching a terminal `""` value marks
+  the provider exhausted; it is removed from the live set but other providers
+  keep retrying. Eden providers continue to cascade server-side through the
+  `fallbacks` payload field (no client-side advance). Previously, `call()`
+  only rotated providers without ever swapping models — the maps were data
+  structures with no consumer.
+- **Direct cascade is suppressed when Eden redundancy is active** (pingpong
+  policy with an Eden route present): a 429 on a direct provider is typically
+  an account-wide rate limit, so swapping to another model on the same
+  account rarely helps — Eden provides real redundancy via a separate account
+  with its own server-side fallback chain. The direct cascade therefore only
+  fires when there is no live Eden route OR the policy is `sticky` (e.g.
+  `fact_check_x`, where pingpong never rotates to Eden so Eden's presence
+  in `live` provides zero real redundancy).
+- **`src/insight.py::summarize()` migrated** to `providers.call("insight", ...)`.
+  The function now routes through the pingpong Mistral-direct ↔ Eden/Mistral
+  path instead of a bare `requests.post` to the Mistral endpoint. A new
+  `_log_call_result()` helper prints a single stderr line when the answering
+  provider/model differs from the happy path (pingpong fallback to Eden,
+  Eden-side substitution, or cascade to another model) so the user always
+  knows which route produced the summary. Availability check switched from
+  `MISTRAL_API_KEY is set` to `is_available("insight")` — the function now
+  runs with Eden-only keys too. Tests in `TestSummarize` rewritten to mock
+  `src.insight.call` instead of `requests.post`; the previously-failing
+  `test_reasoning_effort_high_in_payload` is replaced by paired tests that
+  verify the flag is passed when `INSIGHT_SUMMARY_REASONING=high` and absent
+  otherwise.
+- **`src/insight.py::search_grok()` migrated** to
+  `providers.call("fact_check_x", ...)`. Grok direct stays primary under the
+  sticky policy (Eden is a last-resort fallback, kept out of the pingpong
+  rotation because Eden does not expose the native X/Twitter search tool so
+  losing it would degrade results silently). The inline `xai_sdk` import and
+  Client/chat boilerplate are gone — the xAI SDK call lives in
+  `providers._call_xai_adapter()` exclusively. `_log_call_result()` reuses the
+  same stderr reporting as `summarize()`. The default `INSIGHT_GROK_MODEL`
+  was raised from `grok-4-fast` to `grok-4-1-fast-non-reasoning` to match the
+  Grok 4.1/4.20 model family used in the fallback maps and avoid implicit
+  xAI server-side rerouting. `TestSearchGrok`, the Grok-touching tests in
+  `TestSearch`, and `TestFactcheck` were rewritten to mock `src.insight.call`
+  instead of patching `sys.modules["xai_sdk"]`; the now-unused `_mock_xai_sdk`
+  helper was removed.
+- **`src/insight.py::search_perplexity()` migrated** to
+  `providers.call("search", ...)`. Perplexity direct first, Eden/Perplexity as
+  pingpong fallback on 429. Added a `system` override parameter symmetric with
+  `search_grok()` so future callers can pass `_FACTCHECK_PERPLEXITY_SYSTEM`
+  without another signature change.
+- **Mistral synthesis in `search()` (both-engines branch) and `factcheck()`
+  migrated** to `providers.call("insight", ...)`. Both synthesis paths now
+  inherit the pingpong Mistral-direct ↔ Eden/Mistral fallback automatically
+  and report their effective provider/model via `_log_call_result()`. The
+  `search()` synthesis keeps its graceful degradation: on `ProviderError` it
+  returns the two raw results concatenated instead of failing the whole
+  search.
+- **Search and fact-check dispatchers now resolve availability through
+  `is_available()`** instead of reading direct-API env-var module globals.
+  Concretely, `search()`, `factcheck()`, `_cmd_search()`, and
+  `_cmd_factcheck()` route on `is_available("search")`,
+  `is_available("fact_check_x")`, and `is_available("insight")`. This closes
+  the gap where an Eden-only setup (no `PERPLEXITY_API_KEY` / `XAI_API_KEY`,
+  only `EDENAI_API_KEY`) could not use the search/factcheck flows even though
+  Eden's Perplexity and xAI routes were ready to serve. Error messages were
+  updated to mention `EDENAI_API_KEY` alongside the direct keys.
+- **Tests rewritten:** `TestSearchPerplexity` now mocks `src.insight.call`
+  instead of `requests.post` and covers the `search` capability contract
+  (Eden-only acceptance, `system` override, timeout/model kwargs,
+  `ProviderError → RuntimeError` wrap). `TestSearch` and `TestFactcheck` were
+  rewritten around a new `_route_by_capability()` side-effect helper that
+  dispatches `call()` invocations on the capability argument
+  (`search` / `fact_check_x` / `insight`), so a single `patch("src.insight.call")`
+  can back all three of Perplexity, Grok, and Mistral synthesis in one test.
+  A `_clear_search_env()` fixture unsets every key the host `.env` may prime
+  so the no-provider guards are reachable in isolation.
+- **`src/refine.py` migrated to the provider layer.** Both `refine()` and
+  `_extract_and_update_history()` now call `providers.call("refine", ...)`
+  and `providers.call("history", ...)` respectively, so the 3-tier
+  SHORT/MEDIUM/LONG flow and the background history extraction both inherit
+  pingpong Mistral-direct ↔ Eden/Mistral fallback, the direct cascade on
+  429, and Eden-side substitution/native fallback chains. The parallel
+  compare thread (`REFINE_COMPARE_MODELS=true`) also routes through the
+  provider layer. Availability check switched from `MISTRAL_API_KEY is set`
+  to `is_available("refine")` / `is_available("history")` — refinement now
+  runs with an Eden-only configuration. A new `_log_refine_result()` helper
+  (mirroring `insight.py::_log_call_result()`) prints a single stderr line
+  labelled `Refine (short|medium|long)` or `History` whenever the answering
+  provider/model differs from the happy path. A local
+  `_strip_unsupported_params()` keeps the safety net that drops
+  `reasoning_effort` when the requested model is not `mistral-small-latest`
+  (covers user overrides like `REFINE_MODEL_MEDIUM=magistral-small-latest`).
+- **`_call_model()`, `_API_URL`, `_TRANSIENT_HTTP_CODES`, `REFINE_REQUEST_RETRIES`,
+  and the direct `requests.post` import are gone** from `refine.py` — retries,
+  backoff, and transient-HTTP handling are now the provider layer's concern.
+  In-tier `ProviderError` from the primary model still triggers the existing
+  tier fallback (primary → fallback model without per-tier params), so the
+  app-level graceful-degradation path (returning the raw transcription when
+  every model is exhausted) is preserved. Auth failures (401/403) no longer
+  propagate as `HTTPError` — they surface as `ProviderError` from the
+  provider layer, are caught by the tier loop, and degrade to raw text
+  rather than aborting the paste (behavior change, intentional UX
+  improvement — see `TestRefineFallbackOnProviderError`).
+- **`tests/integration/test_refine_fallback.py` fully rewritten.** All tests
+  now mock `src.refine.call` instead of `requests.post`, inspect the opts
+  passed to `call()` (capability, model, timeout, temperature,
+  reasoning_effort) via `mock.call_args.kwargs`, and use a
+  `_route_by_model()` side-effect helper for compare-mode determinism.
+  `TestRefineFallbackOn429` is renamed `TestRefineFallbackOnProviderError`
+  to reflect the new capability-level error surface. A `_clear_refine_env()`
+  fixture unsets `MISTRAL_API_KEY` / `EDENAI_API_KEY` after import so the
+  `is_available("refine") == False` guard is reachable even when the host
+  `.env` populates both keys.
+- **`tests/unit/test_content_parsing.py` rewritten** to exercise the content
+  parser (plain string vs. magistral list-of-blocks) through
+  `providers.call("refine", ...)` with a mocked `requests.post`. The
+  coverage surface is the same (string returned as-is, list joined, missing
+  `text` key safe), but the tests now target the new home of the logic
+  (`_call_openai_adapter` in `providers.py`).
+- **Provider/effective-model exposed in CLI headers** for every flow already
+  routed through `src/providers.py` (refine + summary/search/factcheck).
+  The Python side writes a small plain-text "meta" file (paths: existing
+  `VOXTRAL_MODELS_FILE` for refine, new `INSIGHT_MODEL_META_FILE` for
+  insight); the shell side reads it and appends a suffix to the result
+  header so the user always sees which provider answered, e.g.
+  `REFINED TEXT — mistral-small-latest` (happy path, direct provider),
+  `REFINED TEXT — mistral/mistral-small-latest (via Eden AI)` (Eden
+  pingpong fallback), `SUMMARY — magistral-small-latest (substituted from
+  mistral-small-latest)` (Eden substitution to an equivalent model).
+  Translate and OCR keep their hardcoded labels until their own migration
+  steps — no placeholder plumbing introduced where it would be dead code.
+- **`src/insight.py` — `_write_model_meta(result)` helper** called from
+  `_log_call_result()` so every migrated capability (summarize, perplexity,
+  grok, search synthesis, factcheck synthesis) emits the meta-file
+  automatically. In multi-step flows the last call wins, which is the
+  user-visible model (e.g. synthesis for factcheck). File format: 5 lines
+  — requested model, effective model, provider internal name (e.g.
+  `mistral_direct`, `eden_mistral`), provider display name, substituted
+  flag.
+- **`src/refine.py` — `VOXTRAL_MODELS_FILE` format extended** with
+  lines 3-6 (effective model, provider internal name, provider display
+  name, substituted flag). Lines 1-2 unchanged (succeeded model, fallback
+  model) so legacy readers continue to work — the existing record-and-
+  transcribe integration sandbox writes only the legacy 2 lines and the
+  shell reader degrades to "plain model" output without provider
+  annotation.
+- **`src/text_flows.sh` — `_model_label_suffix` helper** shared by
+  `_generate_summary`, `_search_flow`, `_factcheck_flow`, and
+  `selection_to_insight.sh`. Rules: empty/missing meta file → empty
+  suffix (legacy look); provider name ends in `_direct` → `" — {model}"`
+  (plus `"(substituted from ...)"` if a substitution flag was set but the
+  model changed); provider name starts with `eden_` → `" — {model} (via
+  Eden AI)"`; other providers → `" — {model} (via {display})"` with the
+  trailing `" (direct)"` stripped.
+- **`record_and_transcribe_local.sh`** uses the same internal-name-based
+  branching as `_model_label_suffix` so the STT flow's "REFINED TEXT" header
+  stays consistent with the insight flows.
+- **`selection_to_insight.sh` / `selection_to_search.sh` /
+  `selection_to_factcheck.sh`** each export `INSIGHT_MODEL_META_FILE=
+  "$INSIGHT_DIR/.model_meta"` alongside the existing `INSIGHT_META_FILE`
+  and friends.
+- **`tests/unit/test_model_meta.py`** (6 tests): locks the 5-line format
+  written by `insight._write_model_meta` and the 6-line format written by
+  `refine.refine`, including the substituted-by-Eden path.
+- **`tests/integration/test_model_label_suffix.py`** (7 tests): sources
+  `src/text_flows.sh` in a subshell and asserts the exact output of
+  `_model_label_suffix` for the full matrix of happy path, any
+  `*_direct` provider, Eden route, Eden substitution, direct-with-
+  substitution, empty meta file, and missing provider fields.
+- **`src/providers.py` — `call_ocr_async()`** implements the Eden AI async
+  OCR job flow: POST job to `/v3/universal-ai/async` with base64 image →
+  receive `public_id` → poll GET until `status == "completed"` → extract
+  text from the response. Handles four observed Eden response shapes (A:
+  `output[0].prediction.pages[].markdown`, B: `prediction.text`, C:
+  `result.pages[].markdown`, D: top-level `text`) by trying each in order.
+  Raises `ProviderError` on missing key, HTTP failure, job failure status,
+  or polling timeout (`_OCR_JOB_TIMEOUT_DEFAULT = 120 s`).
+  A companion `_extract_eden_ocr_text()` helper centralises the shape-
+  detection logic.
+- **`src/ocr.py` migrated to the provider layer — 4-tier cascade.**
+  `ocr()` calls `resolve("ocr")` and iterates the returned provider list,
+  dispatching to the right API function based on `provider.adapter_type` /
+  `provider.name`. No `MISTRAL_API_KEY` / `EDENAI_API_KEY` checks in
+  business code — key-based tier selection is entirely owned by
+  `providers.resolve()`. Active tiers depend on available keys:
+  `MISTRAL_API_KEY` only → tiers 1+3; `EDENAI_API_KEY` only → tiers 2+4;
+  both → all four in order. Cascade:
+  (1) `mistral-ocr-latest` via `/v1/ocr` — provider `mistral_ocr`
+      (new registry entry, `MISTRAL_API_KEY`);
+  (2) Eden OCR async via `call_ocr_async()` — provider `eden_ocr_mistral`
+      (`EDENAI_API_KEY`);
+  (3) `pixtral-large-latest` via chat completions — provider
+      `mistral_vision` (new registry entry, `MISTRAL_API_KEY`);
+  (4) `mistral/pixtral-large-latest` via Eden chat — provider
+      `eden_mistral` (`EDENAI_API_KEY`).
+  Each successful tier writes a 5-line meta file to
+  `VOXREFINER_OCR_META_FILE` (same format as `INSIGHT_MODEL_META_FILE`)
+  so the shell header shows the actual provider that answered.
+- **`providers.py` — two new OCR providers** added to the PROVIDERS
+  registry: `mistral_ocr` (`adapter_type="mistral_ocr"`, endpoint
+  `/v1/ocr`) and `mistral_vision` (`adapter_type="openai"`, endpoint
+  `/v1/chat/completions`), both requiring `MISTRAL_API_KEY`.
+  `CAPABILITIES["ocr"]` updated to the ordered 4-provider list
+  `["mistral_ocr", "eden_ocr_mistral", "mistral_vision", "eden_mistral"]`.
+  `_dispatch_adapter()` raises `ProviderError` for `adapter_type =
+  "mistral_ocr"` (same guard as the existing `eden_ocr` case) to prevent
+  accidental routing through `call()`.
+- **`screen_to_text.sh`** exports `VOXREFINER_OCR_META_FILE` and calls
+  `_model_label_suffix` to build the `EXTRACTED TEXT` header suffix.
+  Default falls back to `— mistral-ocr-latest` when the meta file is
+  absent (e.g. legacy or test environments).
+- **`tests/unit/test_ocr.py`** (26 tests): 4-tier cascade ordering with
+  both keys, Mistral-only (tiers 1→3, Eden tiers skipped), Eden-only
+  (tiers 2→4, Mistral tiers skipped), all-fail error, meta-file provider
+  names at each tier, `call_ocr_async()` for all four response shapes,
+  pending→completed polling, job failure, no key, and missing `public_id`.
+
+### Fixed
+
+- **`EDEN_MODEL_MAP` only covered Mistral, breaking Eden fallback for search /
+  fact-check when `PERPLEXITY_API_KEY` (or `XAI_API_KEY`) was absent but
+  `EDENAI_API_KEY` was set.** `_prepare_eden_opts()` could not translate the
+  canonical model name (e.g. `sonar-pro`) to the Eden identifier
+  (`perplexityai/sonar-pro`), so the payload went out with a name Eden
+  rejects with HTTP 400 "Model(s) not found or inactive". It also meant
+  `EDEN_FALLBACK_CHAINS` was never consulted (keyed on Eden-format names) so
+  the Eden-side server fallback was silently disabled. Added Perplexity
+  (`sonar`, `sonar-pro`, `sonar-reasoning-pro`, `sonar-deep-research`) and
+  xAI (`grok-4-1-fast-non-reasoning`, `grok-4-1-fast-reasoning`,
+  `grok-4.20-0309-non-reasoning`, `grok-4.20-0309-reasoning`,
+  `grok-4.20-multi-agent-0309`) entries. Also broadened the comment:
+  `EDEN_MODEL_MAP` is now explicitly "canonical model (Mistral / Perplexity /
+  xAI) → Eden identifier", not "canonical Mistral model".
+- **Contract tests added** (`test_eden_model_map_covers_all_perplexity_fallbacks`,
+  `test_eden_model_map_covers_all_xai_fallbacks`): mirror the existing
+  Mistral test so any future `PERPLEXITY_FALLBACK_MAP` / `XAI_FALLBACK_MAP`
+  key without an Eden translation now fails CI instead of silently producing
+  HTTP 400 at runtime.
+- **Shell scripts invoked Python modules as files, breaking `from src.X`
+  imports at runtime.** `record_and_transcribe_local.sh`, `voice_translate.sh`,
+  `screen_to_text.sh`, and `vox-refiner-menu.sh` launched the Python entry
+  points with `"$VENV_PYTHON" src/ocr.py` / `src/refine.py` / `src/transcribe.py`,
+  which puts `src/` on `sys.path` but not the project root — so
+  `from src.providers import ...` raised `ModuleNotFoundError: No module named
+  'src'`. OCR failed silently in the post-capture menu (stderr redirected via
+  FD 3 but the exception was caught and returned as empty text), and refine
+  failures were masked by the graceful-degradation fallback that returns the
+  raw transcription on any error. All six shell call sites switched to
+  `"$VENV_PYTHON" -m src.ocr` / `-m src.refine` / `-m src.transcribe`,
+  matching the convention already used in `src/text_flows.sh` and
+  `src/save_audio.sh`. Unit tests were unaffected because they inject
+  `src/` into `sys.path` explicitly in `conftest.py`, so the regression did
+  not surface there.
+
+---
+
 ## [4.6.3] — 2026-04-14
 
 ### Fixed
@@ -175,7 +502,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`[9] Screen to Text`** (was `[8]`): new feature — select a screen region,
   extract text via Mistral OCR (`mistral-ocr-latest`), copy result to clipboard.
   Post-action menu: `[r] Retry OCR  [n] New capture  [l] Read aloud  [i] Insight
-  [p] Search  [f] Fact-check  [m] Menu VoxRefiner`.
+[p] Search  [f] Fact-check  [m] Menu VoxRefiner`.
   - **`screen_to_text.sh`:** captures a region with `maim -s` (preferred) or
     `scrot -s` (fallback), pipes the PNG to `src/ocr.py`, copies extracted text
     to both clipboards.
@@ -201,7 +528,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - `[9]` → `Screen to Text` (was `[8]`)
   - `[W1]` → `Speak & Post` (coming soon, was `[3]`)
   - `[P0]` → `Your Workflows` (coming soon)
-  - `[+]`  → `Create a workflow` (coming soon)
+  - `[+]` → `Create a workflow` (coming soon)
 
 - **`screen_to_text.sh` — post-action menu:** `[z] Summarise` replaces
   `[i] Insight`; sub-scripts called with `VOXREFINER_MENU=1` so their
@@ -255,9 +582,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   refine with `ENABLE_HISTORY=true`. No sub-menu — records immediately using `.env`
   defaults.
   - **`vox-refiner-menu.sh` — case `0)`:** direct recording with `ENABLE_REFINE=false
-    ENABLE_HISTORY=false`. Dynamic post-action menu: `[R] Refine / [n] New / [m]`
+ENABLE_HISTORY=false`. Dynamic post-action menu: `[R] Refine / [n] New / [m]`
     before first refine; expands to `[r] Retry / [n] / [v] View history / [e] Edit /
-    [m]` after. `exec 3>&2` added so Python stderr reaches the terminal during
+[m]` after. `exec 3>&2` added so Python stderr reaches the terminal during
     on-demand refine.
   - **`record_and_transcribe_local.sh`:** raw transcription persisted to
     `recordings/stt/.raw_transcription` after Voxtral. `ENABLE_REFINE` and
@@ -314,7 +641,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   in the voice-picker sub-menu (returns to Settings).
 - **Menu navigation — `[Enter]` audit:** `[Enter]` is no longer used for navigation
   or quit in any feature post-action menu. Each menu has an explicit key: `[m] Menu
-  VoxRefiner`, `[q] Quit`, or `[m] Back`. `[Enter]` remains valid only as a launch
+VoxRefiner`, `[q] Quit`, or `[m] Back`. `[Enter]` remains valid only as a launch
   action (e.g. `[Enter] Start translation` in Feature 2) and as `[Enter] Quit` in
   the standalone `record_and_transcribe_local.sh` direct mode.
 - **`vox-refiner-menu.sh` — Settings menu:** `Press Enter to return...` replaced
@@ -325,7 +652,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`vox-refiner-menu.sh` — Update sub-menu:** `Press Enter to return...` replaced
   with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now a no-op.
 - **`vox-refiner-menu.sh` — Help screen:** proper `HELP` header added; `Press Enter
-  to return...` replaced with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now
+to return...` replaced with `[m] Menu VoxRefiner` + `▸` prompt; `[Enter]` is now
   a no-op.
 
 ---
@@ -422,7 +749,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - `summarize(text)` — `mistral-small-latest` with `reasoning_effort: high`.
   - `search_perplexity(query, context_summary)` — Perplexity `sonar-pro`.
   - `search_grok(query, context_summary, system)` — xAI SDK with `web_search +
-    x_search` server-side tools (requires `grok-4` family; default `grok-4-fast`).
+x_search` server-side tools (requires `grok-4` family; default `grok-4-fast`).
   - `search()` dispatcher — routes to Perplexity, Grok, or both based on
     `INSIGHT_SEARCH_ENGINE` and available API keys.
   - `factcheck(summary, query_hint)` — Perplexity + Grok in parallel via
@@ -526,7 +853,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **`record_and_transcribe_local.sh` — ffmpeg exit code not checked:** ffmpeg failures
   now abort the pipeline immediately instead of passing an invalid file to Voxtral.
 - **`record_and_transcribe_local.sh` — Ctrl+C re-entry in `stop_recording`:** `trap ''
-  SIGINT` is now set at the start of the handler, preventing the function from being
+SIGINT` is now set at the start of the handler, preventing the function from being
   called multiple times if the user presses Ctrl+C repeatedly during cleanup.
 
 ---
@@ -555,7 +882,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   math italic letters (𝐸→E); `_collapse_math_lines` collapses Wikipedia one-char-per-line
   formula rendering; `_merge_split_identifiers` fuses `E v a l` → `Eval`; `_expand_math_symbols`
   substitutes 28 symbols (×→"croix", ∈→"appartient à", etc.); `_expand_function_calls`
-  expands `f(x)` → "f de x" iteratively; colon verbalization on math lines: ` : ` →
+  expands `f(x)` → "f de x" iteratively; colon verbalization on math lines: `:` →
   "fonction de" (type signatures) or "," (other colons on math lines).
 - **`src/tts.py` — citation voice fallback:** after 3 failed attempts with the citation
   voice, the system automatically falls back to the main reading voice for the same

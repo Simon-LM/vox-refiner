@@ -258,20 +258,100 @@ _test_mistral_key() {
     esac
 }
 
+_test_eden_key() {
+    local key="$1"
+    if [ -z "$key" ]; then
+        _error "No Eden AI key to test."
+        return 1
+    fi
+    printf "  ${C_CYAN}⚡ Testing Eden AI key...${C_RESET}\n"
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $key" \
+        -H "Content-Type: application/json" \
+        -d '{"model":"mistral/mistral-small-latest","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+        "https://api.edenai.run/v3/llm/chat/completions" \
+        --max-time 15 2>/dev/null)
+    case "$http_code" in
+        200) _success "Eden AI key is valid." ; return 0 ;;
+        401) _error  "Invalid Eden AI key (401 Unauthorized)." ; return 1 ;;
+        429) _warn   "Rate limited (429) — key exists but quota exceeded." ; return 1 ;;
+        000) _error  "No network response — check your internet connection." ; return 1 ;;
+        *)   _error  "Unexpected response: HTTP $http_code" ; return 1 ;;
+    esac
+}
+
+_show_capability_status() {
+    # Display which features are available/locked based on configured keys.
+    # Intended for display inside _submenu_api_keys.
+    local _has_m="${MISTRAL_API_KEY:-}"
+    local _has_e="${EDENAI_API_KEY:-}"
+    local _has_x="${XAI_API_KEY:-}"
+    local _has_p="${PERPLEXITY_API_KEY:-}"
+
+    echo ""
+    printf "  ${C_DIM}── Capabilities ──────────────────────────────────────────────────${C_RESET}\n"
+    echo ""
+
+    # Core: Speak & Refine, Insight summary (Mistral required)
+    if [ -n "$_has_m" ]; then
+        printf "  ${C_BGREEN}✓${C_RESET}  Speak & Refine, Transcription, Insight summary\n"
+    else
+        printf "  ${C_RED}✗${C_RESET}  ${C_DIM}Speak & Refine / Transcription  — requires MISTRAL_API_KEY${C_RESET}\n"
+    fi
+
+    # Web search & fact-check (web)
+    if [ -n "$_has_p" ]; then
+        printf "  ${C_BGREEN}✓${C_RESET}  Web search & fact-check  (Perplexity direct)\n"
+    elif [ -n "$_has_e" ]; then
+        printf "  ${C_CYAN}~${C_RESET}  Web search & fact-check  (Perplexity via Eden AI)\n"
+        printf "  ${C_DIM}     Tip: add PERPLEXITY_API_KEY for direct access (min ~50 € credit)${C_RESET}\n"
+    else
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Web search / fact-check  — add PERPLEXITY_API_KEY (direct)${C_RESET}\n"
+        printf "  ${C_DIM}                             or EDENAI_API_KEY (Perplexity via Eden)${C_RESET}\n"
+    fi
+
+    # Fact-check X / Twitter (Grok)
+    if [ -n "$_has_x" ]; then
+        printf "  ${C_BGREEN}✓${C_RESET}  Fact-check X/Twitter     (Grok direct — native X/Twitter search)\n"
+    elif [ -n "$_has_e" ]; then
+        printf "  ${C_CYAN}~${C_RESET}  Fact-check X/Twitter     (Grok via Eden AI — no native X search)\n"
+        printf "  ${C_DIM}     Tip: add XAI_API_KEY to unlock native X/Twitter search via Grok${C_RESET}\n"
+    else
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Fact-check X/Twitter     — add XAI_API_KEY (native X search)${C_RESET}\n"
+        printf "  ${C_DIM}                             or EDENAI_API_KEY (Grok via Eden, web only)${C_RESET}\n"
+    fi
+
+    # Eden AI (redundancy + OCR + Gemini)
+    if [ -n "$_has_e" ]; then
+        printf "  ${C_BGREEN}✓${C_RESET}  Eden AI                  (fallbacks, OCR, model redundancy)\n"
+    else
+        printf "  ${C_DIM}○${C_RESET}  ${C_DIM}Eden AI (optional)        — add EDENAI_API_KEY for fallbacks,${C_RESET}\n"
+        printf "  ${C_DIM}                             OCR, Gemini, and rate-limit resilience${C_RESET}\n"
+    fi
+
+    echo ""
+}
+
 _submenu_api_keys() {
     while true; do
+        clear
         _header "API KEYS" "🔑"
         echo ""
-        printf "  ${C_BOLD}Mistral${C_RESET}    (required)  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${MISTRAL_API_KEY:-}")"
-        printf "  ${C_BOLD}Perplexity${C_RESET} (optional)  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${PERPLEXITY_API_KEY:-}")"
-        printf "  ${C_BOLD}xAI / Grok${C_RESET} (optional)  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${XAI_API_KEY:-}")"
-        echo ""
-        printf "  ${C_DIM}Perplexity + xAI unlock [5] Selection to Insight${C_RESET}\n"
+        printf "  ${C_BOLD}Mistral${C_RESET}    ${C_RED}(required)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${MISTRAL_API_KEY:-}")"
+        printf "  ${C_BOLD}Perplexity${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${PERPLEXITY_API_KEY:-}")"
+        printf "  ${C_BOLD}xAI / Grok${C_RESET} ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${XAI_API_KEY:-}")"
+        printf "  ${C_BOLD}Eden AI${C_RESET}    ${C_DIM}(optional)${C_RESET}  : ${C_CYAN}%s${C_RESET}\n" "$(_mask_key "${EDENAI_API_KEY:-}")"
+        _show_capability_status
+        _sep
         echo ""
         printf "  ${C_BOLD}[t]${C_RESET}  Test Mistral key\n"
         printf "  ${C_BOLD}[e]${C_RESET}  Edit Mistral key\n"
         printf "  ${C_BOLD}[p]${C_RESET}  Edit Perplexity key\n"
         printf "  ${C_BOLD}[x]${C_RESET}  Edit xAI / Grok key\n"
+        printf "  ${C_BOLD}[n]${C_RESET}  Edit Eden AI key\n"
+        printf "  ${C_BOLD}[v]${C_RESET}  Test Eden AI key\n"
         echo ""
         printf "  ${C_BOLD}[m]${C_RESET}  Menu VoxRefiner\n"
         echo ""
@@ -334,6 +414,32 @@ _submenu_api_keys() {
                     set -a; source .env; set +a
                     _success "xAI key saved."
                 fi
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            n|N)
+                echo ""
+                printf "  Enter new Eden AI key: "
+                _read_masked
+                _new_key="$_MASKED_INPUT"
+                if [ -z "$_new_key" ]; then
+                    _warn "No key entered — unchanged."
+                else
+                    _set_env_var "EDENAI_API_KEY" "$_new_key"
+                    export EDENAI_API_KEY="$_new_key"
+                    set -a; source .env; set +a
+                    _success "Eden AI key saved."
+                    echo ""
+                    _test_eden_key "$_new_key"
+                fi
+                echo ""
+                printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+                read -r
+                ;;
+            v|V)
+                echo ""
+                _test_eden_key "${EDENAI_API_KEY:-}"
                 echo ""
                 printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
                 read -r
@@ -484,7 +590,7 @@ while true; do
                             _process "Refining with Mistral..."
                             echo ""
                             _refined=$(printf '%s' "$_raw_text" | \
-                                "$VENV_PYTHON" src/refine.py 2>&3)
+                                "$VENV_PYTHON" -m src.refine 2>&3)
                             _final="${_refined:-$_raw_text}"
                             printf '%s' "$_final" | xclip -selection clipboard
                             printf '%s' "$_final" | xclip -selection primary
@@ -502,7 +608,7 @@ while true; do
                                 _wc=$(printf '%s' "$_raw_text" | wc -w)
                                 _thr="${REFINE_MODEL_THRESHOLD_SHORT:-90}"
                                 if [ "$_wc" -ge "$_thr" ]; then
-                                    printf '%s' "$_final" | "$VENV_PYTHON" src/refine.py --update-history 2>&3 &
+                                    printf '%s' "$_final" | "$VENV_PYTHON" -m src.refine --update-history 2>&3 &
                                     echo "🔄 History context update running in background..."
                                 fi
                             fi

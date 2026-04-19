@@ -179,7 +179,7 @@ fi
 
 # ─── Step 1: Speech-to-text (Voxtral) ───────────────────────────────────────
 
-raw_transcription=$("$VENV_PYTHON" src/transcribe.py "$REC_DIR/source.mp3" 2>&3)
+raw_transcription=$("$VENV_PYTHON" -m src.transcribe "$REC_DIR/source.mp3" 2>&3)
 
 if [ -z "$raw_transcription" ]; then
     echo "❌ Empty transcription."
@@ -200,7 +200,7 @@ if [ "${ENABLE_REFINE:-true}" = "true" ]; then
         VOXTRAL_COMPARE_FILE="$REC_DIR/.compare_result"
         export VOXTRAL_COMPARE_FILE
     fi
-    refined_text=$(printf '%s' "$raw_transcription" | "$VENV_PYTHON" src/refine.py 2>&3)
+    refined_text=$(printf '%s' "$raw_transcription" | "$VENV_PYTHON" -m src.refine 2>&3)
     # Graceful degradation: if refinement fails, fall back to raw transcription
     final_text="${refined_text:-$raw_transcription}"
 else
@@ -222,16 +222,44 @@ if [ -n "$final_text" ]; then
         _warn "Clipboard copy failed (is xclip installed and running under X11?)."
         echo ""
     fi
-    # Read which model actually produced the clipboard text
+    # Read which model actually produced the clipboard text.
+    # VOXTRAL_MODELS_FILE layout (lines 3-6 are optional, added for provider awareness):
+    #   1: requested/succeeded model   2: fallback model
+    #   3: effective model (post-substitution/cascade)
+    #   4: provider internal name      5: provider display   6: substituted (1/0)
     _used_model=""
     _fallback_model=""
+    _effective_model=""
+    _provider_name=""
+    _provider_display=""
+    _substituted=""
     if [ -n "${VOXTRAL_MODELS_FILE:-}" ] && [ -s "$VOXTRAL_MODELS_FILE" ]; then
         _used_model="$(sed -n '1p' "$VOXTRAL_MODELS_FILE")"
         _fallback_model="$(sed -n '2p' "$VOXTRAL_MODELS_FILE")"
+        _effective_model="$(sed -n '3p' "$VOXTRAL_MODELS_FILE")"
+        _provider_name="$(sed -n '4p' "$VOXTRAL_MODELS_FILE")"
+        _provider_display="$(sed -n '5p' "$VOXTRAL_MODELS_FILE")"
+        _substituted="$(sed -n '6p' "$VOXTRAL_MODELS_FILE")"
     fi
-    # Build result label with model name
-    if [ -n "$_used_model" ]; then
-        _result_label="REFINED TEXT — $_used_model"
+    # Build result label. Happy path: just "REFINED TEXT — {model}".
+    # Noteworthy paths append a provider hint or substitution note.
+    _display_model="${_effective_model:-$_used_model}"
+    if [ -n "$_display_model" ]; then
+        _result_label="REFINED TEXT — $_display_model"
+        case "$_provider_name" in
+            ""|*_direct)
+                if [ "$_substituted" = "1" ] && [ -n "$_used_model" ] && [ "$_effective_model" != "$_used_model" ]; then
+                    _result_label="$_result_label (substituted from $_used_model)"
+                fi
+                ;;
+            eden_*)
+                _result_label="$_result_label (via Eden AI)"
+                ;;
+            *)
+                _clean_display="${_provider_display% (direct)}"
+                _result_label="$_result_label (via ${_clean_display:-$_provider_name})"
+                ;;
+        esac
     elif [ "${ENABLE_REFINE:-true}" = "true" ]; then
         _result_label="RAW TRANSCRIPTION — refinement failed"
     else
@@ -285,7 +313,7 @@ if [ "${ENABLE_HISTORY:-false}" = "true" ] && [ -n "$final_text" ]; then
     word_count=$(printf '%s' "$raw_transcription" | wc -w)
     threshold="${REFINE_MODEL_THRESHOLD_SHORT:-90}"
     if [ "$word_count" -ge "$threshold" ]; then
-        printf '%s' "$final_text" | "$VENV_PYTHON" src/refine.py --update-history 2>&3 &
+        printf '%s' "$final_text" | "$VENV_PYTHON" -m src.refine --update-history 2>&3 &
         echo ""
         echo "🔄 History context update running in background..."
     fi

@@ -54,6 +54,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+# Provider routing layer — summarize() is migrated; search/factcheck paths
+# still hit requests.post directly until they are migrated in turn.
+from src.providers import ProviderError, call, is_available  # noqa: E402
+
 # ── API endpoints ──────────────────────────────────────────────────────────────
 _MISTRAL_URL    = "https://api.mistral.ai/v1/chat/completions"
 _PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
@@ -62,7 +66,7 @@ _PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 _SUMMARY_MODEL    = os.environ.get("INSIGHT_SUMMARY_MODEL",    "mistral-small-latest")
 _SYNTHESIS_MODEL  = os.environ.get("INSIGHT_SYNTHESIS_MODEL",  "mistral-small-latest")
 _PERPLEXITY_MODEL = os.environ.get("INSIGHT_PERPLEXITY_MODEL", "sonar-pro")
-_GROK_MODEL       = os.environ.get("INSIGHT_GROK_MODEL",       "grok-4-fast")
+_GROK_MODEL       = os.environ.get("INSIGHT_GROK_MODEL",       "grok-4-1-fast-non-reasoning")
 
 # ── API keys ──────────────────────────────────────────────────────────────────
 _MISTRAL_KEY    = os.environ.get("MISTRAL_API_KEY",    "")
@@ -279,52 +283,138 @@ def _chat_text(body: dict) -> str:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def summarize(text: str, content_type: str = "generic") -> str:
-    """Produce a bullet-point summary of *text* using Mistral Small with reasoning.
+    """Produce a bullet-point summary of *text* via the insight capability.
+
+    Routed through src.providers.call("insight", ...) — Mistral direct first,
+    Eden/Mistral as pingpong fallback on 429, with Layer-1 cascade kicking
+    in only when no Eden redundancy is live.
 
     Returns the summary string.
-    Raises RuntimeError if MISTRAL_API_KEY is missing or the call fails.
+    Raises RuntimeError if no provider is available or all attempts fail.
     """
-    if not _MISTRAL_KEY:
-        raise RuntimeError("MISTRAL_API_KEY is not set.")
+    if not is_available("insight"):
+        raise RuntimeError(
+            "No provider available for insight. "
+            "Set MISTRAL_API_KEY (primary) or EDENAI_API_KEY (fallback)."
+        )
 
     # Inject a one-line content-type hint so the model can tailor the summary.
     type_hint = f"[Content type: {content_type}]\n\n" if content_type != "generic" else ""
     user_content = type_hint + text
 
-    print("✨ Generating summary...", file=sys.stderr)
-    payload: dict = {
-        "model": _SUMMARY_MODEL,
-        "messages": [
-            {"role": "system", "content": _SUMMARY_SYSTEM},
-            {"role": "user",   "content": user_content},
-        ],
+    opts: dict = {
+        "model":       _SUMMARY_MODEL,
         "temperature": 0.3,
+        "timeout":     _SUMMARY_TIMEOUT,
     }
     if _SUMMARY_REASONING == "high":
-        payload["reasoning_effort"] = "high"
-    body = _post_json(
-        _MISTRAL_URL,
-        headers={
-            "Authorization": f"Bearer {_MISTRAL_KEY}",
-            "Content-Type": "application/json",
-        },
-        payload=payload,
-        timeout=_SUMMARY_TIMEOUT,
-        label="Mistral summarize",
+        opts["reasoning_effort"] = "high"
+
+    print("✨ Generating summary...", file=sys.stderr)
+    try:
+        result = call(
+            "insight",
+            [
+                {"role": "system", "content": _SUMMARY_SYSTEM},
+                {"role": "user",   "content": user_content},
+            ],
+            **opts,
+        )
+    except ProviderError as exc:
+        raise RuntimeError(f"Summarize failed: {exc}") from exc
+
+    # Report actual provider/model when it differs from the happy path so the
+    # user always knows which route answered (pingpong fallback, Eden
+    # substitution, or cascade to a different model).
+    _log_call_result(result, label="Summary")
+    print(f"✅ Summary ready ({len(result.text)} chars).", file=sys.stderr)
+    return result.text
+
+
+def _log_call_result(result, label: str) -> None:
+    """Print a stderr line describing the actual provider + model used.
+
+    Silent on the happy path (Mistral direct, requested model, first try).
+    Additionally writes the call metadata to INSIGHT_MODEL_META_FILE (if set)
+    so the shell can label the user-facing result header with the effective
+    model/provider. The file is overwritten on each call; in multi-step flows
+    (search + synthesis, factcheck synthesis) the last call wins, which is
+    the intended user-visible model.
+    """
+    _write_model_meta(result)
+    noteworthy = (
+        result.provider.name != "mistral_direct"
+        or result.substituted
+        or result.effective_model != result.requested_model
+        or result.attempts > 1
     )
-    result = _chat_text(body)
-    print(f"✅ Summary ready ({len(result)} chars).", file=sys.stderr)
-    return result
+    if not noteworthy:
+        return
+    detail = f"{result.provider.display_name} ({result.effective_model})"
+    if result.substituted:
+        detail += f" — substituted from {result.requested_model}"
+    elif result.effective_model != result.requested_model and result.requested_model:
+        detail += f" — cascaded from {result.requested_model}"
+    if result.attempts > 1:
+        detail += f" — {result.attempts} attempt(s)"
+    print(f"   \u2139 {label} via {detail}", file=sys.stderr)
 
 
-def search_perplexity(query: str, context_summary: str = "") -> str:
+def _write_model_meta(result) -> None:
+    """Write provider/model metadata to INSIGHT_MODEL_META_FILE when set.
+
+    Format (one value per line):
+      line 1: requested_model
+      line 2: effective_model
+      line 3: provider internal name  (e.g. "mistral_direct", "eden_mistral")
+      line 4: provider display name   (e.g. "Mistral (direct)", "Mistral via Eden AI")
+      line 5: substituted flag ("1" or "0")
+
+    The shell uses the internal name for happy-path detection and the
+    display name for rendering.
+    """
+    meta_file = os.environ.get("INSIGHT_MODEL_META_FILE")
+    if not meta_file:
+        return
+    try:
+        lines = [
+            result.requested_model or "",
+            result.effective_model or "",
+            result.provider.name or "",
+            result.provider.display_name or "",
+            "1" if result.substituted else "0",
+        ]
+        Path(meta_file).write_text("\n".join(lines), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def search_perplexity(
+    query: str,
+    context_summary: str = "",
+    system: Optional[str] = None,
+) -> str:
     """Search Perplexity with *query*, optionally grounded by *context_summary*.
 
+    Routed through src.providers.call("search", ...) — Perplexity direct first,
+    Eden/Perplexity as pingpong fallback on 429.
+
+    Args:
+        query: the search question.
+        context_summary: optional context to ground the search.
+        system: system prompt override (default: _SEARCH_SYSTEM).
+
     Returns the answer string.
-    Raises RuntimeError if PERPLEXITY_API_KEY is missing or the call fails.
+    Raises RuntimeError if no provider is available or all attempts fail.
     """
-    if not _PERPLEXITY_KEY:
-        raise RuntimeError("PERPLEXITY_API_KEY is not set.")
+    if not is_available("search"):
+        raise RuntimeError(
+            "No provider available for search. "
+            "Set PERPLEXITY_API_KEY (primary) or EDENAI_API_KEY (fallback)."
+        )
+
+    if system is None:
+        system = _SEARCH_SYSTEM
 
     user_content = query
     if context_summary:
@@ -334,25 +424,22 @@ def search_perplexity(query: str, context_summary: str = "") -> str:
         )
 
     print("🔍 Searching Perplexity...", file=sys.stderr)
-    body = _post_json(
-        _PERPLEXITY_URL,
-        headers={
-            "Authorization": f"Bearer {_PERPLEXITY_KEY}",
-            "Content-Type": "application/json",
-        },
-        payload={
-            "model": _PERPLEXITY_MODEL,
-            "messages": [
-                {"role": "system", "content": _SEARCH_SYSTEM},
+    try:
+        result = call(
+            "search",
+            [
+                {"role": "system", "content": system},
                 {"role": "user",   "content": user_content},
             ],
-        },
-        timeout=_SEARCH_TIMEOUT,
-        label="Perplexity search",
-    )
-    result = _chat_text(body)
-    print(f"✅ Perplexity answer ready ({len(result)} chars).", file=sys.stderr)
-    return result
+            model=_PERPLEXITY_MODEL,
+            timeout=_SEARCH_TIMEOUT,
+        )
+    except ProviderError as exc:
+        raise RuntimeError(f"Perplexity search failed: {exc}") from exc
+
+    _log_call_result(result, label="Perplexity")
+    print(f"✅ Perplexity answer ready ({len(result.text)} chars).", file=sys.stderr)
+    return result.text
 
 
 def search_grok(
@@ -360,9 +447,11 @@ def search_grok(
     context_summary: str = "",
     system: Optional[str] = None,
 ) -> str:
-    """Search using Grok via the xAI SDK (web_search + x_search in one call).
+    """Search using Grok (web_search + x_search) via the fact_check_x capability.
 
-    Grok activates whichever tool(s) are relevant — no second API call needed.
+    Routed through src.providers.call("fact_check_x", ...) — xAI direct with
+    sticky policy (Eden is last-resort fallback only). Sticky because Eden
+    does not expose the native X/Twitter search tool.
 
     Args:
         query: the search query or fact-check request.
@@ -370,21 +459,13 @@ def search_grok(
         system: system prompt override (default: _SEARCH_SYSTEM).
 
     Returns the answer string.
-    Raises RuntimeError if XAI_API_KEY is missing or xai-sdk is not installed.
+    Raises RuntimeError if no provider is available or all attempts fail.
     """
-    if not _XAI_KEY:
-        raise RuntimeError("XAI_API_KEY is not set.")
-
-    try:
-        from xai_sdk import Client as _XAIClient                        # noqa: PLC0415
-        from xai_sdk.chat import system as _xai_system                  # noqa: PLC0415
-        from xai_sdk.chat import user as _xai_user                      # noqa: PLC0415
-        from xai_sdk.tools import web_search as _web_search             # noqa: PLC0415
-        from xai_sdk.tools import x_search as _x_search                 # noqa: PLC0415
-    except ImportError as exc:
+    if not is_available("fact_check_x"):
         raise RuntimeError(
-            "xai-sdk package not installed. Run: pip install xai-sdk"
-        ) from exc
+            "No provider available for fact_check_x. "
+            "Set XAI_API_KEY (primary) or EDENAI_API_KEY (fallback)."
+        )
 
     if system is None:
         system = _SEARCH_SYSTEM
@@ -398,23 +479,24 @@ def search_grok(
 
     print("🔍 Searching with Grok (web + X)...", file=sys.stderr)
     try:
-        client = _XAIClient(api_key=_XAI_KEY)
-        chat = client.chat.create(
+        result = call(
+            "fact_check_x",
+            [
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user_content},
+            ],
             model=_GROK_MODEL,
-            tools=[_web_search(), _x_search()],
+            timeout=_GROK_TIMEOUT,
         )
-        chat.append(_xai_system(system))
-        chat.append(_xai_user(user_content))
-        response = chat.sample()
-        result = str(response.content).strip()
-    except Exception as exc:
+    except ProviderError as exc:
         raise RuntimeError(f"Grok search failed: {exc}") from exc
 
-    if not result:
+    if not result.text:
         raise RuntimeError("Grok returned an empty response.")
 
-    print(f"✅ Grok answer ready ({len(result)} chars).", file=sys.stderr)
-    return result
+    _log_call_result(result, label="Grok")
+    print(f"✅ Grok answer ready ({len(result.text)} chars).", file=sys.stderr)
+    return result.text
 
 
 def search(query: str, context_summary: str = "") -> str:
@@ -430,38 +512,50 @@ def search(query: str, context_summary: str = "") -> str:
     Raises RuntimeError if no engine is available or configured engine is missing.
     """
     engine = _SEARCH_ENGINE
+    # Availability is resolved through the provider layer so Eden-only users
+    # (no direct Perplexity/xAI key, only EDENAI_API_KEY) can still dispatch.
+    _has_search = is_available("search")
+    _has_grok   = is_available("fact_check_x")
 
     if engine == "auto":
-        if _PERPLEXITY_KEY:
+        if _has_search:
             return search_perplexity(query, context_summary)
-        if _XAI_KEY:
+        if _has_grok:
             return search_grok(query, context_summary)
         raise RuntimeError(
-            "No search engine available. Set PERPLEXITY_API_KEY or XAI_API_KEY."
+            "No search engine available. "
+            "Set PERPLEXITY_API_KEY, XAI_API_KEY, or EDENAI_API_KEY."
         )
 
     if engine == "perplexity":
-        if not _PERPLEXITY_KEY:
-            raise RuntimeError("PERPLEXITY_API_KEY is not set.")
+        if not _has_search:
+            raise RuntimeError(
+                "No provider available for Perplexity search. "
+                "Set PERPLEXITY_API_KEY or EDENAI_API_KEY."
+            )
         return search_perplexity(query, context_summary)
 
     if engine == "grok":
-        if not _XAI_KEY:
-            raise RuntimeError("XAI_API_KEY is not set.")
+        if not _has_grok:
+            raise RuntimeError(
+                "No provider available for Grok search. "
+                "Set XAI_API_KEY or EDENAI_API_KEY."
+            )
         return search_grok(query, context_summary)
 
     if engine == "both":
-        if not _PERPLEXITY_KEY and not _XAI_KEY:
+        if not _has_search and not _has_grok:
             raise RuntimeError(
-                "INSIGHT_SEARCH_ENGINE=both requires PERPLEXITY_API_KEY and/or XAI_API_KEY."
+                "INSIGHT_SEARCH_ENGINE=both requires PERPLEXITY_API_KEY, "
+                "XAI_API_KEY, or EDENAI_API_KEY."
             )
         perp_result = ""
         grok_result = ""
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures: dict = {}
-            if _PERPLEXITY_KEY:
+            if _has_search:
                 futures["perplexity"] = pool.submit(search_perplexity, query, context_summary)
-            if _XAI_KEY:
+            if _has_grok:
                 futures["grok"] = pool.submit(search_grok, query, context_summary)
             for name, future in futures.items():
                 try:
@@ -478,8 +572,9 @@ def search(query: str, context_summary: str = "") -> str:
         if not perp_result or not grok_result:
             return perp_result or grok_result
 
-        # Both available: synthesise (no high reasoning for search)
-        if not _MISTRAL_KEY:
+        # Both available: synthesise via the insight capability
+        # (no high reasoning for search — search synthesis is lightweight)
+        if not is_available("insight"):
             return f"{perp_result}\n\n{grok_result}"
 
         synth_user = (
@@ -487,26 +582,24 @@ def search(query: str, context_summary: str = "") -> str:
             f"Grok result:\n{grok_result}"
         )
         print("🧠 Synthesising search results...", file=sys.stderr)
-        body = _post_json(
-            _MISTRAL_URL,
-            headers={
-                "Authorization": f"Bearer {_MISTRAL_KEY}",
-                "Content-Type": "application/json",
-            },
-            payload={
-                "model": _SYNTHESIS_MODEL,
-                "messages": [
+        try:
+            result = call(
+                "insight",
+                [
                     {"role": "system", "content": _SEARCH_SYNTHESIS_SYSTEM},
                     {"role": "user",   "content": synth_user},
                 ],
-                "temperature": 0.2,
-            },
-            timeout=_SYNTHESIS_TIMEOUT,
-            label="Mistral search synthesis",
-        )
-        result = _chat_text(body)
-        print(f"✅ Search synthesis ready ({len(result)} chars).", file=sys.stderr)
-        return result
+                model=_SYNTHESIS_MODEL,
+                temperature=0.2,
+                timeout=_SYNTHESIS_TIMEOUT,
+            )
+        except ProviderError:
+            # Graceful degradation — return the raw results stacked
+            return f"{perp_result}\n\n{grok_result}"
+
+        _log_call_result(result, label="Search synthesis")
+        print(f"✅ Search synthesis ready ({len(result.text)} chars).", file=sys.stderr)
+        return result.text
 
     raise RuntimeError(
         f"Unknown INSIGHT_SEARCH_ENGINE: {engine!r}. "
@@ -532,14 +625,24 @@ def factcheck(
         (synthesis_or_direct_result, perplexity_detail, grok_detail)
         Any unavailable source is represented as an empty string.
 
-    Raises RuntimeError if MISTRAL_API_KEY is missing or no source is available.
+    Raises RuntimeError if synthesis provider is missing or no source is available.
     """
-    if not _MISTRAL_KEY:
-        raise RuntimeError("MISTRAL_API_KEY is not set.")
+    # Availability resolved through the provider layer — Eden-only users can
+    # fact-check too, going through eden_perplexity / eden_xai / eden_mistral.
+    _has_search = is_available("search")
+    _has_grok   = is_available("fact_check_x")
+    _has_insight = is_available("insight")
 
-    if not _PERPLEXITY_KEY and not _XAI_KEY:
+    if not _has_insight:
         raise RuntimeError(
-            "No fact-check source available. Set PERPLEXITY_API_KEY or XAI_API_KEY."
+            "No provider available for synthesis. "
+            "Set MISTRAL_API_KEY or EDENAI_API_KEY."
+        )
+
+    if not _has_search and not _has_grok:
+        raise RuntimeError(
+            "No fact-check source available. "
+            "Set PERPLEXITY_API_KEY, XAI_API_KEY, or EDENAI_API_KEY."
         )
 
     query = query_hint if query_hint else (
@@ -549,13 +652,13 @@ def factcheck(
     perplexity_result: str = ""
     grok_result: str = ""
 
-    # ── Engine selection (INSIGHT_FACTCHECK_ENGINE: both / perplexity / grok) ───
-    _use_perplexity = _PERPLEXITY_KEY and _FACTCHECK_ENGINE in ("both", "perplexity", "auto")
-    _use_grok       = _XAI_KEY        and _FACTCHECK_ENGINE in ("both", "grok",       "auto")
-    # "auto" falls back: if preferred source missing, use the other
+    # ── Engine selection (INSIGHT_FACTCHECK_ENGINE: both / perplexity / grok / auto) ──
+    _use_perplexity = _has_search and _FACTCHECK_ENGINE in ("both", "perplexity", "auto")
+    _use_grok       = _has_grok   and _FACTCHECK_ENGINE in ("both", "grok",       "auto")
+    # "auto" uses whichever source(s) are available
     if _FACTCHECK_ENGINE == "auto":
-        _use_perplexity = bool(_PERPLEXITY_KEY)
-        _use_grok       = bool(_XAI_KEY)
+        _use_perplexity = _has_search
+        _use_grok       = _has_grok
 
     if not _use_perplexity and not _use_grok:
         raise RuntimeError(
@@ -600,37 +703,36 @@ def factcheck(
         direct = perplexity_result or grok_result
         return direct, perplexity_result, grok_result
 
-    # ── Both sources: synthesise ──────────────────────────────────────────────
+    # ── Both sources: synthesise via the insight capability ───────────────────
     synthesis_user = (
         f"Report A (Perplexity — web search):\n{perplexity_result}\n\n"
         f"Report B (Grok — web + X search):\n{grok_result}"
     )
 
-    payload: dict = {
-        "model": _SYNTHESIS_MODEL,
-        "messages": [
-            {"role": "system", "content": _SYNTHESIS_SYSTEM},
-            {"role": "user",   "content": synthesis_user},
-        ],
+    opts: dict = {
+        "model":       _SYNTHESIS_MODEL,
         "temperature": 0.2,
+        "timeout":     _SYNTHESIS_TIMEOUT,
     }
     if _SYNTHESIS_REASONING == "high":
-        payload["reasoning_effort"] = "high"
+        opts["reasoning_effort"] = "high"
 
     print("🧠 Synthesising fact-check results...", file=sys.stderr)
-    body = _post_json(
-        _MISTRAL_URL,
-        headers={
-            "Authorization": f"Bearer {_MISTRAL_KEY}",
-            "Content-Type": "application/json",
-        },
-        payload=payload,
-        timeout=_SYNTHESIS_TIMEOUT,
-        label="Mistral synthesis",
-    )
-    synthesis = _chat_text(body)
-    print(f"✅ Synthesis ready ({len(synthesis)} chars).", file=sys.stderr)
-    return synthesis, perplexity_result, grok_result
+    try:
+        result = call(
+            "insight",
+            [
+                {"role": "system", "content": _SYNTHESIS_SYSTEM},
+                {"role": "user",   "content": synthesis_user},
+            ],
+            **opts,
+        )
+    except ProviderError as exc:
+        raise RuntimeError(f"Fact-check synthesis failed: {exc}") from exc
+
+    _log_call_result(result, label="Fact-check synthesis")
+    print(f"✅ Synthesis ready ({len(result.text)} chars).", file=sys.stderr)
+    return result.text, perplexity_result, grok_result
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────────
@@ -680,10 +782,10 @@ def _cmd_search() -> None:
         print("❌ Empty query.", file=sys.stderr)
         sys.exit(1)
 
-    if not _PERPLEXITY_KEY and not _XAI_KEY:
+    if not is_available("search") and not is_available("fact_check_x"):
         print(
             "❌ No search engine available.\n"
-            "   Add PERPLEXITY_API_KEY or XAI_API_KEY to your .env file.",
+            "   Add PERPLEXITY_API_KEY, XAI_API_KEY, or EDENAI_API_KEY to your .env file.",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -701,14 +803,18 @@ def _cmd_factcheck() -> None:
     context_summary = sys.stdin.read().strip()
     query_hint = os.environ.get("INSIGHT_QUERY", "")
 
-    if not _MISTRAL_KEY:
-        print("❌ MISTRAL_API_KEY is not set.", file=sys.stderr)
+    if not is_available("insight"):
+        print(
+            "❌ No provider available for synthesis.\n"
+            "   Add MISTRAL_API_KEY or EDENAI_API_KEY to your .env file.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    if not _PERPLEXITY_KEY and not _XAI_KEY:
+    if not is_available("search") and not is_available("fact_check_x"):
         print(
             "❌ No fact-check source available.\n"
-            "   Add PERPLEXITY_API_KEY or XAI_API_KEY to your .env file.",
+            "   Add PERPLEXITY_API_KEY, XAI_API_KEY, or EDENAI_API_KEY to your .env file.",
             file=sys.stderr,
         )
         sys.exit(2)

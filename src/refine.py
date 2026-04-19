@@ -18,19 +18,18 @@ History extraction (optional, ENABLE_HISTORY=true):
 
 import os
 import sys
-import time
 import math
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import requests
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_API_URL = "https://api.mistral.ai/v1/chat/completions"
+from src.providers import CallResult, ProviderError, call, is_available  # noqa: E402
+
 _CONTEXT_FILE = Path(__file__).resolve().parent.parent / "context.txt"
 _HISTORY_FILE = Path(__file__).resolve().parent.parent / "history.txt"
 
@@ -42,8 +41,6 @@ _MODEL_MEDIUM = os.environ.get("REFINE_MODEL_MEDIUM", "mistral-small-latest")
 _MODEL_MEDIUM_FALLBACK = os.environ.get("REFINE_MODEL_MEDIUM_FALLBACK", "mistral-medium-latest")
 _MODEL_LONG = os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
 _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-medium-latest")
-
-_REQUEST_RETRIES = int(os.environ.get("REFINE_REQUEST_RETRIES", "2"))
 
 # ── Per-tier API parameters (primary models only, fallbacks use Mistral defaults) ─
 # reasoning_effort is ONLY supported by mistral-small-latest (Mistral Small 4).
@@ -393,9 +390,6 @@ def _parse_history_lines(content: str) -> List[str]:
     return lines
 
 
-_TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
-
-
 def _refine_timing(word_count: int, *, background: bool = False) -> Tuple[int, float]:
     """Return (timeout_s, retry_delay_s) based on text word count.
 
@@ -443,77 +437,63 @@ def _effective_timeout(base_timeout: int, model: str, model_params: Optional[Dic
     return max(base_timeout, round(base_timeout * factor))
 
 
-def _call_model(
+def _strip_unsupported_params(model: str, params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return a copy of *params* with options the model does not support removed.
+
+    Only ``mistral-small-latest`` accepts ``reasoning_effort``; other models
+    (including user overrides like ``magistral-small-latest``) reject it at
+    the API boundary, so we strip it here before calling the provider layer.
+    """
+    if not params:
+        return {}
+    filtered = dict(params)
+    if model != _REASONING_CAPABLE_MODEL and "reasoning_effort" in filtered:
+        del filtered["reasoning_effort"]
+    return filtered
+
+
+def _log_refine_result(result: CallResult, label: str) -> None:
+    """Print a stderr line describing the actual provider + model used.
+
+    Silent on the happy path (Mistral direct, requested model, first try).
+    """
+    noteworthy = (
+        result.provider.name != "mistral_direct"
+        or result.substituted
+        or result.effective_model != result.requested_model
+        or result.attempts > 1
+    )
+    if not noteworthy:
+        return
+    detail = f"{result.provider.display_name} ({result.effective_model})"
+    if result.substituted:
+        detail += f" \u2014 substituted from {result.requested_model}"
+    elif result.effective_model != result.requested_model and result.requested_model:
+        detail += f" \u2014 cascaded from {result.requested_model}"
+    if result.attempts > 1:
+        detail += f" \u2014 {result.attempts} attempt(s)"
+    print(f"   \u2139 {label} via {detail}", file=sys.stderr)
+
+
+def _invoke(
+    capability: str,
     model: str,
     messages: List[Dict[str, str]],
-    api_key: str,
     *,
     timeout: int,
-    retry_delay: float,
     model_params: Optional[Dict[str, Any]] = None,
-) -> str:
-    """Call the Mistral chat API, retrying up to _REQUEST_RETRIES times on transient errors.
+) -> CallResult:
+    """Thin wrapper around ``providers.call`` for a single refine/history call.
 
-    Timeout and retry delay are caller-supplied (computed from word count).
-    Timeout and connection errors are NOT retried here — the caller's fallback
-    loop handles switching to the next model in that case.
-    ``model_params`` (optional) — extra keys merged into the JSON body
-    (e.g. temperature, top_p, reasoning_effort).
+    Strips model-incompatible options, forwards the remainder as opts, and
+    propagates ``ProviderError`` to the caller's fallback loop.
     """
-    last_exc: Exception = RuntimeError("unreachable")
-    for attempt in range(1 + _REQUEST_RETRIES):
-        if attempt > 0:
-            print(
-                f"⏳  {model} — retry {attempt}/{_REQUEST_RETRIES} (waiting {retry_delay:.0f}s)…",
-                file=sys.stderr,
-            )
-            time.sleep(retry_delay)
-        try:
-            payload: Dict[str, Any] = {"model": model, "messages": messages}
-            if model_params:
-                filtered = dict(model_params)
-                # reasoning_effort is only supported by mistral-small-latest.
-                # Strip it for any other model to avoid HTTP 400.
-                if model != _REASONING_CAPABLE_MODEL and "reasoning_effort" in filtered:
-                    del filtered["reasoning_effort"]
-                payload.update(filtered)
-            response = requests.post(
-                _API_URL,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            body: Dict[str, Any] = response.json()  # type: ignore[assignment]
-            try:
-                raw: Any = body["choices"][0]["message"]["content"]  # type: ignore[index]
-            except (KeyError, IndexError) as exc:
-                raise RuntimeError(
-                    f"Unexpected API response structure: {body}"
-                ) from exc
-            # Reasoning models (magistral) return content as a list of blocks
-            if isinstance(raw, list):
-                parts: List[str] = []
-                for block in raw:  # type: ignore[union-attr]
-                    if isinstance(block, dict):
-                        parts.append(str(block.get("text", "")))  # type: ignore[union-attr, arg-type]
-                    else:
-                        parts.append(str(block))  # type: ignore[arg-type]
-                return "".join(parts).strip()
-            return str(raw).strip()
-        except requests.HTTPError as exc:
-            code = exc.response.status_code if exc.response is not None else None
-            if code in _TRANSIENT_HTTP_CODES:
-                last_exc = exc
-                continue  # retry same model
-            raise  # 401, 403, 404 — don't retry
-    raise last_exc
+    opts: Dict[str, Any] = {"model": model, "timeout": timeout}
+    opts.update(_strip_unsupported_params(model, model_params))
+    return call(capability, messages, **opts)
 
 
-def _extract_and_update_history(refined_text: str, api_key: str) -> None:
+def _extract_and_update_history(refined_text: str) -> None:
     existing_content = (
         _HISTORY_FILE.read_text(encoding="utf-8").strip()
         if _HISTORY_FILE.exists()
@@ -536,21 +516,25 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
         {"role": "user", "content": user_content},
     ]
     wc = len(refined_text.split())
-    base_timeout, retry_delay = _refine_timing(wc, background=True)
-    raw_bullets = None
+    base_timeout, _retry_delay = _refine_timing(wc, background=True)
+    raw_bullets: Optional[str] = None
     for model in (_HISTORY_EXTRACTION_MODEL, _HISTORY_EXTRACTION_FALLBACK_MODEL):
         try:
             h_params = _PARAMS_HISTORY if model == _HISTORY_EXTRACTION_MODEL else None
             timeout = _effective_timeout(base_timeout, model, h_params)
             timeout = max(timeout, round(timeout * _HISTORY_TIMEOUT_MULTIPLIER))
-            raw_bullets = _call_model(model, messages, api_key, timeout=timeout, retry_delay=retry_delay, model_params=h_params)
+            result = _invoke(
+                "history", model, messages,
+                timeout=timeout, model_params=h_params,
+            )
+            _log_refine_result(result, label="History")
+            raw_bullets = result.text
             break
-        except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code in (401, 403):
-                raise
-            print(f"⚠️  History model {model} unavailable, trying fallback...", file=sys.stderr)
-        except requests.RequestException as exc:
-            print(f"⚠️  History model {model} unreachable ({exc.__class__.__name__}), trying fallback...", file=sys.stderr)
+        except ProviderError as exc:
+            print(
+                f"\u26a0\ufe0f  History model {model} unavailable ({exc}), trying fallback...",
+                file=sys.stderr,
+            )
     if raw_bullets is None:
         raise RuntimeError("All history extraction models unavailable.")
     now = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
@@ -585,9 +569,11 @@ def _extract_and_update_history(refined_text: str, api_key: str) -> None:
 
 
 def refine(raw_text: str) -> str:
-    api_key = os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        raise RuntimeError("MISTRAL_API_KEY is not set. Check your .env file.")
+    if not is_available("refine"):
+        raise RuntimeError(
+            "MISTRAL_API_KEY is not set. Check your .env file "
+            "(or set EDENAI_API_KEY as a fallback)."
+        )
 
     word_count = len(raw_text.split())
     primary, fallback = _select_models(word_count)
@@ -625,7 +611,7 @@ def refine(raw_text: str) -> str:
         {"role": "user", "content": f"<transcription>\n{raw_text}\n</transcription>"},
     ]
 
-    base_timeout, retry_delay = _refine_timing(word_count)
+    base_timeout, _retry_delay = _refine_timing(word_count)
 
     # ── Parallel compare: launch fallback thread immediately so primary and
     # fallback run concurrently.  The compare result is collected after the
@@ -640,9 +626,10 @@ def refine(raw_text: str) -> str:
 
         def _run_compare() -> None:
             try:
-                _compare_result[0] = _call_model(
-                    fallback, messages, api_key, timeout=timeout_fb, retry_delay=retry_delay
+                compare_res = _invoke(
+                    "refine", fallback, messages, timeout=timeout_fb,
                 )
+                _compare_result[0] = compare_res.text
             except Exception as exc:  # noqa: BLE001
                 _compare_exc[0] = exc
 
@@ -652,6 +639,7 @@ def refine(raw_text: str) -> str:
     result = raw_text
     succeeded = False
     succeeded_model = None
+    succeeded_result: Optional[CallResult] = None
     for model in (primary, fallback):
         try:
             params = primary_params if model == primary else None
@@ -660,21 +648,18 @@ def refine(raw_text: str) -> str:
                 print(f"  ✨ Refining via {model} ({word_count} words, timeout {timeout}s)...", file=sys.stderr)
             else:
                 print(f"  ⚠️  {primary} unavailable — switching to fallback: {model}", file=sys.stderr)
-            result = _call_model(model, messages, api_key, timeout=timeout, retry_delay=retry_delay, model_params=params)
+            call_result = _invoke(
+                "refine", model, messages,
+                timeout=timeout, model_params=params,
+            )
+            _log_refine_result(call_result, label=f"Refine ({tier})")
+            result = call_result.text
             succeeded = True
             succeeded_model = model
+            succeeded_result = call_result
             break
-        except requests.HTTPError as e:
-            status = e.response.status_code if e.response is not None else "?"
-            if status in _TRANSIENT_HTTP_CODES:
-                if status == 429:
-                    print(f"  ⚠️  {model} rate limit (429) — exhausted retries, switching model…", file=sys.stderr)
-                else:
-                    print(f"  ⚠️  {model} server error ({status}) — switching model…", file=sys.stderr)
-                continue
-            raise
-        except requests.RequestException:
-            print(f"  ⚠️  {model} unreachable, switching...", file=sys.stderr)
+        except ProviderError as exc:
+            print(f"  ⚠️  {model} failed ({exc}) — switching...", file=sys.stderr)
             continue
 
     if not succeeded:
@@ -696,9 +681,22 @@ def refine(raw_text: str) -> str:
                 print(f"⚠️  Fallback compare failed: {_compare_exc[0]}", file=sys.stderr)
 
     # Write model names so the shell can label the [2]/[3] display blocks.
+    # Format (backward compatible — legacy readers only use lines 1-2):
+    #   line 1: requested/succeeded model (what was asked for)
+    #   line 2: fallback model (unused by display; kept for legacy readers)
+    #   line 3: effective model   (what actually ran — may differ after substitution/cascade)
+    #   line 4: provider internal name  (e.g. "mistral_direct", "eden_mistral")
+    #   line 5: provider display name   (e.g. "Mistral (direct)", "Mistral via Eden AI")
+    #   line 6: substituted flag ("1" when Eden substituted, else "0")
     models_file = os.environ.get("VOXTRAL_MODELS_FILE")
     if models_file and succeeded_model:
-        Path(models_file).write_text(f"{succeeded_model}\n{fallback}", encoding="utf-8")
+        lines = [succeeded_model, fallback]
+        if succeeded_result is not None:
+            lines.append(succeeded_result.effective_model or "")
+            lines.append(succeeded_result.provider.name or "")
+            lines.append(succeeded_result.provider.display_name or "")
+            lines.append("1" if succeeded_result.substituted else "0")
+        Path(models_file).write_text("\n".join(lines), encoding="utf-8")
 
     return result
 
@@ -708,10 +706,9 @@ if __name__ == "__main__":
     # Invoked in background by record_and_transcribe_local.sh after clipboard copy.
     if len(sys.argv) > 1 and sys.argv[1] == "--update-history":
         _text = sys.stdin.read().strip()
-        _api_key = os.environ.get("MISTRAL_API_KEY", "")
-        if _text and _api_key:
+        if _text and is_available("history"):
             try:
-                _extract_and_update_history(_text, _api_key)
+                _extract_and_update_history(_text)
             except Exception as _exc:  # noqa: BLE001
                 print(f"⚠️  History update failed: {_exc}", file=sys.stderr)
         sys.exit(0)

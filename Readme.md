@@ -5,7 +5,7 @@
 <!-- markdownlint-disable-next-line MD033 -->
 <p align="center">
   <!-- markdownlint-disable-next-line MD033 -->
-  <img src="Logo/VoxRefiner_Logo_subtitle.avif"g alt="VoxRefiner logo" width="360" />
+  <img src="Logo/VoxRefiner_Logo.avif"g alt="VoxRefiner logo" width="360" />
 </p>
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
@@ -190,13 +190,13 @@ Get an instant audio summary of any selected text, then search or fact-check wit
 
 **Post-summary menu:**
 
-| Key | Action |
-| --- | ------ |
+| Key   | Action                                                              |
+| ----- | ------------------------------------------------------------------- |
 | `[l]` | Read the full original text aloud (hands off to Selection to Voice) |
-| `[p]` | Search via Perplexity |
-| `[f]` | Fact-check (Perplexity + Grok) |
-| `[s]` | Replay the summary |
-| `[q]` | Quit |
+| `[p]` | Search via Perplexity                                               |
+| `[f]` | Fact-check (Perplexity + Grok)                                      |
+| `[s]` | Replay the summary                                                  |
+| `[q]` | Quit                                                                |
 
 **Perplexity search (`[p]`):**
 
@@ -215,10 +215,10 @@ Get an instant audio summary of any selected text, then search or fact-check wit
 
 **API keys required:**
 
-| Feature | Key needed |
-| ------- | ---------- |
-| Summary | `MISTRAL_API_KEY` (already required for core features) |
-| Search | `PERPLEXITY_API_KEY` (optional) |
+| Feature    | Key needed                                                          |
+| ---------- | ------------------------------------------------------------------- |
+| Summary    | `MISTRAL_API_KEY` (already required for core features)              |
+| Search     | `PERPLEXITY_API_KEY` (optional)                                     |
 | Fact-check | `PERPLEXITY_API_KEY` + `XAI_API_KEY` (both optional; one is enough) |
 
 Add optional keys to your `.env` or configure them via **Settings → API Keys** in the interactive menu.
@@ -403,13 +403,13 @@ To force a specific terminal, set `VOXREFINER_TERMINAL` in your environment.
 
 **Available launch flags:**
 
-| Flag                  | What it does                                              |
-| --------------------- | --------------------------------------------------------- |
-| `--speak-refine`      | Record, AI refines, copies to clipboard (most common)     |
-| `--speak-translate`   | Record, translate, play in your own voice                 |
-| `--selection-voice`   | Read selected or clipboard text aloud                     |
-| `--selection-insight` | Summarise selected text, search, or fact-check            |
-| _(no flag)_           | Open the interactive menu                                 |
+| Flag                  | What it does                                          |
+| --------------------- | ----------------------------------------------------- |
+| `--speak-refine`      | Record, AI refines, copies to clipboard (most common) |
+| `--speak-translate`   | Record, translate, play in your own voice             |
+| `--selection-voice`   | Read selected or clipboard text aloud                 |
+| `--selection-insight` | Summarise selected text, search, or fact-check        |
+| _(no flag)_           | Open the interactive menu                             |
 
 **Configure your shortcuts:**
 

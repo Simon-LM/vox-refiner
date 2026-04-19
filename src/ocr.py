@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Step 1 (F8/F9): Image file → extracted text via Mistral OCR API.
 
-Primary:  mistral-ocr-latest  (/v1/ocr)
-Fallback: pixtral-12b         (/v1/chat/completions, vision prompt)
+Cascade order (tiers activated by available keys):
+  1. mistral-ocr-latest         (/v1/ocr — Mistral direct)            MISTRAL_API_KEY
+  2. Eden OCR async              (/v3/universal-ai/async — Eden)       EDENAI_API_KEY
+  3. pixtral-large-latest        (/v1/chat/completions — Mistral vis.) MISTRAL_API_KEY
+  4. mistral/pixtral-large-latest(/v3/llm/chat/completions — Eden vis.)EDENAI_API_KEY
+
+With both keys: 1 → 2 → 3 → 4
+With MISTRAL_API_KEY only: 1 → 3
+With EDENAI_API_KEY only:  2 → 4
 """
 
 import base64
@@ -16,13 +23,16 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-_OCR_URL = "https://api.mistral.ai/v1/ocr"
-_CHAT_URL = "https://api.mistral.ai/v1/chat/completions"
-_OCR_MODEL = "mistral-ocr-latest"
-_FALLBACK_MODEL = "pixtral-large-latest"
-_TIMEOUT = 30
-_RETRIES = 2
-_RETRY_DELAY = 2.0
+from src.providers import EDEN_CHAT_URL, ProviderError, call_ocr_async, is_available, resolve  # noqa: E402
+
+_OCR_URL      = "https://api.mistral.ai/v1/ocr"
+_CHAT_URL     = "https://api.mistral.ai/v1/chat/completions"
+_OCR_MODEL    = "mistral-ocr-latest"
+_VISION_MODEL = "pixtral-large-latest"
+_EDEN_VISION_MODEL = "mistral/pixtral-large-latest"
+_TIMEOUT      = 30
+_RETRIES      = 2
+_RETRY_DELAY  = 2.0
 _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
 
 _FALLBACK_PROMPT = (
@@ -73,12 +83,24 @@ def _request_with_retry(url: str, headers: dict, payload: dict) -> dict:
     raise last_exc
 
 
+def _vision_messages(image_b64: str, mime: str, model: str) -> list:
+    return [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": f"data:{mime};base64,{image_b64}",
+                },
+                {"type": "text", "text": _FALLBACK_PROMPT},
+            ],
+        }
+    ]
+
+
 def _extract_primary(image_b64: str, mime: str, api_key: str) -> str:
-    """Call mistral-ocr-latest."""
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    """Call mistral-ocr-latest via the dedicated /v1/ocr endpoint."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
         "model": _OCR_MODEL,
         "document": {
@@ -93,54 +115,122 @@ def _extract_primary(image_b64: str, mime: str, api_key: str) -> str:
     return "\n\n".join(p.get("markdown", "") for p in pages).strip()
 
 
-def _extract_fallback(image_b64: str, mime: str, api_key: str) -> str:
-    """Call pixtral-12b via chat completions as fallback."""
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+def _extract_vision_fallback(image_b64: str, mime: str, api_key: str) -> str:
+    """Call pixtral-large-latest via Mistral chat completions (vision)."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {
-        "model": _FALLBACK_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": f"data:{mime};base64,{image_b64}",
-                    },
-                    {"type": "text", "text": _FALLBACK_PROMPT},
-                ],
-            }
-        ],
+        "model": _VISION_MODEL,
+        "messages": _vision_messages(image_b64, mime, _VISION_MODEL),
     }
     body = _request_with_retry(_CHAT_URL, headers, payload)
     choices = body.get("choices", [])
     if not choices:
-        raise RuntimeError(f"Empty fallback response: {body}")
+        raise RuntimeError(f"Empty vision fallback response: {body}")
     return choices[0].get("message", {}).get("content", "").strip()
 
 
+def _extract_eden_vision_fallback(image_b64: str, mime: str, api_key: str) -> str:
+    """Call mistral/pixtral-large-latest via Eden AI chat (vision)."""
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": _EDEN_VISION_MODEL,
+        "messages": _vision_messages(image_b64, mime, _EDEN_VISION_MODEL),
+    }
+    body = _request_with_retry(EDEN_CHAT_URL, headers, payload)
+    choices = body.get("choices", [])
+    if not choices:
+        raise RuntimeError(f"Empty Eden vision response: {body}")
+    return choices[0].get("message", {}).get("content", "").strip()
+
+
+def _write_ocr_meta(
+    requested_model: str,
+    effective_model: str,
+    provider_name: str,
+    provider_display: str,
+    substituted: bool = False,
+) -> None:
+    """Write provider/model metadata to VOXREFINER_OCR_META_FILE when set.
+
+    Uses the same 5-line format as insight._write_model_meta so the shell
+    helper _model_label_suffix can consume it directly.
+    """
+    meta_file = os.environ.get("VOXREFINER_OCR_META_FILE")
+    if not meta_file:
+        return
+    try:
+        lines = [
+            requested_model,
+            effective_model,
+            provider_name,
+            provider_display,
+            "1" if substituted else "0",
+        ]
+        Path(meta_file).write_text("\n".join(lines), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def ocr(image_path: str) -> str:
-    api_key = os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        raise RuntimeError("MISTRAL_API_KEY is not set. Check your .env file.")
+    """Extract text from *image_path* using the first available OCR tier.
+
+    Cascade (see module docstring for the full rules):
+      1. mistral-ocr-latest       — Mistral direct
+      2. Eden OCR async            — Eden AI
+      3. pixtral-large-latest     — Mistral direct (vision)
+      4. pixtral-large via Eden   — Eden AI (vision)
+
+    Raises RuntimeError if every available tier fails.
+    """
+    if not is_available("ocr"):
+        raise RuntimeError(
+            "No OCR provider available. Set MISTRAL_API_KEY "
+            "(or EDENAI_API_KEY as fallback)."
+        )
 
     size = Path(image_path).stat().st_size
     print(f"  🖼  Image read: {size} bytes.", file=sys.stderr)
-    print(f"  🔍 Running OCR via {_OCR_MODEL}...", file=sys.stderr)
 
     image_b64 = _encode_image(image_path)
     mime = _mime_type(image_path)
 
-    try:
-        return _extract_primary(image_b64, mime, api_key)
-    except Exception as exc:
-        print(f"  ⚠️  {_OCR_MODEL} failed ({exc}) — falling back to {_FALLBACK_MODEL}…",
-              file=sys.stderr)
+    for provider in resolve("ocr"):
+        try:
+            if provider.adapter_type == "mistral_ocr":
+                print(f"  🔍 Running OCR via {_OCR_MODEL}…", file=sys.stderr)
+                text = _extract_primary(image_b64, mime, provider.key())
+                _write_ocr_meta(_OCR_MODEL, _OCR_MODEL, provider.name, provider.display_name)
 
-    print(f"  🔍 Running OCR via {_FALLBACK_MODEL} (fallback)...", file=sys.stderr)
-    return _extract_fallback(image_b64, mime, api_key)
+            elif provider.adapter_type == "eden_ocr":
+                print("  🔍 Running OCR via Eden AI (async)…", file=sys.stderr)
+                text = call_ocr_async(image_b64, mime)
+                _write_ocr_meta(
+                    "ocr/ocr_async/mistral", "ocr/ocr_async/mistral",
+                    provider.name, provider.display_name,
+                )
+
+            elif provider.name == "mistral_vision":
+                print(f"  🔍 Running OCR via {_VISION_MODEL} (vision fallback)…", file=sys.stderr)
+                text = _extract_vision_fallback(image_b64, mime, provider.key())
+                _write_ocr_meta(_VISION_MODEL, _VISION_MODEL, provider.name, provider.display_name)
+
+            else:  # eden_mistral — pixtral via Eden AI chat
+                print(f"  🔍 Running OCR via {_EDEN_VISION_MODEL} (Eden vision fallback)…", file=sys.stderr)
+                text = _extract_eden_vision_fallback(image_b64, mime, provider.key())
+                _write_ocr_meta(
+                    _EDEN_VISION_MODEL, _EDEN_VISION_MODEL,
+                    provider.name, provider.display_name,
+                )
+
+            return text
+
+        except Exception as exc:
+            print(
+                f"  ⚠️  {provider.display_name} failed ({exc}) — trying next tier…",
+                file=sys.stderr,
+            )
+
+    raise RuntimeError("All OCR providers failed.")
 
 
 if __name__ == "__main__":
@@ -154,5 +244,9 @@ if __name__ == "__main__":
         print(f"❌ File not found: {image_file}", file=sys.stderr)
         sys.exit(1)
 
-    result = ocr(image_file)
-    print(result)  # stdout only — captured by the shell script
+    try:
+        result = ocr(image_file)
+        print(result)  # stdout only — captured by the shell script
+    except RuntimeError as exc:
+        print(f"❌ {exc}", file=sys.stderr)
+        sys.exit(1)

@@ -427,7 +427,7 @@ voice_translate() {
 
     # ── Step 2: Transcription (Voxtral STT) ──────────────────────────────
 
-    raw_transcription=$("$VENV_PYTHON" src/transcribe.py "$REC_SOURCE_MP3" 2>&3)
+    raw_transcription=$("$VENV_PYTHON" -m src.transcribe "$REC_SOURCE_MP3" 2>&3)
 
     if [ -z "$raw_transcription" ]; then
         _error "Empty transcription."

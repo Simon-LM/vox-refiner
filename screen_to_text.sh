@@ -34,6 +34,10 @@ SCR_DIR="$SCRIPT_DIR/recordings/screen"
 mkdir -p "$SCR_DIR"
 SCR_FILE="$SCR_DIR/capture.png"
 
+# Provider/model meta file written by ocr.py; read back to label the result header.
+VOXREFINER_OCR_META_FILE="$SCR_DIR/.ocr_meta"
+export VOXREFINER_OCR_META_FILE
+
 # ─── Screenshot tool detection ───────────────────────────────────────────────
 
 _capture_screen() {
@@ -61,7 +65,7 @@ _run_ocr() {
     _process "Processing image..."
     echo ""
 
-    ocr_text=$("$VENV_PYTHON" src/ocr.py "$SCR_FILE" 2>&3)
+    ocr_text=$("$VENV_PYTHON" -m src.ocr "$SCR_FILE" 2>&3)
 
     if [ -z "$ocr_text" ]; then
         echo ""
@@ -73,7 +77,8 @@ _run_ocr() {
     printf '%s' "$ocr_text" | xclip -selection primary
 
     echo ""
-    _header "EXTRACTED TEXT — mistral-ocr-latest" "🖼"
+    _ocr_suffix="$(_model_label_suffix "${VOXREFINER_OCR_META_FILE:-}")"
+    _header "EXTRACTED TEXT${_ocr_suffix:-" — mistral-ocr-latest"}" "🖼"
     _success "Copied to clipboard"
     echo ""
     printf "${C_BG_CYAN} %s ${C_RESET}\n" "$ocr_text"

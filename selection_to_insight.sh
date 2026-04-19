@@ -68,7 +68,8 @@ mkdir -p "$INSIGHT_DIR"
 INSIGHT_META_FILE="$INSIGHT_DIR/.meta"
 INSIGHT_PERPLEXITY_FILE="$INSIGHT_DIR/.perplexity"
 INSIGHT_GROK_FILE="$INSIGHT_DIR/.grok"
-export INSIGHT_META_FILE INSIGHT_PERPLEXITY_FILE INSIGHT_GROK_FILE
+INSIGHT_MODEL_META_FILE="$INSIGHT_DIR/.model_meta"
+export INSIGHT_META_FILE INSIGHT_PERPLEXITY_FILE INSIGHT_GROK_FILE INSIGHT_MODEL_META_FILE
 
 SUMMARY_AUDIO="$INSIGHT_DIR/summary.mp3"
 SEARCH_AUDIO="$INSIGHT_DIR/search.mp3"
@@ -113,6 +114,13 @@ if [ -s "$INSIGHT_META_FILE" ]; then
     content_type="$(cat "$INSIGHT_META_FILE")"
 fi
 
+# Re-render SUMMARY header with provider/model suffix (available only after the call).
+_summary_suffix=""
+_summary_suffix="$(_model_label_suffix "${INSIGHT_MODEL_META_FILE:-}")"
+if [ -n "$_summary_suffix" ]; then
+    _header "SUMMARY${_summary_suffix}" "💡"
+    echo ""
+fi
 _success "Type detected: $content_type"
 echo ""
 printf "${C_BG_BLUE} %s ${C_RESET}\n" "$summary_text"
