@@ -185,7 +185,11 @@ _voice_picker() {
         printf "  ${C_BOLD}[25]${C_RESET} Sad        ${C_BOLD}[26]${C_RESET} Jealousy  ${C_BOLD}[27]${C_RESET} Frustrated\n"
         printf "  ${C_BOLD}[28]${C_RESET} Curious    ${C_BOLD}[29]${C_RESET} Confident\n"
         echo ""
-        printf "  ${C_BGREEN}GRADIUM${C_RESET}\n"
+        if [ -z "${GRADIUM_API_KEY:-}" ]; then
+            printf "  ${C_BGREEN}GRADIUM${C_RESET}  ${C_DIM}(unavailable — GRADIUM_API_KEY not set, see Settings → API Keys → [e5])${C_RESET}\n"
+        else
+            printf "  ${C_BGREEN}GRADIUM${C_RESET}\n"
+        fi
         printf "  ${C_BCYAN}🇫🇷  GRADIUM — French (France)${C_RESET}\n"
         printf "  ${C_BOLD}[30]${C_RESET} Elise      ${C_BOLD}[31]${C_RESET} Leo       ${C_BOLD}[32]${C_RESET} Olivier\n"
         printf "  ${C_BOLD}[33]${C_RESET} Manon      ${C_BOLD}[34]${C_RESET} Jade      ${C_BOLD}[35]${C_RESET} Amelie\n"
@@ -239,17 +243,26 @@ _voice_picker() {
                     fi
                     _tts_tmp="$SCRIPT_DIR/recordings/.voice_preview.mp3"
                     echo ""
-                    _process "Generating preview for $_vpreview_slug..."
-                    if printf '%s' "$_vsample" | \
-                        TTS_VOICE_ID="$_vpreview_id" \
-                        "$VENV_PYTHON" -m src.tts "$_tts_tmp" 2>/dev/null; then
-                        TTS_PLAYER="${TTS_PLAYER:-mpv --no-video}"
-                        $TTS_PLAYER "$_tts_tmp" 2>/dev/null
-                        rm -f "$_tts_tmp"
-                    else
-                        _warn "Preview failed."
+                    if ! [[ "$_vpreview_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] && \
+                       [ -z "${GRADIUM_API_KEY:-}" ]; then
+                        _warn "GRADIUM_API_KEY is not set — cannot preview or select this voice."
+                        printf "  ${C_DIM}Add it via Settings → API Keys → [e5] Edit Gradium key.${C_RESET}\n"
                         _vpreview_id=""
                         _vpreview_slug=""
+                        sleep 2
+                    else
+                        _process "Generating preview for $_vpreview_slug..."
+                        if printf '%s' "$_vsample" | \
+                            TTS_VOICE_ID="$_vpreview_id" \
+                            "$VENV_PYTHON" -m src.tts "$_tts_tmp" 2>/dev/null; then
+                            TTS_PLAYER="${TTS_PLAYER:-mpv --no-video}"
+                            $TTS_PLAYER "$_tts_tmp" 2>/dev/null
+                            rm -f "$_tts_tmp"
+                        else
+                            _warn "Preview failed."
+                            _vpreview_id=""
+                            _vpreview_slug=""
+                        fi
                     fi
                 else
                     _warn "Invalid choice."

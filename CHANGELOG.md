@@ -13,6 +13,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.9.1] — 2026-04-20
+
+### Fixed
+
+- **Voice picker — Gradium voices blocked when `GRADIUM_API_KEY` is not set.**
+  Selecting a Gradium voice without a key now shows a clear error
+  ("GRADIUM_API_KEY is not set — cannot preview or select this voice.") and
+  prevents the voice from being saved. Previously the picker silently failed
+  with no feedback.
+- **Voice picker — `GRADIUM` section header shows unavailability notice.**
+  When `GRADIUM_API_KEY` is absent, the section header now reads
+  `GRADIUM  (unavailable — GRADIUM_API_KEY not set, see Settings → API Keys → [e5])`
+  so the user understands immediately why the voices are locked.
+
+---
+
 ## [4.9.0] — 2026-04-20
 
 ### Added
