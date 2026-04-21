@@ -1257,6 +1257,648 @@
 							"menu_note": "Adult/F - Indian English, joyful, smooth"
 						}
 					]
+				},
+				{
+					"title": "🇩🇪 German (Germany)",
+					"start_index": 300,
+					"voices": [
+						{
+							"label": "Mia",
+							"slug": "gradium_de_mia",
+							"id": "-uP9MuGtBqAvEyxI",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - joyful, energetic, pro & discussions"
+						},
+						{
+							"label": "Maximilian",
+							"slug": "gradium_de_maximilian",
+							"id": "0y1VZjPabOBU3rWy",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, smooth, friendly narration"
+						},
+						{
+							"label": "Moritz",
+							"slug": "gradium_de_moritz",
+							"id": "IIZIkBSZAmb9nFZb",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - low pitch, smooth, measured pace"
+						},
+						{
+							"label": "Lisa",
+							"slug": "gradium_de_lisa",
+							"id": "kAoOc9Yb5EQDzA-N",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - soft, clear, varied pitch"
+						},
+						{
+							"label": "Hans",
+							"slug": "gradium_de_hans",
+							"id": "vbg20SqFS_gBntTQ",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - calm, low pitch, pleasant tone"
+						},
+						{
+							"label": "Franziska",
+							"slug": "gradium_de_franziska",
+							"id": "VXA4-0_ZN4o8q3vK",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, deep supportive tone"
+						},
+						{
+							"label": "David",
+							"slug": "gradium_de_david",
+							"id": "zyla-_bhVQtNTBdT",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - smooth, calm low tone, educational"
+						},
+						{
+							"label": "Lea",
+							"slug": "gradium_de_lea",
+							"id": "lSVEPWl_N_7MtcHe",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, friendly teacher"
+						},
+						{
+							"label": "Stefanie",
+							"slug": "gradium_de_stefanie",
+							"id": "hXjVvZ6oDDGQAQFj",
+							"sample_lang": "de",
+							"menu_note": "Young adult/F - confident, airy, sincere"
+						},
+						{
+							"label": "Tom",
+							"slug": "gradium_de_tom",
+							"id": "xq0vDziADfAmg6Uh",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - airy, formal, high pitch"
+						},
+						{
+							"label": "Niklas",
+							"slug": "gradium_de_niklas",
+							"id": "-qKylkN2UPxd7Mmg",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - joyful, smooth, formal customer care"
+						},
+						{
+							"label": "Michelle",
+							"slug": "gradium_de_michelle",
+							"id": "fJDF4lEH590XplFv",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - joyful, smooth, high-energy coach"
+						},
+						{
+							"label": "Jasmin",
+							"slug": "gradium_de_jasmin",
+							"id": "h2o5CDDhV5wE3Bwi",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - balanced, airy, light book reading"
+						},
+						{
+							"label": "Dominik",
+							"slug": "gradium_de_dominik",
+							"id": "ZOiGbnYdgKSBM_rH",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - balanced, smooth, formal support"
+						},
+						{
+							"label": "Sabrina",
+							"slug": "gradium_de_sabrina",
+							"id": "dK5Glio51HTxdMu0",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - balanced, smooth, pro reading"
+						},
+						{
+							"label": "Dennis",
+							"slug": "gradium_de_dennis",
+							"id": "YHkMHL6WppbXd42a",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - airy, formal, technical delivery"
+						},
+						{
+							"label": "Julian",
+							"slug": "gradium_de_julian",
+							"id": "LAmPTQZkwYJKRCKt",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - balanced, resonant, calm coach"
+						},
+						{
+							"label": "Jannik",
+							"slug": "gradium_de_jannik",
+							"id": "RPw-aWdY8NBiIWeg",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - joyful, resonant, motivating"
+						},
+						{
+							"label": "Melanie",
+							"slug": "gradium_de_melanie",
+							"id": "bauuigqCZbJFfk5q",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, deep pro tone"
+						},
+						{
+							"label": "Christian",
+							"slug": "gradium_de_christian",
+							"id": "WxHB2b5HxA0Kuq5u",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - joyful, smooth, energetic reporting"
+						},
+						{
+							"label": "Nadine",
+							"slug": "gradium_de_nadine",
+							"id": "9O8ZawShJ7UwURjK",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, journalistic precision"
+						},
+						{
+							"label": "Nicole",
+							"slug": "gradium_de_nicole",
+							"id": "t1Y_yKjku5R46F9t",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, airy, kind journalism"
+						},
+						{
+							"label": "Sebastian",
+							"slug": "gradium_de_sebastian",
+							"id": "KEMqb7dQlTCAEUx6",
+							"sample_lang": "de",
+							"menu_note": "Mature/M - steady, resonant, wise tone"
+						},
+						{
+							"label": "Lena",
+							"slug": "gradium_de_lena",
+							"id": "df4Al5gt14Am4Qaf",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - grounded, smooth, steady news"
+						},
+						{
+							"label": "Fabian",
+							"slug": "gradium_de_fabian",
+							"id": "42-EbMFThYfhVB83",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, high energy, teaching"
+						},
+						{
+							"label": "Patrick",
+							"slug": "gradium_de_patrick",
+							"id": "3-pqEMoGtIq7wXtH",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - steady, smooth, educational news"
+						},
+						{
+							"label": "Christina",
+							"slug": "gradium_de_christina",
+							"id": "9LhjfdN9LOrygqDi",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, insightful guide"
+						},
+						{
+							"label": "Jessica",
+							"slug": "gradium_de_jessica",
+							"id": "--9DFXOPx8kJFsbe",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - airy, formal journalism"
+						},
+						{
+							"label": "Jennifer",
+							"slug": "gradium_de_jennifer",
+							"id": "XFttJvHwReWtWQNQ",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - steady, smooth, pro reporting"
+						},
+						{
+							"label": "Vanessa",
+							"slug": "gradium_de_vanessa",
+							"id": "8eZwfGLoSF2N0RB3",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, lively podcast host"
+						},
+						{
+							"label": "Maria",
+							"slug": "gradium_de_maria",
+							"id": "sz-H9BxaRaqxQ2S0",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - relaxed, airy, cool podcast tone"
+						},
+						{
+							"label": "Jonas",
+							"slug": "gradium_de_jonas",
+							"id": "6tFmjkrmrdhO2bXV",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, philosophical, conversational"
+						},
+						{
+							"label": "Anna",
+							"slug": "gradium_de_anna",
+							"id": "D8iRHK1qJhqfE00v",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - balanced, airy, empathic"
+						},
+						{
+							"label": "Marcel",
+							"slug": "gradium_de_marcel",
+							"id": "Cw79FL0p0J6UM9El",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - balanced, clear, high-pitched support"
+						},
+						{
+							"label": "Kevin",
+							"slug": "gradium_de_kevin",
+							"id": "AySdCEnP2nqRo1WM",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - steady, smooth, formal journalism"
+						},
+						{
+							"label": "Tobias",
+							"slug": "gradium_de_tobias",
+							"id": "uycTGmIXbw_Y83p9",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - low pitch, technical precision"
+						},
+						{
+							"label": "Daniel",
+							"slug": "gradium_de_daniel",
+							"id": "H0GE4TqfCQGmpQhL",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, resonant, friendly student"
+						},
+						{
+							"label": "Tim",
+							"slug": "gradium_de_tim",
+							"id": "-WFy9WtlQNE-dEV2",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - steady, resonant, pro customer care"
+						},
+						{
+							"label": "Philipp",
+							"slug": "gradium_de_philipp",
+							"id": "ZsVFAOnjnEPxJVDI",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - balanced, smooth, immersive reading"
+						},
+						{
+							"label": "Maximilian",
+							"slug": "gradium_de_maximilian_2",
+							"id": "H3Rh9kJcd4gZidvN",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, calm, low-pitched educator"
+						},
+						{
+							"label": "Sarah",
+							"slug": "gradium_de_sarah",
+							"id": "ApPgTz3nMHOsWxhK",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, low pitch, soothing tone"
+						},
+						{
+							"label": "Florian",
+							"slug": "gradium_de_florian",
+							"id": "XnSnbQW98he4aULg",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, high resonant news voice"
+						},
+						{
+							"label": "Katharina",
+							"slug": "gradium_de_katharina",
+							"id": "AEJ61XaIaRill4cJ",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - steady, low pitch, book reading"
+						},
+						{
+							"label": "Mona",
+							"slug": "gradium_de_mona",
+							"id": "T2NDxsof9FHYxgJj",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, smooth, patient tutor"
+						},
+						{
+							"label": "Laura",
+							"slug": "gradium_de_laura",
+							"id": "wBgI9XmASQwvQ13w",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, kind, high-pitched guide"
+						},
+						{
+							"label": "Felix",
+							"slug": "gradium_de_felix",
+							"id": "uF8PfAXrv6qU9UEM",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - smooth, straightforward journalism"
+						},
+						{
+							"label": "Julia",
+							"slug": "gradium_de_julia",
+							"id": "FRTqjB2TL-Ix9GXW",
+							"sample_lang": "de",
+							"menu_note": "Adult/F - warm, conversational, student-like"
+						},
+						{
+							"label": "Alexander",
+							"slug": "gradium_de_alexander",
+							"id": "xki1DK6Ks6tuDmcb",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - warm, resonant, journalistic"
+						},
+						{
+							"label": "Lukas",
+							"slug": "gradium_de_lukas",
+							"id": "5UkFVe2B8OqLo-5R",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - low pitch, seasoned expert tone"
+						},
+						{
+							"label": "Jan",
+							"slug": "gradium_de_jan",
+							"id": "1D38wv1wp-H7QcyM",
+							"sample_lang": "de",
+							"menu_note": "Adult/M - balanced, high pitch, clear support"
+						}
+					]
+				},
+				{
+					"title": "🇪🇸 Spanish (Spain)",
+					"start_index": 400,
+					"voices": [
+						{
+							"label": "Sergio",
+							"slug": "gradium_es_es_sergio",
+							"id": "xu7iJ_fn2ElcWp2s",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - warm, smooth, friendly and professional"
+						},
+						{
+							"label": "Sofia",
+							"slug": "gradium_es_es_sofia",
+							"id": "s4CzgVHP5cEkB9LD",
+							"sample_lang": "es",
+							"menu_note": "Adult/F - soft, low pitch, smooth and measured"
+						},
+						{
+							"label": "Pablo",
+							"slug": "gradium_es_es_pablo",
+							"id": "aCWBiYUiQ4VwW8_b",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - warm, low pitch, calm authority"
+						},
+						{
+							"label": "Carlos",
+							"slug": "gradium_es_es_carlos",
+							"id": "yPxeHKlCzaHeKd_V",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - warm, versatile, ads to pro"
+						},
+						{
+							"label": "Alberto",
+							"slug": "gradium_es_es_alberto",
+							"id": "h39kz1iyoymcjcqh",
+							"sample_lang": "es",
+							"menu_note": "Young adult/M - warm host, media engagement"
+						},
+						{
+							"label": "Elena",
+							"slug": "gradium_es_es_elena",
+							"id": "PqjKPYFyGNsg1YU-",
+							"sample_lang": "es",
+							"menu_note": "Young adult/F - warm, engaging, education/journalism"
+						},
+						{
+							"label": "Ana",
+							"slug": "gradium_es_es_ana",
+							"id": "ynR4CAbXMiOv-vGC",
+							"sample_lang": "es",
+							"menu_note": "Young adult/F - warm, versatile, ads and service"
+						},
+						{
+							"label": "Sara",
+							"slug": "gradium_es_es_sara",
+							"id": "lPCVUcicz2XRaLE3",
+							"sample_lang": "es",
+							"menu_note": "Adult/F - warm, knowledgeable, clear journalist"
+						},
+						{
+							"label": "Daniel",
+							"slug": "gradium_es_es_daniel",
+							"id": "R3L8t75ZEoZCPUA9",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - confident, low pitch, professional"
+						},
+						{
+							"label": "Alejandro",
+							"slug": "gradium_es_es_alejandro",
+							"id": "eorxD0DWv--n7l3p",
+							"sample_lang": "es",
+							"menu_note": "Young adult/M - joyful, smooth, fresh ad energy"
+						},
+						{
+							"label": "Miguel",
+							"slug": "gradium_es_es_miguel",
+							"id": "Gijj_GPBfJVcP-FZ",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - steady, robotic edge, automated support"
+						}
+					]
+				},
+				{
+					"title": "🇲🇽 Spanish (Mexico)",
+					"voices": [
+						{
+							"label": "Valentina",
+							"slug": "gradium_es_mx_valentina",
+							"id": "B36pbz5_UoWn4BDl",
+							"sample_lang": "es",
+							"menu_note": "Adult/F - warm, engaging, natural storytelling"
+						},
+						{
+							"label": "Adrian",
+							"slug": "gradium_es_mx_adrian",
+							"id": "r5WB0b126tlHSrku",
+							"sample_lang": "es",
+							"menu_note": "Young adult/M - warm, smooth, journalism and chat"
+						},
+						{
+							"label": "Sergio",
+							"slug": "gradium_es_mx_sergio",
+							"id": "-8ZoUJpVU98rxpv9",
+							"sample_lang": "es",
+							"menu_note": "Young adult/M - energetic, modern, service and ads"
+						},
+						{
+							"label": "David",
+							"slug": "gradium_es_mx_david",
+							"id": "zdE2H9vw2vcMl_Pt",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - joyful, smooth, casual to formal"
+						},
+						{
+							"label": "Marta",
+							"slug": "gradium_es_mx_marta",
+							"id": "VAb2M8nKHlUUZBk4",
+							"sample_lang": "es",
+							"menu_note": "Young adult/F - warm, relatable, Gen Z friendly"
+						},
+						{
+							"label": "Cristina",
+							"slug": "gradium_es_mx_cristina",
+							"id": "Bwl2KLUPxf82_ZaJ",
+							"sample_lang": "es",
+							"menu_note": "Adult/F - joyful, resonant, social and character"
+						}
+					]
+				},
+				{
+					"title": "🌍 Spanish (Others)",
+					"voices": [
+						{
+							"label": "Javier",
+							"slug": "gradium_es_other_javier",
+							"id": "wGhY_zZCoQ5gB0ce",
+							"sample_lang": "es",
+							"menu_note": "Adult/M - Argentine, warm, smooth, professional"
+						},
+						{
+							"label": "Carmen",
+							"slug": "gradium_es_other_carmen",
+							"id": "zhH3lPUo-JxmlOJT",
+							"sample_lang": "es",
+							"menu_note": "Young adult/F - Colombian, energetic streamer vibe"
+						},
+						{
+							"label": "Maria",
+							"slug": "gradium_es_other_maria",
+							"id": "k2B3TJiffePxjeBn",
+							"sample_lang": "es",
+							"menu_note": "Young adult/F - Colombian, warm and friendly"
+						}
+					]
+				},
+				{
+					"title": "🇧🇷 Portuguese (Brazil)",
+					"start_index": 500,
+					"voices": [
+						{
+							"label": "Alice",
+							"slug": "gradium_pt_br_alice",
+							"id": "pYcGZz9VOo4n2ynh",
+							"sample_lang": "pt",
+							"menu_note": "Adult/F - warm, smooth, pro and enthusiastic"
+						},
+						{
+							"label": "Davi",
+							"slug": "gradium_pt_br_davi",
+							"id": "M-FvVo9c-jGR4PgP",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - engaging, smooth, helpful and relaxed"
+						},
+						{
+							"label": "Laura",
+							"slug": "gradium_pt_br_laura",
+							"id": "xB86uC_i8sO2U41-",
+							"sample_lang": "pt",
+							"menu_note": "Adult/F - smooth, pleasant, chat-friendly"
+						},
+						{
+							"label": "Frederico",
+							"slug": "gradium_pt_br_frederico",
+							"id": "L7890s1B44FqSiGC",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - clear, low pitch, smooth texture"
+						},
+						{
+							"label": "Eduardo",
+							"slug": "gradium_pt_br_eduardo",
+							"id": "hAdJ9w9xBQkFgrRl",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - clear, low pitch, smooth"
+						},
+						{
+							"label": "Daniel",
+							"slug": "gradium_pt_br_daniel",
+							"id": "_cP-0vSYfMmzR4al",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - joyful, dynamic, radio and promos"
+						},
+						{
+							"label": "Thiago",
+							"slug": "gradium_pt_br_thiago",
+							"id": "QZtWUy8jmIroWiOu",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - warm, versatile, host with kindness"
+						},
+						{
+							"label": "Pedro",
+							"slug": "gradium_pt_br_pedro",
+							"id": "Yee42wDKxEFHi0BS",
+							"sample_lang": "pt",
+							"menu_note": "Young adult/M - smooth, low pitch, steady"
+						},
+						{
+							"label": "Jessica",
+							"slug": "gradium_pt_br_jessica",
+							"id": "Fmt16x6anKfMMeSx",
+							"sample_lang": "pt",
+							"menu_note": "Adult/F - smooth, clear, pro customer care"
+						},
+						{
+							"label": "Fernando",
+							"slug": "gradium_pt_br_fernando",
+							"id": "8QUaJGjSFdgHkuI8",
+							"sample_lang": "pt",
+							"menu_note": "Young adult/M - warm, friendly, approachable"
+						}
+					]
+				},
+				{
+					"title": "🇵🇹 Portuguese (Portugal)",
+					"voices": [
+						{
+							"label": "Rodrigo",
+							"slug": "gradium_pt_pt_rodrigo",
+							"id": "EzmLkNorEpZG_oNv",
+							"sample_lang": "pt",
+							"menu_note": "Young adult/M - low pitch, calm confidence"
+						},
+						{
+							"label": "Bruna",
+							"slug": "gradium_pt_pt_bruna",
+							"id": "Du_Dcv4fgXBDdubR",
+							"sample_lang": "pt",
+							"menu_note": "Adult/F - high-pitched, energetic, corporate training"
+						},
+						{
+							"label": "Leonardo",
+							"slug": "gradium_pt_pt_leonardo",
+							"id": "YUKEEk7Y4Igsj1Ts",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - energetic, varied, radio and character"
+						},
+						{
+							"label": "Matheus",
+							"slug": "gradium_pt_pt_matheus",
+							"id": "wT1bHy1Vq_0Bn73I",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - resonant, warm, educational authority"
+						},
+						{
+							"label": "Juliana",
+							"slug": "gradium_pt_pt_juliana",
+							"id": "B6aHVROMF8FuKR07",
+							"sample_lang": "pt",
+							"menu_note": "Young adult/F - high-pitched, energetic, lively"
+						},
+						{
+							"label": "Maria",
+							"slug": "gradium_pt_pt_maria",
+							"id": "73lMH7Zcc411nxJz",
+							"sample_lang": "pt",
+							"menu_note": "Adult/F - cheerful, helpful, bright conversational"
+						},
+						{
+							"label": "Rafael",
+							"slug": "gradium_pt_pt_rafael",
+							"id": "KpDAXeGeen7P9Uri",
+							"sample_lang": "pt",
+							"menu_note": "Adult/M - warm, friendly, relatable host"
+						}
+					]
 				}
 			]
 		}

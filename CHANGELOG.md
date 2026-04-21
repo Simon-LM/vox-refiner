@@ -13,6 +13,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.9.5] — 2026-04-21
+
+### Added
+
+- **`src/voice_catalog.json` — 50 German Gradium voices appended after English groups.**
+  Added a new `🇩🇪 German (Germany)` group at the end of the Gradium catalog,
+  preserving the existing French/English order while extending the picker with
+  50 additional German voices. The German group now starts at `g300` to keep
+  room for future English additions.
+- **`src/voice_catalog.json` — Spanish Gradium groups added with fixed block start.**
+  Added new groups for `🇪🇸 Spanish (Spain)`, `🇲🇽 Spanish (Mexico)`, and
+  `🌍 Spanish (Others)`. The Spain group starts at `g400` to reserve room for
+  future expansions before the Spanish block.
+- **`src/voice_catalog.json` — Portuguese Gradium groups added with fixed block start.**
+  Added new groups for `🇧🇷 Portuguese (Brazil)` and `🇵🇹 Portuguese (Portugal)`.
+  The Brazil group starts at `g500` to reserve room for future additions before
+  the Portuguese block.
+
+---
+
 ## [4.9.4] — 2026-04-21
 
 ### Added
