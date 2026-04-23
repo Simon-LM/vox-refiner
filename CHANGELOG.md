@@ -9,6 +9,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.9.9] — 2026-04-24
+
+### Added
+
+- **`src/tts.py` — French language support for Google TTS.**
+  Added `language_code` parameter to `SpeechConfig` in `_synthesize_google_tts()`,
+  enabling French voice synthesis with Gemini 3.1 Flash TTS API.
+
+---
+
 ## [4.9.8] — 2026-04-23
 
 ### Added

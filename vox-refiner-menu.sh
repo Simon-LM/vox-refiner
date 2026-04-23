@@ -168,7 +168,8 @@ for provider in data.get("providers", []):
             provider_index += 1
         if prefix != "g" and group_rows and not any(note for _, _, note in group_rows):
             grid_items = [f"[{prefix}{idx}] {label}" for idx, label, _ in group_rows]
-            for row in format_grid_rows(grid_items, columns=3, gap=4):
+            columns = 1 if prefix == "c" else 3
+            for row in format_grid_rows(grid_items, columns=columns, gap=4):
                 print(f"ROW\t{prefix}\t{group_idx}\t{row}")
 PY
 )"; then

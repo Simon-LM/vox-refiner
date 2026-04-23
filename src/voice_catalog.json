@@ -1909,13 +1909,14 @@
 			"api_key_env": "GOOGLE_TTS_API_KEY",
 			"groups": [
 				{
-					"title": "🌐 Google TTS (Gemini)",
+					"title": "🌐 Google TTS (Gemini 3.1 Flash TTS)",
 					"voices": [
 						{
 							"label": "Kore",
 							"slug": "google-kore",
 							"id": "google-kore",
 							"sample_lang": "en",
+							"menu_note": "Adult/F - Ferme",
 							"temporary": true
 						},
 						{
@@ -1923,6 +1924,7 @@
 							"slug": "google-aoede",
 							"id": "google-aoede",
 							"sample_lang": "en",
+							"menu_note": "Adult/F - Breezy",
 							"temporary": true
 						},
 						{
@@ -1930,6 +1932,7 @@
 							"slug": "google-zephyr",
 							"id": "google-zephyr",
 							"sample_lang": "en",
+							"menu_note": "Adult/M - Lumineux",
 							"temporary": true
 						},
 						{
@@ -1937,6 +1940,460 @@
 							"slug": "google-puck",
 							"id": "google-puck",
 							"sample_lang": "en",
+							"menu_note": "Adult/M - Upbeat",
+							"temporary": true
+						},
+						{
+							"label": "Charon",
+							"slug": "google-charon",
+							"id": "google-charon",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - informatif",
+							"temporary": true
+						},
+						{
+							"label": "Fenrir",
+							"slug": "google-fenrir",
+							"id": "google-fenrir",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - énergique",
+							"temporary": true
+						},
+						{
+							"label": "Leda",
+							"slug": "google-leda",
+							"id": "google-leda",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - jeune",
+							"temporary": true
+						},
+						{
+							"label": "Orus",
+							"slug": "google-orus",
+							"id": "google-orus",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - ferme",
+							"temporary": true
+						},
+						{
+							"label": "Callirrhoe",
+							"slug": "google-callirrhoe",
+							"id": "google-callirrhoe",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - décontractée",
+							"temporary": true
+						},
+						{
+							"label": "Autonoe",
+							"slug": "google-autonoe",
+							"id": "google-autonoe",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Lumineux",
+							"temporary": true
+						},
+						{
+							"label": "Enceladus",
+							"slug": "google-enceladus",
+							"id": "google-enceladus",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - soufflé/doux",
+							"temporary": true
+						},
+						{
+							"label": "Iapetus",
+							"slug": "google-iapetus",
+							"id": "google-iapetus",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - clair",
+							"temporary": true
+						},
+						{
+							"label": "Umbriel",
+							"slug": "google-umbriel",
+							"id": "google-umbriel",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - décontracté",
+							"temporary": true
+						},
+						{
+							"label": "Algieba",
+							"slug": "google-algieba",
+							"id": "google-algieba",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - grave/lisse",
+							"temporary": true
+						},
+						{
+							"label": "Despina",
+							"slug": "google-despina",
+							"id": "google-despina",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Lisse",
+							"temporary": true
+						},
+						{
+							"label": "Erinome",
+							"slug": "google-erinome",
+							"id": "google-erinome",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Dégagé",
+							"temporary": true
+						},
+						{
+							"label": "Algenib",
+							"slug": "google-algenib",
+							"id": "google-algenib",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - Graveleux",
+							"temporary": true
+						},
+						{
+							"label": "Rasalgethi",
+							"slug": "google-rasalgethi",
+							"id": "google-rasalgethi",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - informatif",
+							"temporary": true
+						},
+						{
+							"label": "Laomedeia",
+							"slug": "google-laomedeia",
+							"id": "google-laomedeia",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Upbeat",
+							"temporary": true
+						},
+						{
+							"label": "Achernar",
+							"slug": "google-achernar",
+							"id": "google-achernar",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - douce",
+							"temporary": true
+						},
+						{
+							"label": "Alnilam",
+							"slug": "google-alnilam",
+							"id": "google-alnilam",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - Ferme",
+							"temporary": true
+						},
+						{
+							"label": "Schedar",
+							"slug": "google-schedar",
+							"id": "google-schedar",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - Even",
+							"temporary": true
+						},
+						{
+							"label": "Gacrux",
+							"slug": "google-gacrux",
+							"id": "google-gacrux",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - mature",
+							"temporary": true
+						},
+						{
+							"label": "Pulcherrima",
+							"slug": "google-pulcherrima",
+							"id": "google-pulcherrima",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Transférer",
+							"temporary": true
+						},
+						{
+							"label": "Achird",
+							"slug": "google-achird",
+							"id": "google-achird",
+							"sample_lang": "en",
+							"menu_note": "Adult/M - amical",
+							"temporary": true
+						},
+						{
+							"label": "Zubenelgenubi",
+							"slug": "google-zubenelgenubi",
+							"id": "google-zubenelgenubi",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Décontracté",
+							"temporary": true
+						},
+						{
+							"label": "Vindemiatrix",
+							"slug": "google-vindemiatrix",
+							"id": "google-vindemiatrix",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - gentille",
+							"temporary": true
+						},
+						{
+							"label": "Sadachbia",
+							"slug": "google-sadachbia",
+							"id": "google-sadachbia",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - Lively",
+							"temporary": true
+						},
+						{
+							"label": "Sadaltager",
+							"slug": "google-sadaltager",
+							"id": "google-sadaltager",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - connaissances",
+							"temporary": true
+						},
+						{
+							"label": "Sulafat",
+							"slug": "google-sulafat",
+							"id": "google-sulafat",
+							"sample_lang": "en",
+							"menu_note": "Adult/F - chaude",
+							"temporary": true
+						}
+					]
+				},
+				{
+					"title": "🇫🇷 Google TTS (Gemini 3.1 Flash TTS) - Français",
+					"voices": [
+						{
+							"label": "Kore",
+							"slug": "google-kore-fr",
+							"id": "google-kore-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Ferme",
+							"temporary": true
+						},
+						{
+							"label": "Aoede",
+							"slug": "google-aoede-fr",
+							"id": "google-aoede-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Breezy",
+							"temporary": true
+						},
+						{
+							"label": "Zephyr",
+							"slug": "google-zephyr-fr",
+							"id": "google-zephyr-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - Lumineux",
+							"temporary": true
+						},
+						{
+							"label": "Puck",
+							"slug": "google-puck-fr",
+							"id": "google-puck-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - Upbeat",
+							"temporary": true
+						},
+						{
+							"label": "Charon",
+							"slug": "google-charon-fr",
+							"id": "google-charon-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - informatif",
+							"temporary": true
+						},
+						{
+							"label": "Fenrir",
+							"slug": "google-fenrir-fr",
+							"id": "google-fenrir-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - énergique",
+							"temporary": true
+						},
+						{
+							"label": "Leda",
+							"slug": "google-leda-fr",
+							"id": "google-leda-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - jeune",
+							"temporary": true
+						},
+						{
+							"label": "Orus",
+							"slug": "google-orus-fr",
+							"id": "google-orus-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - ferme",
+							"temporary": true
+						},
+						{
+							"label": "Callirrhoe",
+							"slug": "google-callirrhoe-fr",
+							"id": "google-callirrhoe-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - décontractée",
+							"temporary": true
+						},
+						{
+							"label": "Autonoe",
+							"slug": "google-autonoe-fr",
+							"id": "google-autonoe-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Lumineux",
+							"temporary": true
+						},
+						{
+							"label": "Enceladus",
+							"slug": "google-enceladus-fr",
+							"id": "google-enceladus-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - soufflé/doux",
+							"temporary": true
+						},
+						{
+							"label": "Iapetus",
+							"slug": "google-iapetus-fr",
+							"id": "google-iapetus-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - clair",
+							"temporary": true
+						},
+						{
+							"label": "Umbriel",
+							"slug": "google-umbriel-fr",
+							"id": "google-umbriel-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - décontracté",
+							"temporary": true
+						},
+						{
+							"label": "Algieba",
+							"slug": "google-algieba-fr",
+							"id": "google-algieba-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - grave/lisse",
+							"temporary": true
+						},
+						{
+							"label": "Despina",
+							"slug": "google-despina-fr",
+							"id": "google-despina-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Lisse",
+							"temporary": true
+						},
+						{
+							"label": "Erinome",
+							"slug": "google-erinome-fr",
+							"id": "google-erinome-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Dégagé",
+							"temporary": true
+						},
+						{
+							"label": "Algenib",
+							"slug": "google-algenib-fr",
+							"id": "google-algenib-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - Graveleux",
+							"temporary": true
+						},
+						{
+							"label": "Rasalgethi",
+							"slug": "google-rasalgethi-fr",
+							"id": "google-rasalgethi-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - informatif",
+							"temporary": true
+						},
+						{
+							"label": "Laomedeia",
+							"slug": "google-laomedeia-fr",
+							"id": "google-laomedeia-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Upbeat",
+							"temporary": true
+						},
+						{
+							"label": "Achernar",
+							"slug": "google-achernar-fr",
+							"id": "google-achernar-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - douce",
+							"temporary": true
+						},
+						{
+							"label": "Alnilam",
+							"slug": "google-alnilam-fr",
+							"id": "google-alnilam-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - Ferme",
+							"temporary": true
+						},
+						{
+							"label": "Schedar",
+							"slug": "google-schedar-fr",
+							"id": "google-schedar-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - Even",
+							"temporary": true
+						},
+						{
+							"label": "Gacrux",
+							"slug": "google-gacrux-fr",
+							"id": "google-gacrux-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - mature",
+							"temporary": true
+						},
+						{
+							"label": "Pulcherrima",
+							"slug": "google-pulcherrima-fr",
+							"id": "google-pulcherrima-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Transférer",
+							"temporary": true
+						},
+						{
+							"label": "Achird",
+							"slug": "google-achird-fr",
+							"id": "google-achird-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/M - amical",
+							"temporary": true
+						},
+						{
+							"label": "Zubenelgenubi",
+							"slug": "google-zubenelgenubi-fr",
+							"id": "google-zubenelgenubi-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Décontracté",
+							"temporary": true
+						},
+						{
+							"label": "Vindemiatrix",
+							"slug": "google-vindemiatrix-fr",
+							"id": "google-vindemiatrix-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - gentille",
+							"temporary": true
+						},
+						{
+							"label": "Sadachbia",
+							"slug": "google-sadachbia-fr",
+							"id": "google-sadachbia-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - Lively",
+							"temporary": true
+						},
+						{
+							"label": "Sadaltager",
+							"slug": "google-sadaltager-fr",
+							"id": "google-sadaltager-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - connaissances",
+							"temporary": true
+						},
+						{
+							"label": "Sulafat",
+							"slug": "google-sulafat-fr",
+							"id": "google-sulafat-fr",
+							"sample_lang": "fr",
+							"menu_note": "Adult/F - chaude",
 							"temporary": true
 						}
 					]

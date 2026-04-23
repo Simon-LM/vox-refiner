@@ -1056,7 +1056,26 @@ def _synthesize_gradium(text: str, output_path: str, voice_id: str) -> None:
     asyncio.run(_run())
 
 
-def _synthesize_google_tts(text: str, output_path: str, voice_name: str) -> None:
+def _parse_accent_tags(text: str) -> tuple[str, Optional[str]]:
+    """Parse accent tags from text and return cleaned text and language_code."""
+    # Look for [accent: french] or similar
+    accent_match = re.search(r'\[accent:\s*(\w+)\]', text, re.IGNORECASE)
+    if accent_match:
+        accent = accent_match.group(1).lower()
+        if accent == "french":
+            language_code = "fr-FR"
+        elif accent == "quebec" or accent == "canadian":
+            language_code = "fr-CA"
+        else:
+            language_code = None
+        # Remove the tag from text
+        text = re.sub(r'\[accent:\s*\w+\]', '', text, flags=re.IGNORECASE).strip()
+    else:
+        language_code = None
+    return text, language_code
+
+
+def _synthesize_google_tts(text: str, output_path: str, voice_name: str, language_code: Optional[str] = None) -> None:
     """Call Google Gemini TTS and write WAV audio to output_path."""
     if genai is None:
         raise RuntimeError("google-genai library not installed. Run 'pip install google-genai'.")
@@ -1065,24 +1084,41 @@ def _synthesize_google_tts(text: str, output_path: str, voice_name: str) -> None
     if not api_key:
         raise RuntimeError("GOOGLE_TTS_API_KEY is not set. Check your .env file.")
 
+    # Parse accent tags from text
+    text, detected_language = _parse_accent_tags(text)
+
+    # Check if voice_id indicates French
+    if voice_name.endswith("-fr"):
+        voice_name = voice_name[:-3]  # Remove "-fr" suffix
+        detected_language = detected_language or "fr-FR"
+
+    language_code = language_code or detected_language
+
     try:
         client = genai.Client(api_key=api_key)
 
         # Extract voice name (e.g., "kore" from "google-kore") and capitalize
         voice_name_clean = voice_name.replace("google-", "").capitalize()
 
+        prebuilt_voice_config = types.PrebuiltVoiceConfig(
+            voice_name=voice_name_clean
+        )
+
+        voice_config = types.VoiceConfig(
+            prebuilt_voice_config=prebuilt_voice_config
+        )
+
+        speech_config = types.SpeechConfig(
+            voice_config=voice_config,
+            language_code=language_code if language_code else None
+        )
+
         response = client.models.generate_content(
             model="models/gemini-3.1-flash-tts-preview",
             contents=text,
             config=types.GenerateContentConfig(
                 response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name=voice_name_clean
-                        )
-                    )
-                )
+                speech_config=speech_config
             )
         )
 
