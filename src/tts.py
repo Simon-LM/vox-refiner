@@ -1233,6 +1233,48 @@ def _synthesize_google_tts(text: str, output_path: str, voice_name: str, languag
         raise RuntimeError(f"Google TTS failed: {e}") from e
 
 
+def _synthesize_deepgram_aura2(text: str, output_path: str, voice_id: str) -> None:
+    """Call Deepgram Aura 2 TTS via Eden AI universal endpoint and write audio to output_path.
+
+    voice_id format: "deepgram-aura-2-<name>-<lang>" (e.g. "deepgram-aura-2-thalia-en").
+    Stripping "deepgram-" yields the full Deepgram model name used as the voice parameter.
+    Eden AI responds with a CloudFront URL; the audio is downloaded in a second request.
+    """
+    api_key = os.environ.get("EDENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("EDENAI_API_KEY is not set. Check your .env file.")
+
+    voice_name = voice_id.removeprefix("deepgram-")  # "aura-2-thalia-en"
+
+    response = requests.post(
+        "https://api.edenai.run/v3/universal-ai/",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "audio/tts/deepgram/aura-2",
+            "input": {"text": text, "voice": voice_name},
+            "show_original_response": False,
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("status") != "success":
+        error = data.get("error") or {}
+        raise RuntimeError(f"Deepgram Aura 2 Eden AI error: {error.get('message', str(data)[:300])}")
+
+    audio_url = (data.get("output") or {}).get("audio_resource_url")
+    if not audio_url:
+        raise RuntimeError(f"Deepgram Aura 2 Eden AI: missing audio_resource_url in response: {str(data)[:300]}")
+
+    audio_response = requests.get(audio_url, timeout=30)
+    audio_response.raise_for_status()
+    Path(output_path).write_bytes(audio_response.content)
+
+
 def _synthesize_amazon_polly(text: str, output_path: str, voice_id: str, model: str) -> None:
     """Call Amazon Polly TTS via Eden AI universal endpoint and write MP3 to output_path.
 
@@ -1369,6 +1411,12 @@ def synthesize(
     if voice_id and voice_id.startswith("openai-"):
         print(f"\U0001f916 OpenAI TTS via Eden AI ({voice_id})...", file=sys.stderr)
         _synthesize_openai_tts(text, output_path, voice_id)
+        return
+
+    # Deepgram Aura 2 voices via Eden AI (prefix "deepgram-") — route before Gradium.
+    if voice_id and voice_id.startswith("deepgram-"):
+        print(f"\U0001f3a4 Deepgram Aura 2 TTS via Eden AI ({voice_id})...", file=sys.stderr)
+        _synthesize_deepgram_aura2(text, output_path, voice_id)
         return
 
     # Amazon Standard (Polly) voices via Eden AI (prefix "amazon-std-") — before neural check.

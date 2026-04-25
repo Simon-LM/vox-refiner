@@ -9,6 +9,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.10.4] — 2026-04-25
+
+### Added
+
+- **`src/voice_catalog.json` — Deepgram Aura 2 voices via Eden AI (C1500–C1510).**
+  11 voices in 3 groups: 🇫🇷 French (C1500, Agathe/Hector),
+  🇺🇸 English US (C1502, Thalia/Andromeda/Helena/Apollo/Arcas/Aries),
+  🇪🇸 Spanish (C1508, Celeste/Estrella/Nestor).
+  Voice IDs use the format `deepgram-aura-2-<name>-<lang>` (e.g. `deepgram-aura-2-thalia-en`).
+  Model: `audio/tts/deepgram/aura-2` via Eden AI universal endpoint. Require `EDENAI_API_KEY`.
+  Marked `"temporary": true` (comparison/hidden).
+- **`src/tts.py` — Deepgram Aura 2 routing via Eden AI.**
+  Added `_synthesize_deepgram_aura2()`: strips `deepgram-` prefix to recover the full
+  Deepgram model name used as the `voice` parameter (e.g. `aura-2-thalia-en`).
+  Routing inserted before Amazon, before Gradium.
+- **`vox-refiner-menu.sh` — API key guard extended to `deepgram-*` voices.**
+  `deepgram-*` comparison voices now require `EDENAI_API_KEY`.
+
+---
+
 ## [4.10.3] — 2026-04-25
 
 ### Added

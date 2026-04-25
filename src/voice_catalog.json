@@ -5635,6 +5635,112 @@
               "temporary": true
             }
           ]
+        },
+        {
+          "title": "🇫🇷 Deepgram Aura 2 — French",
+          "start_index": 1500,
+          "voices": [
+            {
+              "label": "Agathe",
+              "slug": "deepgram-aura2-agathe-fr",
+              "id": "deepgram-aura-2-agathe-fr",
+              "sample_lang": "fr",
+              "menu_note": "F - Cheerful",
+              "temporary": true
+            },
+            {
+              "label": "Hector",
+              "slug": "deepgram-aura2-hector-fr",
+              "id": "deepgram-aura-2-hector-fr",
+              "sample_lang": "fr",
+              "menu_note": "M - Empathetic",
+              "temporary": true
+            }
+          ]
+        },
+        {
+          "title": "🇺🇸 Deepgram Aura 2 — English US",
+          "start_index": 1502,
+          "voices": [
+            {
+              "label": "Thalia",
+              "slug": "deepgram-aura2-thalia-en",
+              "id": "deepgram-aura-2-thalia-en",
+              "sample_lang": "en",
+              "menu_note": "F - Energetic",
+              "temporary": true
+            },
+            {
+              "label": "Andromeda",
+              "slug": "deepgram-aura2-andromeda-en",
+              "id": "deepgram-aura-2-andromeda-en",
+              "sample_lang": "en",
+              "menu_note": "F - Casual",
+              "temporary": true
+            },
+            {
+              "label": "Helena",
+              "slug": "deepgram-aura2-helena-en",
+              "id": "deepgram-aura-2-helena-en",
+              "sample_lang": "en",
+              "menu_note": "F - Caring",
+              "temporary": true
+            },
+            {
+              "label": "Apollo",
+              "slug": "deepgram-aura2-apollo-en",
+              "id": "deepgram-aura-2-apollo-en",
+              "sample_lang": "en",
+              "menu_note": "M - Confident",
+              "temporary": true
+            },
+            {
+              "label": "Arcas",
+              "slug": "deepgram-aura2-arcas-en",
+              "id": "deepgram-aura-2-arcas-en",
+              "sample_lang": "en",
+              "menu_note": "M - Smooth",
+              "temporary": true
+            },
+            {
+              "label": "Aries",
+              "slug": "deepgram-aura2-aries-en",
+              "id": "deepgram-aura-2-aries-en",
+              "sample_lang": "en",
+              "menu_note": "M - Warm",
+              "temporary": true
+            }
+          ]
+        },
+        {
+          "title": "🇪🇸 Deepgram Aura 2 — Spanish",
+          "start_index": 1508,
+          "voices": [
+            {
+              "label": "Celeste",
+              "slug": "deepgram-aura2-celeste-es",
+              "id": "deepgram-aura-2-celeste-es",
+              "sample_lang": "es",
+              "menu_note": "F - CO Friendly",
+              "temporary": true
+            },
+            {
+              "label": "Estrella",
+              "slug": "deepgram-aura2-estrella-es",
+              "id": "deepgram-aura-2-estrella-es",
+              "sample_lang": "es",
+              "menu_note": "F - MX Calm",
+              "temporary": true
+            },
+            {
+              "label": "Nestor",
+              "slug": "deepgram-aura2-nestor-es",
+              "id": "deepgram-aura-2-nestor-es",
+              "sample_lang": "es",
+              "menu_note": "M - ES Professional",
+              "temporary": true
+            }
+          ]
         }
       ]
     }
