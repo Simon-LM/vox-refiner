@@ -9,6 +9,27 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.10.5] — 2026-04-25
+
+### Added
+
+- **`src/voice_catalog.json` — xAI Grok TTS voices (C1550–C1569).**
+  20 voices in 4 groups: 🇫🇷 French (C1550), 🇺🇸 English (C1555),
+  🇪🇸 Spanish Spain (C1560), 🇲🇽 Spanish Mexico (C1565).
+  Each group contains all 5 Grok voices: Eve, Ara, Rex, Sal, Leo.
+  Voice IDs use the format `grok-<voice>-<language>` (e.g. `grok-ara-fr`, `grok-rex-es-ES`).
+  Require `XAI_API_KEY`. Marked `"temporary": true` (comparison/hidden).
+- **`src/tts.py` — Grok TTS routing via xAI direct API.**
+  Added `_synthesize_grok_tts()`: splits `grok-<voice>-<lang>` on `-` (maxsplit=2)
+  to extract voice and language, calls `POST https://api.x.ai/v1/tts` directly.
+  Response is raw MP3 bytes — no intermediate URL download.
+  Uses `XAI_API_KEY` (already present in project for Grok search/fact-check).
+- **`vox-refiner-menu.sh` — API key guard extended to `grok-*` voices.**
+  `grok-*` comparison voices require `XAI_API_KEY` (separate from Eden AI voices).
+  Preview flow override added for `grok-*` → `XAI_API_KEY`.
+
+---
+
 ## [4.10.4] — 2026-04-25
 
 ### Added

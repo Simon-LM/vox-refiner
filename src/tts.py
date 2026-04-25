@@ -1233,6 +1233,35 @@ def _synthesize_google_tts(text: str, output_path: str, voice_name: str, languag
         raise RuntimeError(f"Google TTS failed: {e}") from e
 
 
+def _synthesize_grok_tts(text: str, output_path: str, voice_id: str) -> None:
+    """Call xAI Grok TTS directly and write MP3 bytes to output_path.
+
+    voice_id format: "grok-<voice>-<language>" (e.g. "grok-ara-fr", "grok-rex-es-ES").
+    split("-", 2) always yields ["grok", voice, language] — safe even when language
+    contains a hyphen (e.g. "es-ES").
+    Response is raw MP3 bytes — no intermediate URL download needed.
+    """
+    api_key = os.environ.get("XAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("XAI_API_KEY is not set. Check your .env file.")
+
+    parts = voice_id.split("-", 2)
+    grok_voice = parts[1] if len(parts) >= 2 else "eve"
+    language    = parts[2] if len(parts) >= 3 else "en"
+
+    response = requests.post(
+        "https://api.x.ai/v1/tts",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={"text": text, "voice_id": grok_voice, "language": language},
+        timeout=60,
+    )
+    response.raise_for_status()
+    Path(output_path).write_bytes(response.content)
+
+
 def _synthesize_deepgram_aura2(text: str, output_path: str, voice_id: str) -> None:
     """Call Deepgram Aura 2 TTS via Eden AI universal endpoint and write audio to output_path.
 
@@ -1411,6 +1440,12 @@ def synthesize(
     if voice_id and voice_id.startswith("openai-"):
         print(f"\U0001f916 OpenAI TTS via Eden AI ({voice_id})...", file=sys.stderr)
         _synthesize_openai_tts(text, output_path, voice_id)
+        return
+
+    # Grok TTS voices via xAI direct API (prefix "grok-") — route before Gradium.
+    if voice_id and voice_id.startswith("grok-"):
+        print(f"\U0001f916 Grok TTS via xAI ({voice_id})...", file=sys.stderr)
+        _synthesize_grok_tts(text, output_path, voice_id)
         return
 
     # Deepgram Aura 2 voices via Eden AI (prefix "deepgram-") — route before Gradium.

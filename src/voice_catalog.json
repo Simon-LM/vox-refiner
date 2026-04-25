@@ -5741,6 +5741,190 @@
               "temporary": true
             }
           ]
+        },
+        {
+          "title": "🇫🇷 Grok TTS (xAI) — French",
+          "start_index": 1550,
+          "voices": [
+            {
+              "label": "Eve",
+              "slug": "grok-eve-fr",
+              "id": "grok-eve-fr",
+              "sample_lang": "fr",
+              "menu_note": "N - Energetic",
+              "temporary": true
+            },
+            {
+              "label": "Ara",
+              "slug": "grok-ara-fr",
+              "id": "grok-ara-fr",
+              "sample_lang": "fr",
+              "menu_note": "N - Warm",
+              "temporary": true
+            },
+            {
+              "label": "Rex",
+              "slug": "grok-rex-fr",
+              "id": "grok-rex-fr",
+              "sample_lang": "fr",
+              "menu_note": "M - Professional",
+              "temporary": true
+            },
+            {
+              "label": "Sal",
+              "slug": "grok-sal-fr",
+              "id": "grok-sal-fr",
+              "sample_lang": "fr",
+              "menu_note": "N - Smooth",
+              "temporary": true
+            },
+            {
+              "label": "Leo",
+              "slug": "grok-leo-fr",
+              "id": "grok-leo-fr",
+              "sample_lang": "fr",
+              "menu_note": "M - Authoritative",
+              "temporary": true
+            }
+          ]
+        },
+        {
+          "title": "🇺🇸 Grok TTS (xAI) — English",
+          "start_index": 1555,
+          "voices": [
+            {
+              "label": "Eve",
+              "slug": "grok-eve-en",
+              "id": "grok-eve-en",
+              "sample_lang": "en",
+              "menu_note": "N - Energetic",
+              "temporary": true
+            },
+            {
+              "label": "Ara",
+              "slug": "grok-ara-en",
+              "id": "grok-ara-en",
+              "sample_lang": "en",
+              "menu_note": "N - Warm",
+              "temporary": true
+            },
+            {
+              "label": "Rex",
+              "slug": "grok-rex-en",
+              "id": "grok-rex-en",
+              "sample_lang": "en",
+              "menu_note": "M - Professional",
+              "temporary": true
+            },
+            {
+              "label": "Sal",
+              "slug": "grok-sal-en",
+              "id": "grok-sal-en",
+              "sample_lang": "en",
+              "menu_note": "N - Smooth",
+              "temporary": true
+            },
+            {
+              "label": "Leo",
+              "slug": "grok-leo-en",
+              "id": "grok-leo-en",
+              "sample_lang": "en",
+              "menu_note": "M - Authoritative",
+              "temporary": true
+            }
+          ]
+        },
+        {
+          "title": "🇪🇸 Grok TTS (xAI) — Spanish (Spain)",
+          "start_index": 1560,
+          "voices": [
+            {
+              "label": "Eve",
+              "slug": "grok-eve-es-es",
+              "id": "grok-eve-es-ES",
+              "sample_lang": "es",
+              "menu_note": "N - Energetic",
+              "temporary": true
+            },
+            {
+              "label": "Ara",
+              "slug": "grok-ara-es-es",
+              "id": "grok-ara-es-ES",
+              "sample_lang": "es",
+              "menu_note": "N - Warm",
+              "temporary": true
+            },
+            {
+              "label": "Rex",
+              "slug": "grok-rex-es-es",
+              "id": "grok-rex-es-ES",
+              "sample_lang": "es",
+              "menu_note": "M - Professional",
+              "temporary": true
+            },
+            {
+              "label": "Sal",
+              "slug": "grok-sal-es-es",
+              "id": "grok-sal-es-ES",
+              "sample_lang": "es",
+              "menu_note": "N - Smooth",
+              "temporary": true
+            },
+            {
+              "label": "Leo",
+              "slug": "grok-leo-es-es",
+              "id": "grok-leo-es-ES",
+              "sample_lang": "es",
+              "menu_note": "M - Authoritative",
+              "temporary": true
+            }
+          ]
+        },
+        {
+          "title": "🇲🇽 Grok TTS (xAI) — Spanish (Mexico)",
+          "start_index": 1565,
+          "voices": [
+            {
+              "label": "Eve",
+              "slug": "grok-eve-es-mx",
+              "id": "grok-eve-es-MX",
+              "sample_lang": "es",
+              "menu_note": "N - Energetic",
+              "temporary": true
+            },
+            {
+              "label": "Ara",
+              "slug": "grok-ara-es-mx",
+              "id": "grok-ara-es-MX",
+              "sample_lang": "es",
+              "menu_note": "N - Warm",
+              "temporary": true
+            },
+            {
+              "label": "Rex",
+              "slug": "grok-rex-es-mx",
+              "id": "grok-rex-es-MX",
+              "sample_lang": "es",
+              "menu_note": "M - Professional",
+              "temporary": true
+            },
+            {
+              "label": "Sal",
+              "slug": "grok-sal-es-mx",
+              "id": "grok-sal-es-MX",
+              "sample_lang": "es",
+              "menu_note": "N - Smooth",
+              "temporary": true
+            },
+            {
+              "label": "Leo",
+              "slug": "grok-leo-es-mx",
+              "id": "grok-leo-es-MX",
+              "sample_lang": "es",
+              "menu_note": "M - Authoritative",
+              "temporary": true
+            }
+          ]
         }
       ]
     }
