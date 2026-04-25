@@ -9,7 +9,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [Unreleased]
+## [4.10.2] — 2026-04-24
+
+### Added
+
+- **`src/voice_catalog.json` — OpenAI TTS voices via Eden AI (C1300–C1325).**
+  13 voices (Alloy, Ash, Ballad, Cedar, Coral, Echo, Fable, Marin, Nova, Onyx, Sage, Shimmer, Verse)
+  in two groups: 🇫🇷 French (C1300–C1312) and 🇬🇧 English (C1313–C1325).
+  Model: `gpt-4o-mini-tts` via Eden AI universal endpoint. Require `EDENAI_API_KEY`.
+  Marked `"temporary": true` (comparison/hidden).
+- **`src/tts.py` — OpenAI TTS routing via Eden AI.**
+  Added `_synthesize_openai_tts()`: strips `openai-` prefix to get the voice name,
+  calls Eden AI with model `audio/tts/openai/gpt-4o-mini-tts`, downloads audio
+  from `output.audio_resource_url`. Routing inserted before Gradium check.
+- **`vox-refiner-menu.sh` — API key guard extended to `openai-*` voices.**
+  `openai-*` comparison voices now require `EDENAI_API_KEY` (same as `eleven-*`).
 
 ---
 

@@ -4965,6 +4965,226 @@
 							"temporary": true
 						}
 					]
+				},
+				{
+					"title": "🇫🇷 OpenAI (gpt-4o-mini-tts) — French",
+					"start_index": 1300,
+					"voices": [
+						{
+							"label": "Alloy",
+							"slug": "openai-alloy-fr",
+							"id": "openai-alloy",
+							"sample_lang": "fr",
+							"menu_note": "N - Balanced",
+							"temporary": true
+						},
+						{
+							"label": "Ash",
+							"slug": "openai-ash-fr",
+							"id": "openai-ash",
+							"sample_lang": "fr",
+							"menu_note": "M - Direct",
+							"temporary": true
+						},
+						{
+							"label": "Ballad",
+							"slug": "openai-ballad-fr",
+							"id": "openai-ballad",
+							"sample_lang": "fr",
+							"menu_note": "M - Warm",
+							"temporary": true
+						},
+						{
+							"label": "Cedar",
+							"slug": "openai-cedar-fr",
+							"id": "openai-cedar",
+							"sample_lang": "fr",
+							"menu_note": "M - Premium",
+							"temporary": true
+						},
+						{
+							"label": "Coral",
+							"slug": "openai-coral-fr",
+							"id": "openai-coral",
+							"sample_lang": "fr",
+							"menu_note": "F - Warm",
+							"temporary": true
+						},
+						{
+							"label": "Echo",
+							"slug": "openai-echo-fr",
+							"id": "openai-echo",
+							"sample_lang": "fr",
+							"menu_note": "M - Clear",
+							"temporary": true
+						},
+						{
+							"label": "Fable",
+							"slug": "openai-fable-fr",
+							"id": "openai-fable",
+							"sample_lang": "fr",
+							"menu_note": "M - Expressive",
+							"temporary": true
+						},
+						{
+							"label": "Marin",
+							"slug": "openai-marin-fr",
+							"id": "openai-marin",
+							"sample_lang": "fr",
+							"menu_note": "F - Premium",
+							"temporary": true
+						},
+						{
+							"label": "Nova",
+							"slug": "openai-nova-fr",
+							"id": "openai-nova",
+							"sample_lang": "fr",
+							"menu_note": "F - Bright",
+							"temporary": true
+						},
+						{
+							"label": "Onyx",
+							"slug": "openai-onyx-fr",
+							"id": "openai-onyx",
+							"sample_lang": "fr",
+							"menu_note": "M - Deep",
+							"temporary": true
+						},
+						{
+							"label": "Sage",
+							"slug": "openai-sage-fr",
+							"id": "openai-sage",
+							"sample_lang": "fr",
+							"menu_note": "F - Calm",
+							"temporary": true
+						},
+						{
+							"label": "Shimmer",
+							"slug": "openai-shimmer-fr",
+							"id": "openai-shimmer",
+							"sample_lang": "fr",
+							"menu_note": "F - Soft",
+							"temporary": true
+						},
+						{
+							"label": "Verse",
+							"slug": "openai-verse-fr",
+							"id": "openai-verse",
+							"sample_lang": "fr",
+							"menu_note": "M - Narrative",
+							"temporary": true
+						}
+					]
+				},
+				{
+					"title": "🇬🇧 OpenAI (gpt-4o-mini-tts) — English",
+					"start_index": 1313,
+					"voices": [
+						{
+							"label": "Alloy",
+							"slug": "openai-alloy-en",
+							"id": "openai-alloy",
+							"sample_lang": "en",
+							"menu_note": "N - Balanced",
+							"temporary": true
+						},
+						{
+							"label": "Ash",
+							"slug": "openai-ash-en",
+							"id": "openai-ash",
+							"sample_lang": "en",
+							"menu_note": "M - Direct",
+							"temporary": true
+						},
+						{
+							"label": "Ballad",
+							"slug": "openai-ballad-en",
+							"id": "openai-ballad",
+							"sample_lang": "en",
+							"menu_note": "M - Warm",
+							"temporary": true
+						},
+						{
+							"label": "Cedar",
+							"slug": "openai-cedar-en",
+							"id": "openai-cedar",
+							"sample_lang": "en",
+							"menu_note": "M - Premium",
+							"temporary": true
+						},
+						{
+							"label": "Coral",
+							"slug": "openai-coral-en",
+							"id": "openai-coral",
+							"sample_lang": "en",
+							"menu_note": "F - Warm",
+							"temporary": true
+						},
+						{
+							"label": "Echo",
+							"slug": "openai-echo-en",
+							"id": "openai-echo",
+							"sample_lang": "en",
+							"menu_note": "M - Clear",
+							"temporary": true
+						},
+						{
+							"label": "Fable",
+							"slug": "openai-fable-en",
+							"id": "openai-fable",
+							"sample_lang": "en",
+							"menu_note": "M - Expressive",
+							"temporary": true
+						},
+						{
+							"label": "Marin",
+							"slug": "openai-marin-en",
+							"id": "openai-marin",
+							"sample_lang": "en",
+							"menu_note": "F - Premium",
+							"temporary": true
+						},
+						{
+							"label": "Nova",
+							"slug": "openai-nova-en",
+							"id": "openai-nova",
+							"sample_lang": "en",
+							"menu_note": "F - Bright",
+							"temporary": true
+						},
+						{
+							"label": "Onyx",
+							"slug": "openai-onyx-en",
+							"id": "openai-onyx",
+							"sample_lang": "en",
+							"menu_note": "M - Deep",
+							"temporary": true
+						},
+						{
+							"label": "Sage",
+							"slug": "openai-sage-en",
+							"id": "openai-sage",
+							"sample_lang": "en",
+							"menu_note": "F - Calm",
+							"temporary": true
+						},
+						{
+							"label": "Shimmer",
+							"slug": "openai-shimmer-en",
+							"id": "openai-shimmer",
+							"sample_lang": "en",
+							"menu_note": "F - Soft",
+							"temporary": true
+						},
+						{
+							"label": "Verse",
+							"slug": "openai-verse-en",
+							"id": "openai-verse",
+							"sample_lang": "en",
+							"menu_note": "M - Narrative",
+							"temporary": true
+						}
+					]
 				}
 			]
 		}
