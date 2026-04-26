@@ -19,6 +19,11 @@ recordings/
 --loudness
 --output
 
+# Frontend (Next.js) — node_modules and .next are local only; out/ is committed
+frontend/node_modules/
+frontend/.next/
+frontend/.pnpm-debug.log
+
 # Python
 __pycache__/
 *.pyc

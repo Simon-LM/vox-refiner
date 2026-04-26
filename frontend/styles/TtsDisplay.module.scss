@@ -1,0 +1,84 @@
+@use 'variables' as *;
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 32px 48px;
+}
+
+.status {
+  font-size: 14px;
+  color: $dim;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.modeBadge {
+  background: $accent;
+  color: #000;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  overflow: hidden;
+}
+
+.ctx {
+  width: 100%;
+  text-align: center;
+  line-height: 1.4;
+  color: $dim;
+  font-size: 18px;
+  max-height: 12vh;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 200ms ease;
+
+  &.before { opacity: 0.5; }
+  &.after  { opacity: 0.35; }
+}
+
+.current {
+  width: 100%;
+  text-align: center;
+  line-height: 1.4;
+  transition: opacity 200ms ease, font-size 200ms ease;
+  color: $fg;
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 500;
+  background: $highlight-bg;
+  padding: 24px 32px;
+  border-radius: 12px;
+  border-left: 4px solid $accent;
+  max-height: 70vh;
+  overflow: auto;
+
+  &.preInit {
+    color: $dim;
+    font-style: italic;
+  }
+}
+
+.footer {
+  font-size: 12px;
+  color: $dim;
+  margin-top: 16px;
+  text-align: right;
+
+  &.done { color: $accent; }
+}

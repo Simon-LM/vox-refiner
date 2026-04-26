@@ -9,7 +9,7 @@ which forks this module, captures the chosen port, and pushes events as TTS
 chunks play.
 
 Endpoints:
-  GET  /         → embedded HTML page
+  GET  /         → Next.js static export (frontend/out/)
   GET  /events   → SSE stream (replays last init + last chunk on connect)
   POST /push     → broadcast event to all SSE clients (bash → server)
   POST /shutdown → graceful exit
@@ -36,211 +36,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
 
-# ── HTML page (embedded) ─────────────────────────────────────────────────────
+# ── Frontend static files ────────────────────────────────────────────────────
 
-_HTML_PAGE = r"""<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<title>VoxRefiner — Live Display</title>
-<style>
-  :root {
-    --bg: #0e1014;
-    --fg: #e8e8e8;
-    --dim: #5a5f6a;
-    --accent: #7dd3fc;
-    --highlight-bg: #1c2230;
-    --done: #4a4f58;
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
-    background: var(--bg); color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    overflow: hidden;
-  }
-  #app {
-    display: flex; flex-direction: column;
-    height: 100vh;
-    padding: 32px 48px;
-  }
-  #status {
-    font-size: 14px; color: var(--dim);
-    margin-bottom: 16px;
-    display: flex; gap: 16px; align-items: center;
-  }
-  #mode-badge {
-    background: var(--accent); color: #000;
-    padding: 2px 10px; border-radius: 4px;
-    font-weight: 600; text-transform: uppercase;
-    font-size: 11px; letter-spacing: 0.5px;
-  }
-  #stage {
-    flex: 1; min-height: 0;
-    display: flex; flex-direction: column;
-    justify-content: center; align-items: center;
-    gap: 24px;
-    overflow: hidden;
-  }
-  .ctx, .current {
-    width: 100%;
-    text-align: center;
-    line-height: 1.4;
-    transition: opacity 200ms ease, font-size 200ms ease;
-  }
-  .ctx {
-    color: var(--dim);
-    font-size: 18px;
-    max-height: 12vh;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .current {
-    color: var(--fg);
-    font-size: clamp(28px, 5vw, 64px);
-    font-weight: 500;
-    background: var(--highlight-bg);
-    padding: 24px 32px;
-    border-radius: 12px;
-    border-left: 4px solid var(--accent);
-    max-height: 70vh;
-    overflow: auto;
-  }
-  .ctx.before { opacity: 0.5; }
-  .ctx.after  { opacity: 0.35; }
-  #footer {
-    font-size: 12px; color: var(--dim);
-    margin-top: 16px;
-    text-align: right;
-  }
-  #footer.done { color: var(--accent); }
-  .pre-init {
-    color: var(--dim);
-    font-style: italic;
-  }
-</style>
-</head>
-<body>
-<div id="app">
-  <div id="status">
-    <span id="mode-badge">…</span>
-    <span id="progress">en attente…</span>
-  </div>
-  <div id="stage">
-    <div class="ctx before" id="before"></div>
-    <div class="current pre-init" id="current">En attente de la lecture…</div>
-    <div class="ctx after" id="after"></div>
-  </div>
-  <div id="footer">VoxRefiner</div>
-</div>
-<script>
-  const state = {
-    mode: null,
-    total: 0,
-    chunks: {},   // idx → text
-    fullChunks: [], // for insight mode: all chunks parsed from full_text
-    current: -1,
-    done: false,
-  };
+# Built output from frontend/ (Next.js static export). Committed to git so
+# end-users never need Node.js at runtime.
+_FRONTEND_OUT = os.path.join(os.path.dirname(__file__), "..", "frontend", "out")
 
-  const $mode    = document.getElementById('mode-badge');
-  const $prog    = document.getElementById('progress');
-  const $before  = document.getElementById('before');
-  const $current = document.getElementById('current');
-  const $after   = document.getElementById('after');
-  const $footer  = document.getElementById('footer');
-
-  function render() {
-    if (state.mode) $mode.textContent = state.mode;
-
-    if (state.current < 0) {
-      $current.classList.add('pre-init');
-      if (state.mode === 'insight' && state.fullChunks.length > 0) {
-        $current.textContent = state.fullChunks[0] || 'En attente de la lecture…';
-        $current.classList.remove('pre-init');
-        $before.textContent = '';
-        $after.textContent  = state.fullChunks.slice(1, 3).join(' · ');
-      } else {
-        $current.textContent = 'En attente de la lecture…';
-        $before.textContent = '';
-        $after.textContent  = '';
-      }
-      $prog.textContent = state.total > 0
-        ? `0 / ${state.total} passages`
-        : 'en attente…';
-      return;
-    }
-
-    $current.classList.remove('pre-init');
-    const curText = state.chunks[state.current]
-      || state.fullChunks[state.current]
-      || '';
-    $current.textContent = curText;
-
-    // Show ±1 chunk of context (insight has all chunks; voice only has played ones)
-    let beforeText = '', afterText = '';
-    const source = state.mode === 'insight' ? state.fullChunks : null;
-    if (source && source.length > 0) {
-      beforeText = state.current > 0 ? source[state.current - 1] : '';
-      afterText  = state.current < source.length - 1 ? source[state.current + 1] : '';
-    } else {
-      beforeText = state.chunks[state.current - 1] || '';
-    }
-    $before.textContent = beforeText;
-    $after.textContent  = afterText;
-
-    const total = state.total || state.fullChunks.length || (state.current + 1);
-    $prog.textContent = `${state.current + 1} / ${total} passages`;
-
-    if (state.done) {
-      $footer.textContent = '✓ Lecture terminée';
-      $footer.classList.add('done');
-    }
-  }
-
-  function applyEvent(type, payload) {
-    if (type === 'init') {
-      state.mode = (payload && payload.mode) || 'voice';
-      state.total = (payload && payload.total) || 0;
-      state.chunks = {};
-      state.current = -1;
-      state.done = false;
-      $footer.textContent = 'VoxRefiner';
-      $footer.classList.remove('done');
-      if (payload && payload.full_text) {
-        state.fullChunks = payload.full_text.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
-      } else {
-        state.fullChunks = [];
-      }
-    } else if (type === 'chunk') {
-      const idx  = payload && typeof payload.idx === 'number' ? payload.idx : -1;
-      const text = (payload && payload.text) || '';
-      if (idx >= 0) {
-        state.chunks[idx] = text;
-        state.current = idx;
-      }
-    } else if (type === 'done') {
-      state.done = true;
-    } else if (type === 'error') {
-      const msg = (payload && payload.message) || 'erreur';
-      $footer.textContent = '⚠ ' + msg;
-    }
-    render();
-  }
-
-  const es = new EventSource('/events');
-  es.addEventListener('init',  e => { try { applyEvent('init',  JSON.parse(e.data)); } catch(_) {} });
-  es.addEventListener('chunk', e => { try { applyEvent('chunk', JSON.parse(e.data)); } catch(_) {} });
-  es.addEventListener('done',  e => { applyEvent('done',  null); });
-  es.addEventListener('error', e => {
-    try { applyEvent('error', JSON.parse(e.data)); } catch(_) {}
-  });
-
-  render();
-</script>
-</body>
-</html>
-"""
 
 
 # ── Event broadcaster ────────────────────────────────────────────────────────
@@ -309,14 +110,27 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A002
         return
 
-    def _send_html(self, body: str, code: int = 200) -> None:
-        encoded = body.encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(encoded)))
+    def _serve_file(self, rel_path: str) -> None:
+        """Serve a file from the Next.js static export directory."""
+        import mimetypes
+        full = os.path.realpath(os.path.join(_FRONTEND_OUT, rel_path))
+        out_root = os.path.realpath(_FRONTEND_OUT)
+        if not full.startswith(out_root + os.sep) and full != out_root:
+            self.send_error(403)
+            return
+        if not os.path.isfile(full):
+            self.send_error(404)
+            return
+        ctype, _ = mimetypes.guess_type(full)
+        ctype = ctype or "application/octet-stream"
+        with open(full, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(encoded)
+        self.wfile.write(data)
 
     def _send_json(self, body: dict, code: int = 200) -> None:
         encoded = json.dumps(body).encode("utf-8")
@@ -327,10 +141,6 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path in ("/", "/index.html"):
-            self._send_html(_HTML_PAGE)
-            return
-
         if self.path == "/events":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -368,7 +178,9 @@ class _Handler(BaseHTTPRequestHandler):
                 _broadcaster.remove_client(q)
             return
 
-        self.send_error(404)
+        # All other GET paths → serve from Next.js static export
+        rel = "index.html" if self.path in ("/", "") else self.path.lstrip("/")
+        self._serve_file(rel)
 
     def do_POST(self) -> None:  # noqa: N802
         length = int(self.headers.get("Content-Length", "0") or 0)

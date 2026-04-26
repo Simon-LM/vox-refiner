@@ -13,6 +13,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.12.0] — 2026-04-27
+
+### Changed
+
+- **Display page migrated to Next.js + SCSS (static export).**
+  The embedded `_HTML_PAGE` Python string has been replaced by a proper Next.js
+  project (`frontend/`) compiled to a static export (`frontend/out/`). The Python
+  server now serves those static files instead of an inline HTML string.
+  End-users need no Node.js at runtime — the built `out/` directory is committed to
+  git and served directly by `src/web_display.py`.
+
+### Added
+
+- **`frontend/` — Next.js 15 project (App Router, TypeScript, SCSS).**
+  - `components/TtsDisplay.tsx` — React client component replacing the vanilla JS
+    display logic; uses `useEffect` + `useState` + `EventSource('/events')`.
+  - `styles/_variables.scss` — SCSS design tokens (colors).
+  - `styles/TtsDisplay.module.scss` — component styles using SCSS modules and
+    `@use 'variables'`.
+  - `app/globals.scss` — global reset and body styles.
+  - `next.config.js` — `output: 'export'`, `sassOptions.includePaths` configured.
+  - `pnpm` as package manager (`packageManager: pnpm@10.4.0`).
+- **`src/web_display.py` — `_serve_file()` static file handler.**
+  Replaces the single `_send_html(_HTML_PAGE)` route with a general static file
+  handler that serves any path from `frontend/out/`, with path traversal protection.
+
+---
+
 ## [4.11.2] — 2026-04-26
 
 ### Fixed
