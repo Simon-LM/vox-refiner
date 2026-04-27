@@ -4,27 +4,27 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 32px 48px;
+  padding: 2rem 3rem;
 }
 
 .status {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: $dim;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
   display: flex;
-  gap: 16px;
+  gap: 1rem;
   align-items: center;
 }
 
 .modeBadge {
   background: $accent;
   color: #000;
-  padding: 2px 10px;
-  border-radius: 4px;
+  padding: 0.125rem 0.625rem;
+  border-radius: 0.25rem;
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.5px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.045em;
 }
 
 .stage {
@@ -34,7 +34,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 24px;
+  gap: 1.5rem;
   overflow: hidden;
 }
 
@@ -43,7 +43,7 @@
   text-align: center;
   line-height: 1.4;
   color: $dim;
-  font-size: 18px;
+  font-size: 1.125rem;
   max-height: 12vh;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -59,12 +59,12 @@
   line-height: 1.4;
   transition: opacity 200ms ease, font-size 200ms ease;
   color: $fg;
-  font-size: clamp(28px, 5vw, 64px);
+  font-size: clamp(1.75rem, 5vw, 4rem);
   font-weight: 500;
   background: $highlight-bg;
-  padding: 24px 32px;
-  border-radius: 12px;
-  border-left: 4px solid $accent;
+  padding: 1.5rem 2rem;
+  border-radius: 0.75rem;
+  border-left: 0.25rem solid $accent;
   max-height: 70vh;
   overflow: auto;
 
@@ -75,9 +75,9 @@
 }
 
 .footer {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: $dim;
-  margin-top: 16px;
+  margin-top: 1rem;
   text-align: right;
 
   &.done { color: $accent; }

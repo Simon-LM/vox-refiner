@@ -23,10 +23,31 @@ const initialState: TtsState = {
   errorMsg: null,
 };
 
+const mockState: TtsState = {
+  mode: 'voice',
+  total: 5,
+  chunks: {
+    0: 'Le renard brun et rapide saute par-dessus le chien paresseux.',
+    1: 'La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.',
+    2: 'VoxRefiner transforme votre texte sélectionné en audio de haute qualité.',
+    3: 'Les modèles de langage permettent une synthèse vocale naturelle et expressive.',
+    4: "Fin de la lecture — merci d'avoir utilisé VoxRefiner.",
+  },
+  fullChunks: [],
+  current: 2,
+  done: false,
+  errorMsg: null,
+};
+
 export default function TtsDisplay() {
   const [state, setState] = useState<TtsState>(initialState);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('mock')) {
+      setState(mockState);
+      return;
+    }
+
     const es = new EventSource('/events');
 
     const apply = (type: string, payload: Record<string, unknown> | null) => {
@@ -77,8 +98,8 @@ export default function TtsDisplay() {
   const beforeText = !isPreInit
     ? (source ? source[state.current - 1] : state.chunks[state.current - 1]) ?? ''
     : '';
-  const afterText = !isPreInit && source
-    ? source[state.current + 1] ?? ''
+  const afterText = !isPreInit
+    ? (source ? source[state.current + 1] : state.chunks[state.current + 1]) ?? ''
     : '';
 
   const preInitCurrent = isPreInit && state.mode === 'insight' && state.fullChunks.length > 0

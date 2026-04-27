@@ -13,6 +13,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.12.1] — 2026-04-27
+
+### Fixed
+
+- **`TtsDisplay` — rem units throughout (`styles/TtsDisplay.module.scss`).**
+  All `px` values converted to `rem` (font sizes, padding, margin, gap, border,
+  border-radius) and `em` for `letter-spacing`. `clamp(28px, 5vw, 64px)` →
+  `clamp(1.75rem, 5vw, 4rem)`. Respects the user's browser font-size preference
+  for accessibility.
+- **`TtsDisplay` — `afterText` visible in voice mode (`components/TtsDisplay.tsx`).**
+  The next-chunk slot was always empty in `voice` mode because only `insight` mode
+  checked `fullChunks`. Now also reads `chunks[current + 1]`, so the after-context
+  renders whenever the chunk is available (real playback or mock).
+
+### Added
+
+- **`?mock` URL parameter for dev preview (`components/TtsDisplay.tsx`).**
+  Opening `http://localhost:3000?mock` injects fixture data (5 voice chunks, chunk 2
+  active) so the full layout — before / current / after — is visible without a running
+  Python backend. Ignored in production (EventSource used as normal).
+
+---
+
 ## [4.12.0] — 2026-04-27
 
 ### Changed
