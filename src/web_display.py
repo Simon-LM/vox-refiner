@@ -57,15 +57,18 @@ class _Broadcaster:
         self._lock = threading.Lock()
         self._clients: list[queue.Queue[Optional[tuple[str, str]]]] = []
         self._last_init: Optional[tuple[str, str]] = None
+        self._last_display_chunks: Optional[tuple[str, str]] = None
         self._last_chunk: Optional[tuple[str, str]] = None
 
     def add_client(self) -> queue.Queue[Optional[tuple[str, str]]]:
         q: queue.Queue[Optional[tuple[str, str]]] = queue.Queue(maxsize=128)
         with self._lock:
             self._clients.append(q)
-            # Replay state for late connections
+            # Replay state for late connections (display_chunks before audio chunk)
             if self._last_init is not None:
                 q.put(self._last_init)
+            if self._last_display_chunks is not None:
+                q.put(self._last_display_chunks)
             if self._last_chunk is not None:
                 q.put(self._last_chunk)
         return q
@@ -81,9 +84,12 @@ class _Broadcaster:
         with self._lock:
             if event_type == "init":
                 self._last_init = (event_type, data_json)
-                self._last_chunk = None  # new init resets chunk replay
+                self._last_chunk = None             # new init resets chunk replay
+                self._last_display_chunks = None    # new init resets meta replay
             elif event_type == "chunk":
                 self._last_chunk = (event_type, data_json)
+            elif event_type == "display_chunks":
+                self._last_display_chunks = (event_type, data_json)
             for q in list(self._clients):
                 try:
                     q.put_nowait((event_type, data_json))
@@ -179,7 +185,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         # All other GET paths → serve from Next.js static export
-        rel = "index.html" if self.path in ("/", "") else self.path.lstrip("/")
+        # Strip query string so /?displayMode=summary serves index.html
+        clean_path = self.path.split("?", 1)[0]
+        rel = "index.html" if clean_path in ("/", "") else clean_path.lstrip("/")
         self._serve_file(rel)
 
     def do_POST(self) -> None:  # noqa: N802
@@ -429,6 +437,9 @@ def _launch_browser(url: str, size: str, pos: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="VoxRefiner web display server")
     parser.add_argument("--mode", choices=["voice", "insight"], default="voice")
+    parser.add_argument("--display-mode",
+                        choices=["fulltext", "summary", "keywords"],
+                        default=os.environ.get("VOX_WEB_DISPLAY_MODE", "summary"))
     parser.add_argument("--size", default=os.environ.get("VOX_WEB_SIZE", "1100x800"))
     parser.add_argument("--pos",  default=os.environ.get("VOX_WEB_POS",  "100x100"))
     parser.add_argument("--port-file", default=None)
@@ -456,7 +467,8 @@ def main() -> int:
     signal.signal(signal.SIGINT, _on_signal)
 
     if not args.no_browser:
-        _launch_browser(f"http://127.0.0.1:{port}", args.size, args.pos)
+        url = f"http://127.0.0.1:{port}/?displayMode={args.display_mode}"
+        _launch_browser(url, args.size, args.pos)
 
     try:
         server.serve_forever(poll_interval=0.5)

@@ -1590,6 +1590,17 @@ if __name__ == "__main__":
             print("\u274c Text is empty after cleaning.", file=sys.stderr)
             sys.exit(1)
 
+        # Expose the cleaned text so other branches (e.g. display_meta) can reuse
+        # it without re-running the cleaning IA. Atomic write: tmp + rename.
+        cleaned_out = os.environ.get("TTS_CLEANED_TEXT_OUT")
+        if cleaned_out:
+            try:
+                tmp_path = cleaned_out + ".tmp"
+                Path(tmp_path).write_text(text, encoding="utf-8")
+                os.replace(tmp_path, cleaned_out)
+            except OSError as exc:
+                print(f"\u26a0\ufe0f  Could not write cleaned text to {cleaned_out}: {exc}", file=sys.stderr)
+
         # Display cleaned text in terminal with centralized UI colors
         _BG = f"{BG_BLUE}{WHITE}"
         print(f"{'─' * 64}", file=sys.stderr)
@@ -1611,6 +1622,26 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
 
+        # Compute char_start/char_end of each chunk inside the cleaned text so
+        # the web display can align audio playback with display_meta output.
+        # Each chunk text is a contiguous substring (paragraphs joined by "\n\n",
+        # or a sub-split of one paragraph). We search forward, never backtracking.
+        chunk_positions: list[tuple[int, int]] = []
+        _search_from = 0
+        for chunk_text, _voice in chunk_tuples:
+            pos = text.find(chunk_text, _search_from)
+            if pos < 0:
+                # Fallback: search from start (rare — should never happen with
+                # paragraph-aligned chunks). Better than crashing.
+                pos = text.find(chunk_text)
+            if pos < 0:
+                # Still not found: emit zero-width range at last known position.
+                chunk_positions.append((_search_from, _search_from))
+            else:
+                end = pos + len(chunk_text)
+                chunk_positions.append((pos, end))
+                _search_from = end
+
         _CHUNK_MAX_ATTEMPTS = 5
         _CHUNK_RETRY_DELAYS = [2, 4, 8, 15]  # escalating delays between retries
         _MIN_AUDIO_BYTES = 1024  # valid mp3 should be > 1 KB
@@ -1620,6 +1651,17 @@ if __name__ == "__main__":
             citation_voice = chunk_voice_id if chunk_voice_id is not None else resolved_voice_id
             out = str(Path(chunks_dir) / f"chunk_{idx:03d}.mp3")
             Path(chunks_dir, f"chunk_{idx:03d}.txt").write_text(chunk_text, encoding="utf-8")
+            # Sidecar with chunk's char position in the cleaned text — consumed
+            # by the bash flow to enrich the web display SSE chunk event.
+            try:
+                _cs, _ce = chunk_positions[idx]
+                import json as _json
+                Path(chunks_dir, f"chunk_{idx:03d}.json").write_text(
+                    _json.dumps({"char_start": _cs, "char_end": _ce}),
+                    encoding="utf-8",
+                )
+            except (IndexError, OSError):
+                pass
             last_exc: Exception = RuntimeError("unknown")
             # Attempts 0-2 use the requested voice; attempts 3-4 fall back to
             # resolved_voice_id so the text is always read even if citation voice

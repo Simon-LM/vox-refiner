@@ -10,12 +10,16 @@
 # Required globals from caller: SCRIPT_DIR, VENV_PYTHON.
 #
 # Exposed helpers:
-#   _web_start <mode>                     — boot server + browser (idempotent)
-#   _web_push_init <mode> [full_text]     — broadcast init event
-#   _web_send_chunk <idx> <chunks_dir>    — push chunk text from chunks_dir/chunk_NNN.txt
-#   _web_push_done                        — broadcast end-of-playback event
-#   _web_push_error <message>             — broadcast an error event
-#   _web_stop                             — kill server (idempotent)
+#   _web_start <mode>                            — boot server + browser (idempotent)
+#   _web_push_init <mode> [full_text]            — broadcast init event
+#   _web_send_display_meta <cleaned_text>        — run display_meta on cleaned text,
+#                                                   resolve anchor positions, push
+#                                                   `display_chunks` SSE event
+#   _web_send_chunk <idx> <chunks_dir>           — push chunk text + char range +
+#                                                   audio duration
+#   _web_push_done                               — broadcast end-of-playback event
+#   _web_push_error <message>                    — broadcast an error event
+#   _web_stop                                    — kill server (idempotent)
 
 # ─── State ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +45,7 @@ _web_start() {
     [ -n "${_WEB_PORT:-}" ] && return 0  # already started
 
     local mode="${1:-voice}"
+    local display_mode="${VOX_WEB_DISPLAY_MODE:-summary}"
     local size="${VOX_WEB_SIZE:-1100x800}"
     local pos="${VOX_WEB_POS:-100x100}"
 
@@ -52,12 +57,14 @@ _web_start() {
     # is not open (e.g. sourced from a script that didn't run `exec 3>&2`).
     if { true >&3; } 2>/dev/null; then
         "$VENV_PYTHON" -m src.web_display \
-            --mode "$mode" --size "$size" --pos "$pos" \
+            --mode "$mode" --display-mode "$display_mode" \
+            --size "$size" --pos "$pos" \
             --port-file "$port_file" \
             >/dev/null 2>&3 &
     else
         "$VENV_PYTHON" -m src.web_display \
-            --mode "$mode" --size "$size" --pos "$pos" \
+            --mode "$mode" --display-mode "$display_mode" \
+            --size "$size" --pos "$pos" \
             --port-file "$port_file" \
             >/dev/null 2>&1 &
     fi
@@ -117,23 +124,149 @@ print(json.dumps({
     [ -n "$body" ] && _web_push_raw "$body"
 }
 
+_web_send_display_meta() {
+    # Usage: _web_send_display_meta <cleaned_text>
+    # Runs display_meta.py on the cleaned text, resolves each display chunk's
+    # anchor to a character range in the cleaned text, and broadcasts a
+    # `display_chunks` SSE event. Skipped when VOX_WEB_DISPLAY_MODE=fulltext.
+    [ "${VOX_WEB_DISPLAY:-0}" != "1" ] && return 0
+    [ "${VOX_WEB_DISPLAY_MODE:-summary}" = "fulltext" ] && return 0
+    [ -z "${_WEB_PORT:-}" ] && return 0
+
+    local _port="$_WEB_PORT"
+    local _text="$1"
+    (
+        local _meta
+        _meta="$(printf '%s' "$_text" | "$VENV_PYTHON" -m src.display_meta 2>/dev/null)"
+        [ -z "$_meta" ] && exit 0
+
+        local _body
+        _body="$(VOX_TEXT="$_text" VOX_META="$_meta" "$VENV_PYTHON" -c "
+import json, os, sys
+text = os.environ['VOX_TEXT']
+meta = json.loads(os.environ['VOX_META'])
+chunks = meta.get('display_chunks', [])
+search_from = 0
+resolved = []
+for c in chunks:
+    anchor = c.get('anchor', '') or ''
+    start = text.find(anchor, search_from) if anchor else -1
+    if start < 0 and anchor:
+        start = text.find(anchor)
+    if start < 0:
+        # Fallback: place after the previous chunk's end (best-effort, will be
+        # closed by the next chunk's start).
+        start = search_from
+    end = start + max(len(anchor), 1)
+    resolved.append({
+        'char_start': start,
+        'char_end': end,
+        'topic': c.get('topic', ''),
+        'keywords': c.get('keywords', []),
+        'summary_short': c.get('summary_short', ''),
+    })
+    search_from = max(search_from, end)
+# Close ranges so each display chunk runs up to the next one's start.
+for i in range(len(resolved) - 1):
+    if resolved[i + 1]['char_start'] > resolved[i]['char_end']:
+        resolved[i]['char_end'] = resolved[i + 1]['char_start']
+if resolved:
+    resolved[-1]['char_end'] = max(resolved[-1]['char_end'], len(text))
+print(json.dumps({
+    'type': 'display_chunks',
+    'payload': {
+        'language': meta.get('language', ''),
+        'total_chars': len(text),
+        'chunks': resolved,
+    },
+}))
+" 2>/dev/null)"
+        [ -z "$_body" ] && exit 0
+        curl -s --max-time 0.5 -X POST \
+            -H "Content-Type: application/json" \
+            --data-binary "$_body" \
+            "http://127.0.0.1:${_port}/push" >/dev/null 2>&1
+    ) &
+}
+
+_web_watch_cleaned_then_meta() {
+    # Usage: _web_watch_cleaned_then_meta <cleaned_text_file>
+    # For voice mode: poll for the cleaned text file written by tts.py
+    # (TTS_CLEANED_TEXT_OUT). When it appears, launch _web_send_display_meta
+    # in background. No-op when web display is off or in fulltext mode.
+    [ "${VOX_WEB_DISPLAY:-0}" != "1" ] && return 0
+    [ "${VOX_WEB_DISPLAY_MODE:-summary}" = "fulltext" ] && return 0
+    [ -z "${_WEB_PORT:-}" ] && return 0
+
+    local _file="$1"
+    (
+        # Wait up to 30s (cleaning should finish in 1–2s normally).
+        local _i
+        for _i in $(seq 1 60); do
+            [ -s "$_file" ] && break
+            sleep 0.5
+        done
+        if [ -s "$_file" ]; then
+            local _cleaned
+            _cleaned="$(cat "$_file")"
+            _web_send_display_meta "$_cleaned"
+        fi
+    ) &
+}
+
 _web_send_chunk() {
     # Usage: _web_send_chunk <idx> <chunks_dir>
+    # Broadcasts a `chunk` SSE event with text + char range (read from
+    # chunk_NNN.json sidecar) + audio duration (ffprobe on chunk_NNN.mp3).
+    # Both fields are optional — degrade gracefully when missing.
     [ -z "${_WEB_PORT:-}" ] && return 0
     local idx="$1" dir="$2"
-    local text_file
+    local text_file json_file mp3_file
     text_file="$(printf '%s/chunk_%03d.txt' "$dir" "$idx")"
+    json_file="$(printf '%s/chunk_%03d.json' "$dir" "$idx")"
+    mp3_file="$(printf  '%s/chunk_%03d.mp3'  "$dir" "$idx")"
     [ -f "$text_file" ] || return 0
 
+    # Audio duration via ffprobe (silent fallback to 0.0 if unavailable).
+    local duration="0.0"
+    if [ -f "$mp3_file" ] && command -v ffprobe >/dev/null 2>&1; then
+        local _d
+        _d="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$mp3_file" 2>/dev/null)"
+        [ -n "$_d" ] && duration="$_d"
+    fi
+
     local body
-    body="$(VOX_CHUNK_IDX="$idx" VOX_CHUNK_FILE="$text_file" "$VENV_PYTHON" -c "
+    body="$(VOX_CHUNK_IDX="$idx" \
+        VOX_CHUNK_FILE="$text_file" \
+        VOX_CHUNK_JSON="$json_file" \
+        VOX_CHUNK_DURATION="$duration" \
+        "$VENV_PYTHON" -c "
 import json, os
 with open(os.environ['VOX_CHUNK_FILE'], encoding='utf-8') as f:
     text = f.read()
-print(json.dumps({
-    'type': 'chunk',
-    'payload': {'idx': int(os.environ['VOX_CHUNK_IDX']), 'text': text}
-}))
+char_start = char_end = -1
+jpath = os.environ.get('VOX_CHUNK_JSON', '')
+if jpath and os.path.isfile(jpath):
+    try:
+        with open(jpath, encoding='utf-8') as f:
+            meta = json.load(f)
+        char_start = int(meta.get('char_start', -1))
+        char_end   = int(meta.get('char_end',   -1))
+    except Exception:
+        pass
+try:
+    duration = float(os.environ.get('VOX_CHUNK_DURATION', '0') or 0)
+except ValueError:
+    duration = 0.0
+payload = {
+    'idx': int(os.environ['VOX_CHUNK_IDX']),
+    'text': text,
+    'duration_s': duration,
+}
+if char_start >= 0:
+    payload['char_start'] = char_start
+    payload['char_end']   = char_end
+print(json.dumps({'type': 'chunk', 'payload': payload}))
 " 2>/dev/null)"
 
     [ -n "$body" ] && _web_push_raw "$body"

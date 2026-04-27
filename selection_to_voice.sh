@@ -207,8 +207,13 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
     # Run Python in background so we can kill it on Ctrl+C.
     _TTS_FIFO=$(mktemp -u /tmp/vox-tts-XXXXXX)
     mkfifo "$_TTS_FIFO"
+    # Cleaned-text sidecar: tts.py writes the post-cleaning text here so the
+    # display_meta branch can reuse it (no duplicated AI cleaning call).
+    _CLEANED_TEXT_FILE="$REC_DIR/.cleaned.txt"
+    rm -f "$_CLEANED_TEXT_FILE"
     printf '%s' "$selected_text" | \
         TTS_VOICE_ID="$_sel_voice" TTS_LANG="$_sel_lang" \
+        TTS_CLEANED_TEXT_OUT="$_CLEANED_TEXT_FILE" \
         "$VENV_PYTHON" -m src.tts --chunked "$CHUNKS_DIR" > "$_TTS_FIFO" 2>&3 &
     _TTS_PID=$!
 
@@ -226,6 +231,10 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
 
     _web_start voice
     _web_push_init voice "$selected_text"
+    # Watch the cleaned-text sidecar; when tts.py finishes cleaning (~1–2 s),
+    # launch display_meta in background on the cleaned text — same content
+    # Voxtral will read, no re-cleaning.
+    _web_watch_cleaned_then_meta "$_CLEANED_TEXT_FILE"
 
     # Python prints chunk file paths (or CHUNK_FAILED:<idx>) to the FIFO.
     # Retries are handled in Python to preserve per-chunk voice selection

@@ -13,6 +13,77 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.13.0] — 2026-04-27
+
+### Added
+
+- **3-mode browser display: `fulltext` / `summary` / `keywords` (`frontend/components/TtsDisplay.tsx`, `frontend/styles/TtsDisplay.module.scss`).**
+  A new `?displayMode=` URL parameter selects the reading mode (default: `summary`).
+  - `fulltext` — shows the exact text being spoken.
+  - `summary` — shows a 1-sentence AI summary for the current section.
+  - `keywords` — shows 3–5 key nouns in very large font (`clamp(3rem, 8vw, 8rem)`),
+    ideal for low-vision / peripheral reading.
+  A topic label appears above the current chunk in `summary` and `keywords` modes,
+  and a compact `displayMode` badge is added to the status bar.
+- **Decoupled audio / display layers with character-position alignment.**
+  The display layer is independent of Voxtral's audio chunking — Mistral Small
+  produces its own (typically shorter) display chunks optimised for visual
+  readability. A character-position alignment in the cleaned text bridges the
+  two layers, so a single audio chunk can cover several display chunks (long
+  prose) and several short audio chunks (citations) can fall inside one display
+  chunk.
+- **`src/display_meta.py` — Mistral Small display metadata generator.**
+  Receives the **cleaned text** (not the raw selection) and produces a list of
+  `display_chunks` each carrying:
+  - `anchor` — verbatim ~30-char prefix from the cleaned text (used by the bash
+    flow to resolve the chunk's character range via string search);
+  - `topic`, `keywords`, `summary_short` — content for the three frontend modes.
+  Single `mistral-small-latest` call per session. Skipped entirely in `fulltext`
+  mode. Configurable via `DISPLAY_META_MODEL` and `DISPLAY_META_TIMEOUT`.
+- **No redundant AI cleaning calls — cleaned text reused across branches.**
+  `src/tts.py --chunked` now writes the post-cleaning text to `TTS_CLEANED_TEXT_OUT`
+  (atomic tmp+rename) so the bash flow can feed `display_meta` exactly the same
+  text Voxtral reads, without re-running `_ai_clean_text()`. For mode 5 (Voice),
+  the bash watches the sidecar (200 ms polling) and launches `display_meta` in
+  background as soon as cleaning finishes — Voxtral synthesis runs in parallel.
+  For mode 6 (Insight), the summary is already AI-cleaned so it goes straight
+  to `display_meta`.
+- **`chunk_NNN.json` sidecars with character ranges.**
+  `tts.py --chunked` now writes a JSON sidecar next to each `chunk_NNN.txt` /
+  `.mp3` containing `{char_start, char_end}` of the chunk inside the cleaned
+  text. The bash flow uses these ranges (plus `ffprobe`-measured audio
+  durations) when emitting SSE `chunk` events, so the frontend can interpolate
+  the speaker's character position in real time.
+- **`display_chunks` SSE event type with anchor resolution.**
+  New event broadcast and replayed on late connects (stored alongside `init`
+  and the last `chunk`). The bash helper `_web_send_display_meta` runs
+  `display_meta.py` in background, resolves each anchor to a character range
+  in the cleaned text, closes inter-chunk gaps, and broadcasts the resolved
+  list. The previous `chunk_meta` event is removed.
+- **Time-based progression in the frontend (`requestAnimationFrame` loop).**
+  When an audio chunk K arrives, the frontend records its `receivedAt` timestamp,
+  `duration_s`, and char range. A `requestAnimationFrame` loop interpolates the
+  estimated character position inside K and looks up the matching display chunk.
+  Switching display chunks within a single audio chunk is therefore smooth and
+  proportional to elapsed playback time.
+- **`--display-mode` argument for `src/web_display.py`.**
+  The Python server now receives the display mode at startup and appends
+  `?displayMode=<mode>` to the URL it opens in the browser. Controlled via
+  `VOX_WEB_DISPLAY_MODE` env var (default: `summary`) or `--display-mode` CLI flag.
+- **`?mock&displayMode=keywords` dev preview.**
+  The mock fixture now includes resolved `displayChunks` with character ranges
+  and respects `?displayMode=` so all three modes can be tested without a Python
+  backend.
+
+### Fixed
+
+- **Static export now works with query strings (`src/web_display.py`).**
+  The `do_GET` handler stripped the path before query params, so opening the
+  browser at `/?displayMode=summary` was returning 404. The query string is now
+  removed before resolving the file path.
+
+---
+
 ## [4.12.1] — 2026-04-27
 
 ### Fixed

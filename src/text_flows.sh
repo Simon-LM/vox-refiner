@@ -192,8 +192,12 @@ _show_and_speak() {
     echo ""
     _process "Reading aloud..."
     # Refresh web display with this section's content (no-op when not active).
+    # Search/factcheck results are AI-generated → already clean, feed directly.
     if declare -F _web_push_init >/dev/null 2>&1; then
         _web_push_init insight "$result_text"
+        if declare -F _web_send_display_meta >/dev/null 2>&1; then
+            _web_send_display_meta "$result_text"
+        fi
     fi
     _tts_speak "$result_text" "$audio_file"
     if declare -F _web_push_done >/dev/null 2>&1; then

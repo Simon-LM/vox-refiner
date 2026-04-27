@@ -133,6 +133,8 @@ echo ""
 trap '_web_stop' EXIT
 _web_start insight
 _web_push_init insight "$summary_text"
+# Summary is already AI-cleaned content → feed directly to display_meta.
+_web_send_display_meta "$summary_text"
 
 _process "Reading summary..."
 _tts_speak "$summary_text" "$SUMMARY_AUDIO"
