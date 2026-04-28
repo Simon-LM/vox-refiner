@@ -136,27 +136,56 @@ _web_send_display_meta() {
     local _port="$_WEB_PORT"
     local _text="$1"
     (
+        # Trace subshell entry — proves the function fired even when it later
+        # fails silently somewhere downstream.
+        "$VENV_PYTHON" -m src.debug_log set display_meta_pipeline \
+            '{"step":"subshell_started"}' >/dev/null 2>&1
+
+        # Capture display_meta stderr to a temp file; log it on failure.
+        local _stderr_file
+        _stderr_file="$(mktemp /tmp/vox-dm-err-XXXXXX)"
         local _meta
-        _meta="$(printf '%s' "$_text" | "$VENV_PYTHON" -m src.display_meta 2>/dev/null)"
-        [ -z "$_meta" ] && exit 0
+        _meta="$(printf '%s' "$_text" | "$VENV_PYTHON" -m src.display_meta 2>"$_stderr_file")"
+        local _dm_exit=$?
+        if [ -z "$_meta" ]; then
+            local _err
+            _err="$(cat "$_stderr_file" 2>/dev/null || true)"
+            VOX_DM_ERR="$_err" VOX_DM_EXIT="$_dm_exit" "$VENV_PYTHON" -c "
+import json, os
+from src import debug_log as _dbg
+_dbg.merge_into('display_meta_pipeline', {
+    'step': 'display_meta_failed',
+    'exit_code': int(os.environ.get('VOX_DM_EXIT', '0') or 0),
+    'stderr': os.environ.get('VOX_DM_ERR', ''),
+})
+" >/dev/null 2>&1
+            rm -f "$_stderr_file"
+            exit 0
+        fi
+        rm -f "$_stderr_file"
 
         local _body
         _body="$(VOX_TEXT="$_text" VOX_META="$_meta" "$VENV_PYTHON" -c "
 import json, os, sys
+from src import debug_log as _dbg
 text = os.environ['VOX_TEXT']
 meta = json.loads(os.environ['VOX_META'])
 chunks = meta.get('display_chunks', [])
 search_from = 0
 resolved = []
-for c in chunks:
+anchor_failures = []
+for i, c in enumerate(chunks):
     anchor = c.get('anchor', '') or ''
-    start = text.find(anchor, search_from) if anchor else -1
+    start_fwd = text.find(anchor, search_from) if anchor else -1
+    start = start_fwd
     if start < 0 and anchor:
-        start = text.find(anchor)
+        start = text.find(anchor)  # fallback: from beginning
+        if start >= 0:
+            anchor_failures.append({'idx': i, 'reason': 'forward-search-failed', 'anchor': anchor[:50]})
+        else:
+            anchor_failures.append({'idx': i, 'reason': 'not-found', 'anchor': anchor[:50]})
     if start < 0:
-        # Fallback: place after the previous chunk's end (best-effort, will be
-        # closed by the next chunk's start).
-        start = search_from
+        start = search_from  # last-resort fallback
     end = start + max(len(anchor), 1)
     resolved.append({
         'char_start': start,
@@ -164,6 +193,7 @@ for c in chunks:
         'topic': c.get('topic', ''),
         'keywords': c.get('keywords', []),
         'summary_short': c.get('summary_short', ''),
+        'quote_short': c.get('quote_short', ''),
     })
     search_from = max(search_from, end)
 # Close ranges so each display chunk runs up to the next one's start.
@@ -172,6 +202,14 @@ for i in range(len(resolved) - 1):
         resolved[i]['char_end'] = resolved[i + 1]['char_start']
 if resolved:
     resolved[-1]['char_end'] = max(resolved[-1]['char_end'], len(text))
+
+# Debug log: resolved display chunks + anchor failures.
+_dbg.set_section('alignment', {
+    'total_chars': len(text),
+    'display_chunks_resolved': resolved,
+    'anchor_failures': anchor_failures,
+})
+
 print(json.dumps({
     'type': 'display_chunks',
     'payload': {
@@ -180,12 +218,41 @@ print(json.dumps({
         'chunks': resolved,
     },
 }))
-" 2>/dev/null)"
-        [ -z "$_body" ] && exit 0
-        curl -s --max-time 0.5 -X POST \
+" 2>"$_stderr_file")"
+        local _resolve_exit=$?
+        if [ -z "$_body" ]; then
+            local _err
+            _err="$(cat "$_stderr_file" 2>/dev/null || true)"
+            VOX_RES_ERR="$_err" VOX_RES_EXIT="$_resolve_exit" "$VENV_PYTHON" -c "
+import json, os
+from src import debug_log as _dbg
+_dbg.merge_into('display_meta_pipeline', {
+    'step': 'anchor_resolution_failed',
+    'exit_code': int(os.environ.get('VOX_RES_EXIT', '0') or 0),
+    'stderr': os.environ.get('VOX_RES_ERR', ''),
+})
+" >/dev/null 2>&1
+            rm -f "$_stderr_file"
+            exit 0
+        fi
+        rm -f "$_stderr_file"
+
+        # POST to the SSE server. Capture curl exit code so we can tell whether
+        # the event actually reached the broadcaster.
+        curl -s --max-time 1.0 -X POST \
             -H "Content-Type: application/json" \
             --data-binary "$_body" \
             "http://127.0.0.1:${_port}/push" >/dev/null 2>&1
+        local _curl_exit=$?
+        VOX_CURL_EXIT="$_curl_exit" VOX_BODY_LEN="${#_body}" "$VENV_PYTHON" -c "
+import os
+from src import debug_log as _dbg
+_dbg.merge_into('display_meta_pipeline', {
+    'step': 'curl_done',
+    'curl_exit': int(os.environ.get('VOX_CURL_EXIT', '0') or 0),
+    'body_bytes': int(os.environ.get('VOX_BODY_LEN', '0') or 0),
+})
+" >/dev/null 2>&1
     ) &
 }
 
@@ -241,7 +308,8 @@ _web_send_chunk() {
         VOX_CHUNK_JSON="$json_file" \
         VOX_CHUNK_DURATION="$duration" \
         "$VENV_PYTHON" -c "
-import json, os
+import json, os, time
+from src import debug_log as _dbg
 with open(os.environ['VOX_CHUNK_FILE'], encoding='utf-8') as f:
     text = f.read()
 char_start = char_end = -1
@@ -266,6 +334,13 @@ payload = {
 if char_start >= 0:
     payload['char_start'] = char_start
     payload['char_end']   = char_end
+
+# Trace the SSE chunk event into the debug log for playback timing analysis.
+_dbg.append_to('sse_chunk_events', {
+    'sent_at': time.strftime('%H:%M:%S'),
+    **payload,
+})
+
 print(json.dumps({'type': 'chunk', 'payload': payload}))
 " 2>/dev/null)"
 

@@ -1582,10 +1582,15 @@ if __name__ == "__main__":
         # TTS_SKIP_AI_CLEAN=1: skip the two-call Mistral detection+cleaning step.
         # Use this when the text is already clean (e.g. AI-generated summaries).
         # _clean_text() + _isolate_quotes() still run so quote voice switching works.
-        if os.environ.get("TTS_SKIP_AI_CLEAN") == "1":
+        from src import debug_log as _dbg  # noqa: PLC0415
+        _t0_clean = time.perf_counter()
+        _raw_input_text = text
+        _ai_cleaning = os.environ.get("TTS_SKIP_AI_CLEAN") != "1"
+        if not _ai_cleaning:
             text = _strip_markdown(_isolate_quotes(_expand_function_calls(_expand_math_symbols(_clean_text(text)))))
         else:
             text = _strip_markdown(_isolate_quotes(_expand_function_calls(_expand_math_symbols(_ai_clean_text(text)))))
+        _cleaning_duration = _dbg.perf_seconds_since(_t0_clean)
         if not text:
             print("\u274c Text is empty after cleaning.", file=sys.stderr)
             sys.exit(1)
@@ -1600,6 +1605,15 @@ if __name__ == "__main__":
                 os.replace(tmp_path, cleaned_out)
             except OSError as exc:
                 print(f"\u26a0\ufe0f  Could not write cleaned text to {cleaned_out}: {exc}", file=sys.stderr)
+
+        # Debug log: cleaning section (no-op when VOX_DEBUG_LOG is unset).
+        _dbg.set_section("cleaning", {
+            "ai_cleaning": _ai_cleaning,
+            "duration_s": _cleaning_duration,
+            "raw_input_chars": len(_raw_input_text),
+            "cleaned_chars": len(text),
+            "cleaned_text": text,
+        })
 
         # Display cleaned text in terminal with centralized UI colors
         _BG = f"{BG_BLUE}{WHITE}"
@@ -1621,6 +1635,14 @@ if __name__ == "__main__":
             f"\U0001f50a Generating {total} chunk(s) via {_MODEL} ({len(text)} chars)...",
             file=sys.stderr,
         )
+
+        _dbg.set_section("chunking", {
+            "model": _MODEL,
+            "total_chunks": total,
+            "max_chunk_chars": _CHUNK_MAX_CHARS,
+            "resolved_voice_id": resolved_voice_id,
+            "quote_voice_id": quote_voice_id,
+        })
 
         # Compute char_start/char_end of each chunk inside the cleaned text so
         # the web display can align audio playback with display_meta output.
@@ -1648,6 +1670,7 @@ if __name__ == "__main__":
 
         def _gen_chunk(args: tuple[int, str, Optional[str]]) -> str:
             idx, chunk_text, chunk_voice_id = args
+            _t0_chunk = time.perf_counter()
             citation_voice = chunk_voice_id if chunk_voice_id is not None else resolved_voice_id
             out = str(Path(chunks_dir) / f"chunk_{idx:03d}.mp3")
             Path(chunks_dir, f"chunk_{idx:03d}.txt").write_text(chunk_text, encoding="utf-8")
@@ -1655,12 +1678,15 @@ if __name__ == "__main__":
             # by the bash flow to enrich the web display SSE chunk event.
             try:
                 _cs, _ce = chunk_positions[idx]
+            except IndexError:
+                _cs, _ce = 0, 0
+            try:
                 import json as _json
                 Path(chunks_dir, f"chunk_{idx:03d}.json").write_text(
                     _json.dumps({"char_start": _cs, "char_end": _ce}),
                     encoding="utf-8",
                 )
-            except (IndexError, OSError):
+            except OSError:
                 pass
             last_exc: Exception = RuntimeError("unknown")
             # Attempts 0-2 use the requested voice; attempts 3-4 fall back to
@@ -1682,6 +1708,17 @@ if __name__ == "__main__":
                     if out_size < _MIN_AUDIO_BYTES:
                         raise RuntimeError(f"audio trop petit ({out_size} octets)")
                     print(f"  \u2705 Passage {idx + 1}/{total} OK ({out_size:,} octets)", file=sys.stderr)
+                    _dbg.append_to("audio_chunks", {
+                        "idx": idx,
+                        "text": chunk_text,
+                        "char_start": _cs,
+                        "char_end": _ce,
+                        "voice_id": use_voice,
+                        "voice_was_citation": chunk_voice_id is not None,
+                        "attempts": attempt + 1,
+                        "size_bytes": out_size,
+                        "generation_s": _dbg.perf_seconds_since(_t0_chunk),
+                    })
                     return out
                 except Exception as exc:
                     last_exc = exc
@@ -1694,6 +1731,17 @@ if __name__ == "__main__":
                     if attempt < _CHUNK_MAX_ATTEMPTS - 1:
                         print(f"     Nouvelle tentative dans {delay}s\u2026", file=sys.stderr)
                         time.sleep(delay)
+            _dbg.append_to("audio_chunks", {
+                "idx": idx,
+                "text": chunk_text,
+                "char_start": _cs,
+                "char_end": _ce,
+                "voice_id": citation_voice,
+                "attempts": _CHUNK_MAX_ATTEMPTS,
+                "failed": True,
+                "error": str(last_exc),
+                "generation_s": _dbg.perf_seconds_since(_t0_chunk),
+            })
             raise last_exc
 
         with ThreadPoolExecutor(max_workers=3) as executor:

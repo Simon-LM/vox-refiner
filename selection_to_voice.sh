@@ -126,6 +126,24 @@ if [ -z "$(printf '%s' "$selected_text" | tr -d '[:space:]')" ]; then
     exit 1
 fi
 
+# Debug log session bootstrap (no-op when VOX_DEBUG_LOG is unset).
+"$VENV_PYTHON" -m src.debug_log reset --meta "$(VOX_DBG_MODE="voice" VOX_DBG_DM="${VOX_WEB_DISPLAY_MODE:-summary}" "$VENV_PYTHON" -c "
+import json, os
+print(json.dumps({
+    'mode':         os.environ['VOX_DBG_MODE'],
+    'display_mode': os.environ['VOX_DBG_DM'],
+}))
+")" 2>/dev/null
+"$VENV_PYTHON" -m src.debug_log set input "$(VOX_TXT="$selected_text" VOX_SRC="$_source" "$VENV_PYTHON" -c "
+import json, os
+text = os.environ['VOX_TXT']
+print(json.dumps({
+    'source':         os.environ['VOX_SRC'],
+    'selected_chars': len(text),
+    'selected_text':  text,
+}))
+")" 2>/dev/null
+
 # ─── Auto-translate ──────────────────────────────────────────────────────────
 
 if [ "$_SETTING_VOICE_AUTO_TRANSLATE" = "1" ]; then

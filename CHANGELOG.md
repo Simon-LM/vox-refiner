@@ -13,6 +13,38 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.0] — 2026-04-28
+
+### Added
+
+- **5 display modes (was 3): `summary` / `keywords` / `quote` / `dual` / `fulltext`** (`frontend/components/TtsDisplay.tsx`, `frontend/styles/TtsDisplay.module.scss`).
+  - `summary` — extractive 1-sentence summary that REUSES the spoken vocabulary.
+  - `keywords` — 3–5 single words, very large.
+  - `quote` — a verbatim 8–15-word substring of the chunk being spoken (perfect spoken/display alignment).
+  - `dual` — keywords (large) + a secondary line with the summary/quote (small).
+  - `fulltext` — exact spoken chunk text, in a smaller font for readability.
+- **Keyboard shortcuts `1`–`5` to toggle modes live** during playback (ignored when typing in inputs).
+- **Mode selector buttons** in the top-right corner with key hint + label, click-to-switch, active state highlighted.
+- **`quote_short` field added to `display_meta` output** (`src/display_meta.py`).
+- **Opt-in debug log: `src/debug_log.py` + `VOX_DEBUG_LOG` env var.**
+  - Set `VOX_DEBUG_LOG=1` for the default location (`recordings/debug/last-session.json`) or any custom path.
+  - Captures cleaning/chunking, audio chunk generation, display_meta raw+parsed payload, alignment, and SSE chunk events.
+
+### Fixed
+
+- **Silent failure of `_web_send_display_meta`** (`src/web_display.sh`, `src/display_meta.py`).
+  Diagnostics are no longer swallowed; failures are traceable (especially with `VOX_DEBUG_LOG=1`).
+- **`display_meta` JSON truncation from Mistral** (`src/display_meta.py`).
+  Increased token cap (`DISPLAY_META_MAX_TOKENS`), enforced JSON output (`response_format={"type": "json_object"}`),
+  retries on transient HTTP errors, and finish reason logging.
+
+### Changed
+
+- **`displayMode` is now stateful in the frontend** — it can be changed live via keyboard/buttons; URL param remains the initial value.
+- Static export artifacts regenerated (`frontend/out/`).
+
+---
+
 ## [4.13.0] — 2026-04-27
 
 ### Added
@@ -23,8 +55,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - `summary` — shows a 1-sentence AI summary for the current section.
   - `keywords` — shows 3–5 key nouns in very large font (`clamp(3rem, 8vw, 8rem)`),
     ideal for low-vision / peripheral reading.
-  A topic label appears above the current chunk in `summary` and `keywords` modes,
-  and a compact `displayMode` badge is added to the status bar.
+    A topic label appears above the current chunk in `summary` and `keywords` modes,
+    and a compact `displayMode` badge is added to the status bar.
 - **Decoupled audio / display layers with character-position alignment.**
   The display layer is independent of Voxtral's audio chunking — Mistral Small
   produces its own (typically shorter) display chunks optimised for visual
@@ -38,8 +70,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   - `anchor` — verbatim ~30-char prefix from the cleaned text (used by the bash
     flow to resolve the chunk's character range via string search);
   - `topic`, `keywords`, `summary_short` — content for the three frontend modes.
-  Single `mistral-small-latest` call per session. Skipped entirely in `fulltext`
-  mode. Configurable via `DISPLAY_META_MODEL` and `DISPLAY_META_TIMEOUT`.
+    Single `mistral-small-latest` call per session. Skipped entirely in `fulltext`
+    mode. Configurable via `DISPLAY_META_MODEL` and `DISPLAY_META_TIMEOUT`.
 - **No redundant AI cleaning calls — cleaned text reused across branches.**
   `src/tts.py --chunked` now writes the post-cleaning text to `TTS_CLEANED_TEXT_OUT`
   (atomic tmp+rename) so the bash flow can feed `display_meta` exactly the same

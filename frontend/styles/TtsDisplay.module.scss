@@ -100,6 +100,95 @@
     letter-spacing: 0.03em;
     line-height: 1.2;
   }
+
+  // Dual mode: keywords as main element, slightly smaller than keywords-only
+  // (so the secondary line below stays readable on the same screen).
+  &.dualKeywords {
+    font-size: clamp(2.5rem, 6vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+  }
+
+  // Fulltext "small" mode for users with good visual acuity who want to
+  // read along with the spoken text in a non-overpowering size.
+  &.fulltextSmall {
+    font-size: clamp(1rem, 1.6vw, 1.5rem);
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    padding: 1rem 1.5rem;
+  }
+}
+
+// Dual mode secondary line (summary_short under the keywords).
+.dualSub {
+  width: 100%;
+  text-align: center;
+  font-size: clamp(1rem, 1.8vw, 1.5rem);
+  color: $fg;
+  opacity: 0.75;
+  line-height: 1.4;
+  margin-top: -0.5rem;
+}
+
+// Mode selector — fixed top-right, becomes a small button row.
+.modeSelector {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(28, 34, 48, 0.85);
+  backdrop-filter: blur(6px);
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  z-index: 10;
+}
+
+.modeButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.375rem 0.625rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.3125rem;
+  color: $dim;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+
+  &:hover {
+    color: $fg;
+    background: rgba(125, 211, 252, 0.08);
+  }
+}
+
+.modeButtonActive {
+  color: $bg;
+  background: $accent;
+  border-color: $accent;
+
+  &:hover {
+    color: $bg;
+    background: $accent;
+  }
+}
+
+.modeButtonKey {
+  font-size: 0.625rem;
+  font-weight: 700;
+  opacity: 0.7;
+  letter-spacing: 0.05em;
+}
+
+.modeButtonLabel {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .footer {

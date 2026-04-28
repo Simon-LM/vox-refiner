@@ -11,6 +11,7 @@ interface DisplayChunk {
   topic: string;
   keywords: string[];
   summary_short: string;
+  quote_short: string;
 }
 
 interface AudioChunkInfo {
@@ -21,7 +22,16 @@ interface AudioChunkInfo {
   receivedAt: number;  // performance.now() timestamp when the SSE event arrived
 }
 
-type DisplayMode = 'fulltext' | 'summary' | 'keywords';
+type DisplayMode = 'summary' | 'keywords' | 'quote' | 'dual' | 'fulltext';
+
+const ALL_MODES: DisplayMode[] = ['summary', 'keywords', 'quote', 'dual', 'fulltext'];
+const MODE_LABEL: Record<DisplayMode, string> = {
+  summary:  'Résumé',
+  keywords: 'Mots-clés',
+  quote:    'Citation',
+  dual:     'Dual',
+  fulltext: 'Texte exact',
+};
 
 interface TtsState {
   mode: string | null;
@@ -41,17 +51,15 @@ interface TtsState {
 function readDisplayMode(): DisplayMode {
   if (typeof window === 'undefined') return 'summary';
   const p = new URLSearchParams(window.location.search).get('displayMode');
-  if (p === 'fulltext' || p === 'keywords') return p;
+  if (p && (ALL_MODES as string[]).includes(p)) return p as DisplayMode;
   return 'summary';
 }
 
 function findDisplayChunk(chunks: DisplayChunk[], charPos: number): DisplayChunk | null {
   if (!chunks.length) return null;
-  // Linear scan is fine — display chunks are typically <30.
   for (const c of chunks) {
     if (charPos >= c.char_start && charPos < c.char_end) return c;
   }
-  // Past the last chunk? Return it.
   if (charPos >= chunks[chunks.length - 1].char_start) return chunks[chunks.length - 1];
   return chunks[0];
 }
@@ -75,18 +83,18 @@ const mockSourceText =
 
 const mockDisplayChunks: DisplayChunk[] = (() => {
   const anchors = [
-    { anchor: 'Le renard brun', topic: 'Renard et chien',           keywords: ['renard', 'saut', 'chien'],          summary_short: 'Un renard brun saute au-dessus du chien.' },
-    { anchor: 'La migration',   topic: 'Migration des oiseaux',     keywords: ['migration', 'oiseaux', 'routes'],   summary_short: 'Les oiseaux migrent sur des routes ancestrales.' },
-    { anchor: 'VoxRefiner',     topic: 'Transformation texte→audio', keywords: ['VoxRefiner', 'texte', 'audio'],     summary_short: 'VoxRefiner transforme le texte en audio.' },
-    { anchor: 'Les modèles',    topic: 'Synthèse vocale naturelle', keywords: ['modèles', 'synthèse', 'naturelle'], summary_short: 'Les modèles produisent une synthèse naturelle.' },
-    { anchor: 'Fin de la',      topic: 'Fin de lecture',            keywords: ['fin', 'lecture'],                   summary_short: 'La lecture se termine.' },
+    { anchor: 'Le renard brun', topic: 'Renard et chien',           keywords: ['renard', 'saut', 'chien'],          summary_short: 'Le renard brun saute par-dessus le chien paresseux.',           quote_short: 'Le renard brun saute par-dessus le chien' },
+    { anchor: 'La migration',   topic: 'Migration des oiseaux',     keywords: ['migration', 'oiseaux', 'routes'],   summary_short: 'Les oiseaux suivent des routes ancestrales millénaires.',         quote_short: 'des routes ancestrales tracées depuis des millénaires' },
+    { anchor: 'VoxRefiner',     topic: 'Transformation texte→audio', keywords: ['VoxRefiner', 'texte', 'audio'],     summary_short: 'VoxRefiner transforme le texte en audio de haute qualité.',       quote_short: 'transforme votre texte sélectionné en audio' },
+    { anchor: 'Les modèles',    topic: 'Synthèse vocale naturelle', keywords: ['modèles', 'synthèse', 'naturelle'], summary_short: 'Les modèles permettent une synthèse vocale naturelle et expressive.', quote_short: 'une synthèse vocale naturelle et expressive' },
+    { anchor: 'Fin de la',      topic: 'Fin de lecture',            keywords: ['fin', 'lecture', 'VoxRefiner'],     summary_short: 'Fin de la lecture, merci d\'avoir utilisé VoxRefiner.',           quote_short: "Fin de la lecture — merci d'avoir utilisé VoxRefiner" },
   ];
   let pos = 0;
   return anchors.map((a, i) => {
     const start = mockSourceText.indexOf(a.anchor, pos);
     pos = start + a.anchor.length;
     const end = i < anchors.length - 1 ? mockSourceText.indexOf(anchors[i + 1].anchor, pos) : mockSourceText.length;
-    return { char_start: start, char_end: end, topic: a.topic, keywords: a.keywords, summary_short: a.summary_short };
+    return { char_start: start, char_end: end, topic: a.topic, keywords: a.keywords, summary_short: a.summary_short, quote_short: a.quote_short };
   });
 })();
 
@@ -107,10 +115,22 @@ const initialState: TtsState = {
 
 export default function TtsDisplay() {
   const [state, setState] = useState<TtsState>(initialState);
-  // Tick state — increments via requestAnimationFrame to drive time-based
-  // display chunk progression while an audio chunk is playing.
   const [tick, setTick] = useState(0);
   const rafRef = useRef<number | null>(null);
+
+  // Keyboard shortcuts: 1–5 toggle the display mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = ['1', '2', '3', '4', '5'].indexOf(e.key);
+      if (idx >= 0) {
+        e.preventDefault();
+        setState(prev => ({ ...prev, displayMode: ALL_MODES[idx] }));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -198,7 +218,7 @@ export default function TtsDisplay() {
     return () => es.close();
   }, []);
 
-  // ── rAF loop: drives time-based display chunk progression within an audio chunk
+  // ── rAF loop: drives time-based display chunk progression ──────────────────
   useEffect(() => {
     if (state.done || state.current < 0 || state.displayChunks.length === 0) {
       if (rafRef.current !== null) {
@@ -253,33 +273,54 @@ export default function TtsDisplay() {
       ? '✓ Lecture terminée'
       : 'VoxRefiner';
 
-  // ── Smart display: time-based char position → display chunk lookup ──────────
-  // tick is read inside estimateCharPos via performance.now() — referencing it
-  // here ensures React re-renders this branch on each rAF tick.
+  // ── Smart display lookup ────────────────────────────────────────────────────
   void tick;
   const charPos = estimateCharPos(currentAudio, performance.now());
   const displayChunk = isPreInit ? null : findDisplayChunk(state.displayChunks, charPos);
 
-  const renderContent = (): string => {
+  // Render content per mode.
+  const renderMain = (): string => {
     if (isPreInit) return preInitCurrent ?? 'En attente de la lecture…';
-    if (displayChunk) {
-      if (state.displayMode === 'keywords') return displayChunk.keywords.join(' · ');
-      if (state.displayMode === 'summary')  return displayChunk.summary_short;
+    if (state.displayMode === 'fulltext') return currentText;
+    if (!displayChunk) return currentText;  // Fallback while meta is loading
+    switch (state.displayMode) {
+      case 'keywords': return displayChunk.keywords.join(' · ');
+      case 'quote':    return displayChunk.quote_short || displayChunk.summary_short || currentText;
+      case 'dual':     return displayChunk.keywords.join(' · ');  // dual main = keywords
+      case 'summary':  return displayChunk.summary_short || currentText;
     }
     return currentText;
   };
 
   const showTopic = !isPreInit && state.displayMode !== 'fulltext' && !!displayChunk?.topic;
-  const isKeywordsMode = state.displayMode === 'keywords';
+  const dualSubText = state.displayMode === 'dual' && displayChunk
+    ? (displayChunk.summary_short || displayChunk.quote_short || '')
+    : '';
+
+  const onPickMode = (m: DisplayMode) => setState(prev => ({ ...prev, displayMode: m }));
 
   return (
     <div className={styles.app}>
       <div className={styles.status}>
         <span className={styles.modeBadge}>{state.mode ?? '…'}</span>
-        {state.displayMode !== 'fulltext' && (
-          <span className={styles.displayModeBadge}>{state.displayMode}</span>
-        )}
+        <span className={styles.displayModeBadge}>{state.displayMode}</span>
         <span>{progress}</span>
+      </div>
+
+      <div className={styles.modeSelector} aria-label="Mode d'affichage">
+        {ALL_MODES.map((m, i) => (
+          <button
+            key={m}
+            type="button"
+            className={`${styles.modeButton} ${state.displayMode === m ? styles.modeButtonActive : ''}`}
+            onClick={() => onPickMode(m)}
+            aria-pressed={state.displayMode === m}
+            title={`${MODE_LABEL[m]} (${i + 1})`}
+          >
+            <span className={styles.modeButtonKey}>{i + 1}</span>
+            <span className={styles.modeButtonLabel}>{MODE_LABEL[m]}</span>
+          </button>
+        ))}
       </div>
 
       <div className={styles.stage}>
@@ -294,10 +335,16 @@ export default function TtsDisplay() {
         <div className={[
           styles.current,
           isPreInit ? styles.preInit : '',
-          isKeywordsMode ? styles.keywords : '',
+          state.displayMode === 'keywords' ? styles.keywords : '',
+          state.displayMode === 'dual'     ? styles.dualKeywords : '',
+          state.displayMode === 'fulltext' ? styles.fulltextSmall : '',
         ].filter(Boolean).join(' ')}>
-          {renderContent()}
+          {renderMain()}
         </div>
+
+        {state.displayMode === 'dual' && dualSubText && (
+          <div className={styles.dualSub}>{dualSubText}</div>
+        )}
 
         <div className={`${styles.ctx} ${styles.after}`}>
           {isPreInit ? preInitAfter : afterText}
