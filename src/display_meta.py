@@ -84,8 +84,13 @@ _SYSTEM = textwrap.dedent("""
                        — used by the bash flow for string-search positioning. MUST
                        be a character-for-character substring of the input.
       topic         : up to 5 words — eye-readable label, prefer source words.
-      keywords      : 3–5 SINGLE words (no phrases) — the main nouns/proper nouns
-                       of the chunk, taken FROM the source (not paraphrased).
+      keywords      : 3–5 KEY CONCEPTS lifted FROM the source (not paraphrased).
+                       Each entry is normally a single word, EXCEPT for proper
+                       names (people, organisations, places) which MUST be kept
+                       whole — including titles, particles, and abbreviations.
+                       Examples of valid multi-word keywords: "Sadio Camara",
+                       "Abdelkarim B.", "Africa Corps", "FLA". Never split a
+                       proper name across two entries.
       summary_short : ONE short sentence, ≤ 15 words, that REUSES the chunk's own
                        vocabulary as much as possible. Think "tightened sentence",
                        not "rephrased summary". When the source contains a clause

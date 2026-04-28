@@ -13,6 +13,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.3] — 2026-04-29
+
+### Fixed
+
+- **Proper names kept whole in display-meta keywords** (`src/display_meta.py`).
+  The system prompt now explicitly instructs Mistral to keep proper names
+  (people, organisations, places) intact as multi-word entries instead of
+  splitting them across keywords. Examples: "Sadio Camara", "Abdelkarim B.",
+  "Africa Corps", "FLA".
+- **Keywords separator changed from middle dot `·` to em-dash `—`**
+  (`frontend/components/TtsDisplay.tsx`).
+  Both the keywords display mode and the dual-mode capsule now use an em-dash
+  separator (`—`) instead of the middle dot (`·`), for better visual
+  separation and consistency with the `quote_short` display.
+
+---
+
 ## [4.14.2] — 2026-04-28
 
 ### Fixed

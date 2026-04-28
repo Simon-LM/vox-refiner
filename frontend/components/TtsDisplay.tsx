@@ -415,7 +415,7 @@ export default function TtsDisplay() {
 		if (!displayChunk) return currentText; // Fallback while meta is loading
 		switch (state.displayMode) {
 			case "keywords":
-				return displayChunk.keywords.join(" · ");
+				return displayChunk.keywords.join(" — ");
 			case "quote":
 				return (
 					displayChunk.quote_short || displayChunk.summary_short || currentText
@@ -472,7 +472,7 @@ export default function TtsDisplay() {
 					{state.displayMode === "dual" && displayChunk ? (
 						<div className={styles.dualInner}>
 							<div className={styles.dualCapsules}>
-								{displayChunk.keywords.join(" · ")}
+								{displayChunk.keywords.join(" — ")}
 							</div>
 							<div className={styles.dualBody}>
 								{displayChunk.summary_short ||
