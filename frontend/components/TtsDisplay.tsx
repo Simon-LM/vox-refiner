@@ -420,8 +420,6 @@ export default function TtsDisplay() {
 				return (
 					displayChunk.quote_short || displayChunk.summary_short || currentText
 				);
-			case "dual":
-				return displayChunk.keywords.join(" · "); // dual main = keywords
 			case "summary":
 				return displayChunk.summary_short || currentText;
 		}
@@ -453,7 +451,6 @@ export default function TtsDisplay() {
 				{showTopic && (
 					<span className={styles.topicBadge}>{displayChunk!.topic}</span>
 				)}
-				<span>{progress}</span>
 			</div>
 
 			<div className={styles.stage}>
@@ -467,22 +464,33 @@ export default function TtsDisplay() {
 						styles.current,
 						isPreInit ? styles.preInit : "",
 						state.displayMode === "keywords" ? styles.keywords : "",
-						state.displayMode === "dual" ? styles.dualKeywords : "",
+						state.displayMode === "dual" ? styles.dual : "",
 						state.displayMode === "fulltext" ? styles.fulltextSmall : "",
 					]
 						.filter(Boolean)
 						.join(" ")}>
-					{renderMain()}
+					{state.displayMode === "dual" && displayChunk ? (
+						<div className={styles.dualInner}>
+							<div className={styles.dualCapsules}>
+								{displayChunk.keywords.join(" · ")}
+							</div>
+							<div className={styles.dualBody}>
+								{displayChunk.summary_short ||
+									displayChunk.quote_short ||
+									currentText}
+							</div>
+						</div>
+					) : (
+						renderMain()
+					)}
 				</div>
-
-				{state.displayMode === "dual" && dualSubText && (
-					<div className={styles.dualSub}>{dualSubText}</div>
-				)}
 
 				<div className={`${styles.ctx} ${styles.after}`}>
 					{isPreInit ? preInitAfter : afterText}
 				</div>
 			</div>
+
+			<div className={styles.progressBar}>{progress}</div>
 
 			{/*
         ── Bottom bar ────────────────────────────────────────────────────

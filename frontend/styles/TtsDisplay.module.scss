@@ -68,26 +68,37 @@
 .ctx {
 	width: 100%;
 	text-align: center;
-	line-height: 1.4;
+	line-height: 1.5;
 	font-size: 1.125rem;
-	max-height: 12vh;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
 	overflow: hidden;
-	text-overflow: ellipsis;
 	transition: color 200ms ease;
-	padding: 0.75rem 1.25rem;
+	padding: 0 1.25rem;
 	flex-shrink: 1;
 	min-height: 0;
 
+	// background-color: red;
+
 	&.before {
 		color: $dim;
+		margin-top: clamp(0.5rem, 0.5vw, 1rem);
+		margin-bottom: clamp(0.125rem, 0.5vw, 0.25rem);
+		// background-color: aqua;
 	}
 	&.after {
 		color: #6f6f6f;
+		margin-top: clamp(0.125rem, 0.5vw, 0.25rem);
+		margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+		// background-color: paleturquoise;
 	}
 }
 
 .current {
-	width: 100%;
+	// width: 100%;a
+	width: calc(100% - min(1vw, 10px));
 	text-align: center;
 	line-height: 1.4;
 	transition:
@@ -116,30 +127,45 @@
 		line-height: 1.2;
 	}
 
-	&.dualKeywords {
-		font-size: clamp(2.5rem, 6vw, 5.5rem);
-		font-weight: 700;
-		letter-spacing: 0.03em;
-		line-height: 1.2;
+	&.dual {
+		text-align: center;
+		padding: 1.25rem 1.5rem;
 	}
 
 	&.fulltextSmall {
 		font-size: clamp(1rem, 1.6vw, 1.5rem);
 		font-weight: 400;
 		line-height: 1.5;
-		text-align: left;
+		// text-align: left;
 		padding: 1rem 1.5rem;
 	}
 }
 
-.dualSub {
-	width: 100%;
+// ── Dual mode ───────────────────────────────────────────────────────────────
+
+.dualInner {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.dualCapsules {
+	display: inline-block;
+	align-self: center;
+	font-size: clamp(1rem, 3vw, 1.5rem);
+	font-weight: 600;
+	color: #fff;
+	background: #4a4a5a;
+	padding: 0.5rem 1rem;
+	border-radius: 0.75rem;
+	letter-spacing: 0.03em;
+}
+
+.dualBody {
+	font-size: clamp(1.75rem, 5vw, 4rem);
+	font-weight: 400;
+	line-height: 1.5;
 	text-align: center;
-	font-size: clamp(1rem, 1.8vw, 1.5rem);
-	color: $fg;
-	opacity: 0.75;
-	line-height: 1.4;
-	margin-top: -0.5rem;
 }
 
 // ── Bottom bar ───────────────────────────────────────────────────────────────
@@ -289,6 +315,18 @@
 	min-width: 2.5rem;
 	text-align: center;
 	justify-content: center;
+}
+
+// ── Progress bar (between stage and bottom bar) ──────────────────────────────
+
+.progressBar {
+	font-size: 0.875rem;
+	color: $dim;
+	text-align: center;
+	padding: 0.5rem 1.25rem;
+	// padding-top: 0;
+	background: $highlight-bg;
+	// background-color: blueviolet;
 }
 
 // ── Footer ───────────────────────────────────────────────────────────────────

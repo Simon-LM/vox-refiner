@@ -13,6 +13,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.2] — 2026-04-28
+
+### Fixed
+
+- **Dual mode keywords now inside the spoken-text bubble** (`frontend/components/TtsDisplay.tsx`,
+  `frontend/styles/TtsDisplay.module.scss`).
+  Previously the dual mode rendered large keywords inside `.current` + a separate `.dualSub` line
+  below the bubble. The keywords are now shown inside a capsule badge (dark pill, white text,
+  rounded corners) at the top of `.current`, with the summary/quote text below it — both inside
+  a single visual bubble. The standalone `.dualSub` element is removed.
+- **Progress bar moved below the stage** (`frontend/components/TtsDisplay.tsx`,
+  `frontend/styles/TtsDisplay.module.scss`).
+  The chunk-position indicator was cramped in the header next to the topic badge. It now lives
+  in a dedicated `.progressBar` row between `.stage` and the bottom bar, with a `$highlight-bg`
+  background for visual separation.
+- **`.ctx` paragraphs no longer clipped by `max-height`** (`frontend/styles/TtsDisplay.module.scss`).
+  Replaced brittle `max-height: 12vh` with CSS `line-clamp: 2` (with WebKit prefix), which
+  consistently truncates at exactly 2 lines regardless of container geometry.
+
+### Changed
+
+- **Static export regenerated** (`frontend/out/`).
+
+---
+
 ## [4.14.1] — 2026-04-28
 
 ### Fixed
