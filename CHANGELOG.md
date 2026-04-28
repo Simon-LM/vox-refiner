@@ -13,6 +13,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.1] — 2026-04-28
+
+### Fixed
+
+- **Bubble no longer crushed by fixed viewport height** (`frontend/styles/TtsDisplay.module.scss`).
+  The `.app` root container was locked at `height: 100vh`, which compressed the `.stage` (including
+  the current-text bubble) when the content exceeded the viewport. Changed to `min-height: 100vh` so
+  the bubble's natural height is respected and the page scrolls instead of crushing.
+- **`overflow: hidden` removed from `html, body`** (`frontend/app/globals.scss`).
+  The global rule was blocking vertical scrolling on the display page. Removed so any overflow
+  from the bubble (or other content) scrolls naturally rather than being clipped.
+
+### Added
+
+- **Bubble auto-centered on first chunk via `scrollIntoView`** (`frontend/components/TtsDisplay.tsx`).
+  A new `useEffect` fires once when `state.current >= 0` (first chunk received) and calls
+  `bubbleRef.current.scrollIntoView({ block: "center" })`. This ensures the spoken text is
+  visually centered when the display opens, while the user remains free to scroll to the header,
+  footer, or player controls manually.
+
+---
+
 ## [4.14.0] — 2026-04-28
 
 ### Added
