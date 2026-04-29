@@ -13,6 +13,31 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.4] — 2026-04-29
+
+### Fixed
+
+- **`\n` line breaks now rendered in fulltext mode** (`frontend/styles/TtsDisplay.module.scss`).
+  Added `white-space: pre-line` on `.fulltextSmall` so newlines inside the spoken
+  text (e.g. multiple bullet points) are displayed as actual line breaks instead
+  of being collapsed into a single space.
+- **Before/after context hidden in fulltext mode** (`frontend/components/TtsDisplay.tsx`).
+  The two `.ctx` divs (previous/next chunk) are no longer rendered when
+  `displayMode === "fulltext"`, since the fulltext view already shows the entire
+  current chunk content and the extra context is redundant.
+
+### Changed
+
+- **Topic badge moved from status bar to standalone bar** (`frontend/components/TtsDisplay.tsx`,
+  `frontend/styles/TtsDisplay.module.scss`).
+  The topic label is no longer displayed inline in the `.status` header. It now
+  lives in a dedicated `.topicBar` row between the status bar and the stage,
+  symmetrical to `.progressBar` below the stage — same font-size, padding, and
+  `$highlight-bg` background, with `$accent` text colour and a `border-bottom`
+  separator.
+
+---
+
 ## [4.14.3] — 2026-04-29
 
 ### Fixed

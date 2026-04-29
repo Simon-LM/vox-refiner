@@ -92,10 +92,10 @@ function estimateCharPos(
 // ── Mock state (dev preview — append ?mock to URL) ────────────────────────────
 
 const mockSourceText =
-	"Le renard brun et rapide saute par-dessus le chien paresseux.\n\n" +
-	"La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.\n\n" +
-	"VoxRefiner transforme votre texte sélectionné en audio de haute qualité.\n\n" +
-	"Les modèles de langage permettent une synthèse vocale naturelle et expressive.\n\n" +
+	"• Le renard brun et rapide saute par-dessus le chien paresseux.\n\n" +
+	"• La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.\n\n" +
+	"• VoxRefiner transforme votre texte sélectionné en audio de haute qualité.\n\n" +
+	"• Les modèles de langage permettent une synthèse vocale naturelle et expressive.\n\n" +
 	"Fin de la lecture — merci d'avoir utilisé VoxRefiner.";
 
 const mockDisplayChunks: DisplayChunk[] = (() => {
@@ -117,10 +117,10 @@ const mockDisplayChunks: DisplayChunk[] = (() => {
 		{
 			anchor: "VoxRefiner",
 			topic: "Transformation texte→audio",
-			keywords: ["VoxRefiner", "texte", "audio"],
+			keywords: [" 2 VoxRefiner", "texte", "audio"],
 			summary_short:
-				"VoxRefiner transforme le texte en audio de haute qualité.",
-			quote_short: "transforme votre texte sélectionné en audio",
+				"1 VoxRefiner transforme le texte en audio de haute qualité.",
+			quote_short: "3 transforme votre texte sélectionné en audio",
 		},
 		{
 			anchor: "Les modèles",
@@ -223,7 +223,7 @@ export default function TtsDisplay() {
 						receivedAt: now,
 					},
 					2: {
-						text: "VoxRefiner transforme votre texte sélectionné en audio de haute qualité.",
+						text: "• 5 VoxRefiner transforme votre texte sélectionné en audio de haute qualité.\n • VoxRefiner transforme votre texte sélectionné en audio de haute qualité.\n • VoxRefiner transforme votre texte sélectionné en audio de haute qualité.",
 						char_start: 149,
 						char_end: 219,
 						duration_s: 4,
@@ -448,15 +448,18 @@ export default function TtsDisplay() {
 			<div className={styles.status}>
 				<span className={styles.modeBadge}>{state.mode ?? "…"}</span>
 				<span className={styles.displayModeBadge}>{state.displayMode}</span>
-				{showTopic && (
-					<span className={styles.topicBadge}>{displayChunk!.topic}</span>
-				)}
 			</div>
 
+			{showTopic && (
+				<div className={styles.topicBar}>{displayChunk!.topic}</div>
+			)}
+
 			<div className={styles.stage}>
-				<div className={`${styles.ctx} ${styles.before}`}>
-					{isPreInit ? "" : beforeText}
-				</div>
+				{state.displayMode !== "fulltext" && (
+					<div className={`${styles.ctx} ${styles.before}`}>
+						{isPreInit ? "" : beforeText}
+					</div>
+				)}
 
 				<div
 					ref={bubbleRef}
@@ -485,9 +488,11 @@ export default function TtsDisplay() {
 					)}
 				</div>
 
-				<div className={`${styles.ctx} ${styles.after}`}>
-					{isPreInit ? preInitAfter : afterText}
-				</div>
+				{state.displayMode !== "fulltext" && (
+					<div className={`${styles.ctx} ${styles.after}`}>
+						{isPreInit ? preInitAfter : afterText}
+					</div>
+				)}
 			</div>
 
 			<div className={styles.progressBar}>{progress}</div>

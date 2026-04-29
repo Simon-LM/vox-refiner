@@ -53,6 +53,18 @@
 	font-weight: 600;
 }
 
+// ── Topic bar (between status bar and stage) ─────────────────────────────────
+
+.topicBar {
+	font-size: 0.875rem;
+	text-transform: uppercase;
+	color: $accent;
+	text-align: center;
+	padding: 0.5rem 1.25rem;
+	background: $highlight-bg;
+	// border-bottom: 1px solid $border;
+}
+
 // ── Stage (center) ───────────────────────────────────────────────────────────
 
 .stage {
@@ -84,7 +96,7 @@
 
 	&.before {
 		color: $dim;
-		margin-top: clamp(0.5rem, 0.5vw, 1rem);
+		margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
 		margin-bottom: clamp(0.125rem, 0.5vw, 0.25rem);
 		// background-color: aqua;
 	}
@@ -133,11 +145,12 @@
 	}
 
 	&.fulltextSmall {
-		font-size: clamp(1rem, 1.6vw, 1.5rem);
+		font-size: clamp(1rem, 2vw, 1.25rem);
 		font-weight: 400;
 		line-height: 1.5;
-		// text-align: left;
+		text-align: left;
 		padding: 1rem 1.5rem;
+		white-space: pre-line;
 	}
 }
 
