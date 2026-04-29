@@ -139,11 +139,6 @@
 		line-height: 1.2;
 	}
 
-	&.dual {
-		text-align: center;
-		padding: 1.25rem 1.5rem;
-	}
-
 	&.fulltextSmall {
 		font-size: clamp(1rem, 2vw, 1.25rem);
 		font-weight: 400;
@@ -154,15 +149,20 @@
 	}
 }
 
-// ── Dual mode ───────────────────────────────────────────────────────────────
+// ── Bridge mode (dual / hybrid layouts) ────────────────────────────────────
 
-.dualInner {
+.bridge {
+	text-align: center;
+	padding: 1.25rem 1.5rem;
+}
+
+.bridgeInner {
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
 }
 
-.dualCapsules {
+.bridgeCapsules {
 	display: inline-block;
 	align-self: center;
 	font-size: clamp(1rem, 3vw, 1.5rem);
@@ -174,7 +174,7 @@
 	letter-spacing: 0.03em;
 }
 
-.dualBody {
+.bridgeBody {
 	font-size: clamp(1.75rem, 5vw, 4rem);
 	font-weight: 400;
 	line-height: 1.5;
@@ -187,9 +187,10 @@
 	display: flex;
 	flex-wrap: wrap-reverse;
 	align-items: center;
-	padding: 0.75rem 1.25rem;
-	gap: 0.75rem;
+	padding: 0.5rem 1.25rem;
+	gap: 1rem 3rem;
 	border-top: 1px solid $border;
+	// background-color: red;
 }
 
 .bottomSection {
@@ -197,27 +198,35 @@
 	display: flex;
 	justify-content: center;
 	min-height: 0;
-	overflow: hidden;
+	// overflow: hidden;
+	// background-color: pink;
 }
 
 // ── Mode selector (bottom-left) ──────────────────────────────────────────────
 
 .modeSelector {
 	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
 	gap: 0.25rem;
-	flex-shrink: 0;
+	// flex-shrink: 0;
+	align-items: center;
+	// background-color: purple;
 }
 
 .modeButton {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	justify-content: center;
 	gap: 0.125rem;
-	padding: 0.375rem 0.625rem;
+	padding: 0.25rem 0.5rem;
+	min-height: 2.5rem;
 	background: transparent;
 	border: 1px solid $border;
 	border-radius: 0.3125rem;
 	color: $dim;
+	font-size: 0.75rem;
 	font-family: inherit;
 	cursor: pointer;
 	transition:
@@ -244,17 +253,64 @@
 	}
 }
 
-.modeButtonKey {
-	font-size: 0.625rem;
-	font-weight: 700;
-	letter-spacing: 0.05em;
-}
-
 .modeButtonLabel {
-	font-size: 0.6875rem;
+	// font-size: 0.75rem;
 	font-weight: 500;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
+	// background-color: yellow;
+}
+
+// ── Bridge buttons (taller, narrow, arrows below label) ────────────────────
+
+.modeButtonBridge {
+	flex-direction: column;
+	gap: 0;
+	padding: 0.25rem 0.375rem;
+	border-style: dotted;
+	// border-color: lighten($border, 10%);
+
+	&:hover {
+		border-color: $accent;
+	}
+}
+
+.modeButtonArrow {
+	font-size: 1.5rem;
+	// opacity: 0.6;
+	line-height: 0.75;
+	margin-top: -0.5rem;
+}
+
+.modeButtonLabelBridge {
+	// font-size: 0.75rem;
+	font-weight: 400;
+	text-transform: uppercase;
+	color: inherit;
+	// opacity: 0.5;
+}
+
+// ── Separator between primary modes and fulltext ─────────────────────────
+
+.modeSeparator {
+	width: 1px;
+	height: 1.5rem;
+	background: $border;
+	margin: 0 0.375rem;
+	flex-shrink: 0;
+}
+
+// ── Fulltext button (visually separated, distinct height) ──────────────────
+
+.modeButtonFulltext {
+	min-height: auto;
+
+	.modeButtonLabel {
+		// font-size: 0.625rem;
+		font-weight: 300;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
 }
 
 // ── Player controls (bottom-right) ───────────────────────────────────────────

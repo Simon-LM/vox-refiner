@@ -24,22 +24,39 @@ interface AudioChunkInfo {
 	receivedAt: number; // performance.now() timestamp when the SSE event arrived
 }
 
-type DisplayMode = "summary" | "keywords" | "quote" | "dual" | "fulltext";
+type DisplayMode =
+	| "summary"
+	| "summary_keywords"
+	| "keywords"
+	| "keywords_quote"
+	| "quote"
+	| "fulltext";
 
 const ALL_MODES: DisplayMode[] = [
 	"summary",
+	"summary_keywords",
 	"keywords",
+	"keywords_quote",
 	"quote",
-	"dual",
 	"fulltext",
 ];
 const MODE_LABEL: Record<DisplayMode, string> = {
 	summary: "Résumé",
+	summary_keywords: "dual",
 	keywords: "Mots-clés",
-	quote: "Citation",
-	dual: "Dual",
+	keywords_quote: "dual",
+	quote: "Citations",
 	fulltext: "Texte exact",
 };
+
+/** Modes principaux affichés dans la rangée (sans "Texte exact") */
+const PRIMARY_MODES: DisplayMode[] = [
+	"summary",
+	"summary_keywords",
+	"keywords",
+	"keywords_quote",
+	"quote",
+];
 
 interface TtsState {
 	mode: string | null;
@@ -179,7 +196,7 @@ export default function TtsDisplay() {
 	const bubbleRef = useRef<HTMLDivElement>(null);
 	const scrolledRef = useRef(false);
 
-	// Keyboard shortcuts: 1–5 toggle the display mode.
+	// Keyboard shortcuts: 1–6 toggle the display mode.
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (
@@ -187,7 +204,7 @@ export default function TtsDisplay() {
 				e.target instanceof HTMLTextAreaElement
 			)
 				return;
-			const idx = ["1", "2", "3", "4", "5"].indexOf(e.key);
+			const idx = ["1", "2", "3", "4", "5", "6"].indexOf(e.key);
 			if (idx >= 0) {
 				e.preventDefault();
 				setState((prev) => ({ ...prev, displayMode: ALL_MODES[idx] }));
@@ -408,7 +425,9 @@ export default function TtsDisplay() {
 		? null
 		: findDisplayChunk(state.displayChunks, charPos);
 
-	// Render content per mode.
+	// ── Rendering helpers ─────────────────────────────────────────────────────
+
+	/** Returns the primary displayed text for simple modes. */
 	const renderMain = (): string => {
 		if (isPreInit) return preInitCurrent ?? "En attente de la lecture…";
 		if (state.displayMode === "fulltext") return currentText;
@@ -422,16 +441,34 @@ export default function TtsDisplay() {
 				);
 			case "summary":
 				return displayChunk.summary_short || currentText;
+			// Bridge modes fall back to their "primary" text when not rendered as dual layout
+			case "summary_keywords":
+			case "keywords_quote":
+				return displayChunk.summary_short || currentText;
 		}
 		return currentText;
 	};
 
+	/** True when the mode is one of the "dual" bridge modes. */
+	const isBridgeMode =
+		state.displayMode === "summary_keywords" ||
+		state.displayMode === "keywords_quote";
+
+	/** Return keywords + secondary text for bridge modes. */
+	const bridgeData = (() => {
+		if (!displayChunk || !isBridgeMode) return null;
+		const secondary =
+			state.displayMode === "summary_keywords"
+				? displayChunk.summary_short
+				: displayChunk.quote_short;
+		return {
+			keywords: displayChunk.keywords,
+			secondary: secondary || displayChunk.summary_short || currentText,
+		};
+	})();
+
 	const showTopic =
 		!isPreInit && state.displayMode !== "fulltext" && !!displayChunk?.topic;
-	const dualSubText =
-		state.displayMode === "dual" && displayChunk
-			? displayChunk.summary_short || displayChunk.quote_short || ""
-			: "";
 
 	const onPickMode = (m: DisplayMode) =>
 		setState((prev) => ({ ...prev, displayMode: m }));
@@ -467,21 +504,17 @@ export default function TtsDisplay() {
 						styles.current,
 						isPreInit ? styles.preInit : "",
 						state.displayMode === "keywords" ? styles.keywords : "",
-						state.displayMode === "dual" ? styles.dual : "",
+						isBridgeMode ? styles.bridge : "",
 						state.displayMode === "fulltext" ? styles.fulltextSmall : "",
 					]
 						.filter(Boolean)
 						.join(" ")}>
-					{state.displayMode === "dual" && displayChunk ? (
-						<div className={styles.dualInner}>
-							<div className={styles.dualCapsules}>
-								{displayChunk.keywords.join(" — ")}
+					{isBridgeMode && bridgeData ? (
+						<div className={styles.bridgeInner}>
+							<div className={styles.bridgeCapsules}>
+								{bridgeData.keywords.join(" — ")}
 							</div>
-							<div className={styles.dualBody}>
-								{displayChunk.summary_short ||
-									displayChunk.quote_short ||
-									currentText}
-							</div>
+							<div className={styles.bridgeBody}>{bridgeData.secondary}</div>
 						</div>
 					) : (
 						renderMain()
@@ -499,24 +532,63 @@ export default function TtsDisplay() {
 
 			{/*
         ── Bottom bar ────────────────────────────────────────────────────
-        Left:   5 mode-selector buttons
+        Left:   5 primary mode-selector buttons + separated "Texte exact"
         Right:  Player controls (visual only — not wired yet)
       */}
 			<div className={styles.bottomBar}>
 				<div className={styles.bottomSection}>
 					<div className={styles.modeSelector} aria-label="Mode d'affichage">
-						{ALL_MODES.map((m, i) => (
-							<button
-								key={m}
-								type="button"
-								className={`${styles.modeButton} ${state.displayMode === m ? styles.modeButtonActive : ""}`}
-								onClick={() => onPickMode(m)}
-								aria-pressed={state.displayMode === m}
-								title={`${MODE_LABEL[m]} (${i + 1})`}>
-								<span className={styles.modeButtonKey}>{i + 1}</span>
-								<span className={styles.modeButtonLabel}>{MODE_LABEL[m]}</span>
-							</button>
-						))}
+						{PRIMARY_MODES.map((m) => {
+							const isBridge =
+								m === "summary_keywords" || m === "keywords_quote";
+							return (
+								<button
+									key={m}
+									type="button"
+									className={[
+										styles.modeButton,
+										state.displayMode === m ? styles.modeButtonActive : "",
+										isBridge ? styles.modeButtonBridge : "",
+									]
+										.filter(Boolean)
+										.join(" ")}
+									onClick={() => onPickMode(m)}
+									aria-pressed={state.displayMode === m}
+									title={MODE_LABEL[m]}>
+									{isBridge ? (
+										<>
+											<span className={styles.modeButtonLabelBridge}>
+												{MODE_LABEL[m]}
+											</span>
+											<span className={styles.modeButtonArrow}>↔</span>
+										</>
+									) : (
+										<span className={styles.modeButtonLabel}>
+											{MODE_LABEL[m]}
+										</span>
+									)}
+								</button>
+							);
+						})}
+
+						<span className={styles.modeSeparator} />
+
+						<button
+							type="button"
+							className={[
+								styles.modeButton,
+								styles.modeButtonFulltext,
+								state.displayMode === "fulltext" ? styles.modeButtonActive : "",
+							]
+								.filter(Boolean)
+								.join(" ")}
+							onClick={() => onPickMode("fulltext")}
+							aria-pressed={state.displayMode === "fulltext"}
+							title={MODE_LABEL.fulltext}>
+							<span className={styles.modeButtonLabel}>
+								{MODE_LABEL.fulltext}
+							</span>
+						</button>
 					</div>
 				</div>
 

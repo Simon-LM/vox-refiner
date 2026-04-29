@@ -13,6 +13,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.5] — 2026-04-29
+
+### Changed
+
+- **Display mode buttons reorganized**: 3 primary modes (Résumé, Mots-clés, Citations) + 2 bridge buttons with `↔` arrows (summary_keywords, keywords_quote) + separated "Texte exact" with visual divider (`frontend/components/TtsDisplay.tsx`, `frontend/styles/TtsDisplay.module.scss`).
+- **Bridge buttons**: taller/narrower layout with arrow below label, dot-dashed border, `font-size: 1rem` arrows (`frontend/styles/TtsDisplay.module.scss`).
+- **Bottom bar alignment**: all primary buttons share `min-height: 2.5rem`; fulltext button keeps auto height (`frontend/styles/TtsDisplay.module.scss`).
+- **Keyboard shortcuts extended** to 6 keys (1–6) (`frontend/components/TtsDisplay.tsx`).
+
+### Removed
+
+- Deprecated `"dual"` display mode and its associated SCSS classes (`.dual`, `.dualInner`, `.dualCapsules`, `.dualBody`) (`frontend/components/TtsDisplay.tsx`, `frontend/styles/TtsDisplay.module.scss`).
+- Hard-coded number badges on mode buttons (`frontend/styles/TtsDisplay.module.scss`).
+- Horizontal dash (`—`) pseudo-element before "Texte exact" button (`frontend/styles/TtsDisplay.module.scss`).
+
+---
+
 ## [4.14.4] — 2026-04-29
 
 ### Fixed
