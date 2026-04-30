@@ -2,7 +2,7 @@
 
 @use "variables" as *;
 
-// ── App root ─────────────────────────────────────────────────────────────────
+// ── .app ──────────────────────────────────────────────────────────────────────
 
 .app {
 	display: flex;
@@ -10,9 +10,9 @@
 	min-height: 100vh;
 }
 
-// ── Status bar (top) ─────────────────────────────────────────────────────────
+// ── .top (status bar) ─────────────────────────────────────────────────────────
 
-.status {
+.top {
 	font-size: 0.875rem;
 	color: $dim;
 	display: flex;
@@ -21,51 +21,44 @@
 	flex-wrap: wrap;
 	padding: 1rem 1.25rem;
 	border-bottom: 1px solid $border;
+
+	&__mode {
+		background: $accent;
+		color: #fff;
+		padding: 0.125rem 0.625rem;
+		border-radius: 0.25rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		font-size: 0.6875rem;
+		letter-spacing: 0.045em;
+	}
+
+	&__display {
+		background: $border;
+		color: $accent;
+		padding: 0.125rem 0.5rem;
+		border-radius: 0.25rem;
+		font-size: 0.625rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-weight: 500;
+	}
 }
 
-.displayModeBadge {
-	background: $border;
-	color: $accent;
-	padding: 0.125rem 0.5rem;
-	border-radius: 0.25rem;
-	font-size: 0.625rem;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	font-weight: 500;
+// ── .topic (between status bar and stage) ──────────────────────────────────────
+
+.topic {
+	&__bar {
+		font-size: 0.875rem;
+		text-transform: uppercase;
+		color: $accent;
+		text-align: center;
+		padding: 0.5rem 1.25rem;
+		background: $highlight-bg;
+	}
 }
 
-.modeBadge {
-	background: $accent;
-	color: #fff;
-	padding: 0.125rem 0.625rem;
-	border-radius: 0.25rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	font-size: 0.6875rem;
-	letter-spacing: 0.045em;
-}
-
-.topicBadge {
-	font-size: 0.75rem;
-	color: $accent;
-	text-transform: uppercase;
-	letter-spacing: 0.1em;
-	font-weight: 600;
-}
-
-// ── Topic bar (between status bar and stage) ─────────────────────────────────
-
-.topicBar {
-	font-size: 0.875rem;
-	text-transform: uppercase;
-	color: $accent;
-	text-align: center;
-	padding: 0.5rem 1.25rem;
-	background: $highlight-bg;
-	// border-bottom: 1px solid $border;
-}
-
-// ── Stage (center) ───────────────────────────────────────────────────────────
+// ── .stage (center) ───────────────────────────────────────────────────────────
 
 .stage {
 	flex: 1;
@@ -75,245 +68,226 @@
 	align-items: center;
 	justify-content: center;
 	background: $highlight-bg;
-}
 
-.ctx {
-	width: 100%;
-	text-align: center;
-	line-height: 1.5;
-	font-size: 1.125rem;
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	line-clamp: 2;
-	overflow: hidden;
-	transition: color 200ms ease;
-	padding: 0 1.25rem;
-	flex-shrink: 1;
-	min-height: 0;
+	// -- context (before / after) --
+	&__context {
+		width: 100%;
+		text-align: center;
+		line-height: 1.5;
+		font-size: 1.125rem;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+		transition: color 200ms ease;
+		padding: 0 1.25rem;
+		flex-shrink: 1;
+		min-height: 0;
 
-	// background-color: red;
+		&--before {
+			color: $dim;
+			margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
+			margin-bottom: clamp(0.125rem, 0.5vw, 0.25rem);
+		}
 
-	&.before {
-		color: $dim;
-		margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
-		margin-bottom: clamp(0.125rem, 0.5vw, 0.25rem);
-		// background-color: aqua;
-	}
-	&.after {
-		color: #6f6f6f;
-		margin-top: clamp(0.125rem, 0.5vw, 0.25rem);
-		margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
-		// background-color: paleturquoise;
-	}
-}
-
-.current {
-	// width: 100%;a
-	width: calc(100% - min(1vw, 10px));
-	text-align: center;
-	line-height: 1.4;
-	transition:
-		opacity 200ms ease,
-		font-size 200ms ease;
-	color: $fg;
-	font-size: clamp(1.75rem, 5vw, 4rem);
-	font-weight: 500;
-	background: #fff;
-	padding: 1.5rem 2rem;
-	border-radius: 1.5rem;
-	border: 1px solid #e5e5e5;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	word-break: break-word;
-	flex-shrink: 0;
-
-	&.preInit {
-		color: $dim;
-		font-style: italic;
+		&--after {
+			color: #6f6f6f;
+			margin-top: clamp(0.125rem, 0.5vw, 0.25rem);
+			margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+		}
 	}
 
-	&.keywords {
-		font-size: clamp(3rem, 8vw, 8rem);
-		font-weight: 700;
+	// -- bubble (current chunk) --
+	&__bubble {
+		width: calc(100% - min(1vw, 10px));
+		text-align: center;
+		line-height: 1.4;
+		transition:
+			opacity 200ms ease,
+			font-size 200ms ease;
+		color: $fg;
+		font-size: clamp(1.75rem, 5vw, 4rem);
+		font-weight: 500;
+		background: #fff;
+		padding: 1.5rem 2rem;
+		border-radius: 1.5rem;
+		border: 1px solid #e5e5e5;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		word-break: break-word;
+		flex-shrink: 0;
+
+		&--preinit {
+			color: $dim;
+			font-style: italic;
+		}
+
+		&--keywords {
+			font-size: clamp(3rem, 8vw, 8rem);
+			font-weight: 700;
+			letter-spacing: 0.03em;
+			line-height: 1.2;
+		}
+
+		&--fulltext {
+			font-size: clamp(1rem, 2vw, 1.25rem);
+			font-weight: 400;
+			line-height: 1.5;
+			text-align: left;
+			padding: 1rem 1.5rem;
+			white-space: pre-line;
+		}
+
+		&--bridge {
+			text-align: center;
+			padding: 1.25rem 1.5rem;
+		}
+	}
+
+	// -- bridge sub-layout --
+	&__bridge {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	&__bridge-capsules {
+		display: inline-block;
+		align-self: center;
+		font-size: clamp(1rem, 3vw, 1.5rem);
+		font-weight: 600;
+		color: #fff;
+		background: #4a4a5a;
+		padding: 0.5rem 1rem;
+		border-radius: 0.75rem;
 		letter-spacing: 0.03em;
-		line-height: 1.2;
 	}
 
-	&.fulltextSmall {
-		font-size: clamp(1rem, 2vw, 1.25rem);
+	&__bridge-body {
+		font-size: clamp(1.75rem, 5vw, 4rem);
 		font-weight: 400;
 		line-height: 1.5;
-		text-align: left;
-		padding: 1rem 1.5rem;
-		white-space: pre-line;
+		text-align: center;
 	}
 }
 
-// ── Bridge mode (dual / hybrid layouts) ────────────────────────────────────
+// ── .bottom (bottom bar + mode selector) ──────────────────────────────────────
 
-.bridge {
-	text-align: center;
-	padding: 1.25rem 1.5rem;
-}
-
-.bridgeInner {
-	display: flex;
-	flex-direction: column;
-	gap: 0.75rem;
-}
-
-.bridgeCapsules {
-	display: inline-block;
-	align-self: center;
-	font-size: clamp(1rem, 3vw, 1.5rem);
-	font-weight: 600;
-	color: #fff;
-	background: #4a4a5a;
-	padding: 0.5rem 1rem;
-	border-radius: 0.75rem;
-	letter-spacing: 0.03em;
-}
-
-.bridgeBody {
-	font-size: clamp(1.75rem, 5vw, 4rem);
-	font-weight: 400;
-	line-height: 1.5;
-	text-align: center;
-}
-
-// ── Bottom bar ───────────────────────────────────────────────────────────────
-
-.bottomBar {
+.bottom {
 	display: flex;
 	flex-wrap: wrap-reverse;
 	align-items: center;
 	padding: 0.5rem 1.25rem;
 	gap: 1rem 3rem;
 	border-top: 1px solid $border;
-	// background-color: red;
-}
 
-.bottomSection {
-	flex: 1 1 auto;
-	display: flex;
-	justify-content: center;
-	min-height: 0;
-	// overflow: hidden;
-	// background-color: pink;
-}
-
-// ── Mode selector (bottom-left) ──────────────────────────────────────────────
-
-.modeSelector {
-	display: flex;
-	justify-content: center;
-	flex-wrap: wrap;
-	gap: 0.25rem;
-	// flex-shrink: 0;
-	align-items: center;
-	// background-color: purple;
-}
-
-.modeButton {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 0.125rem;
-	padding: 0.25rem 0.5rem;
-	min-height: 2.5rem;
-	background: transparent;
-	border: 1px solid $border;
-	border-radius: 0.3125rem;
-	color: $dim;
-	font-size: 0.75rem;
-	font-family: inherit;
-	cursor: pointer;
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
-
-	&:hover {
-		color: $fg;
-		background: $highlight-bg;
-		border-color: $accent;
+	&__section {
+		flex: 1 1 auto;
+		display: flex;
+		justify-content: center;
+		min-height: 0;
 	}
-}
 
-.modeButtonActive {
-	color: #fff;
-	background: $accent;
-	border-color: $accent;
-
-	&:hover {
-		color: #fff;
-		background: $accent;
-		border-color: $accent;
+	&__selector {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		align-items: center;
 	}
-}
 
-.modeButtonLabel {
-	// font-size: 0.75rem;
-	font-weight: 500;
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	// background-color: yellow;
-}
+	// -- mode button base --
+	&__mode {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.125rem;
+		padding: 0.25rem 0.5rem;
+		min-height: 2.5rem;
+		background: transparent;
+		border: 1px solid $border;
+		border-radius: 0.3125rem;
+		color: $dim;
+		font-size: 0.75rem;
+		font-family: inherit;
+		cursor: pointer;
+		transition:
+			background 120ms ease,
+			color 120ms ease,
+			border-color 120ms ease;
 
-// ── Bridge buttons (taller, narrow, arrows below label) ────────────────────
+		&:hover {
+			color: $fg;
+			background: $highlight-bg;
+			border-color: $accent;
+		}
 
-.modeButtonBridge {
-	flex-direction: column;
-	gap: 0;
-	padding: 0.25rem 0.375rem;
-	border-style: dotted;
-	// border-color: lighten($border, 10%);
+		// --active (highlighted) --
+		&--active {
+			color: #fff;
+			background: $accent;
+			border-color: $accent;
 
-	&:hover {
-		border-color: $accent;
+			&:hover {
+				color: #fff;
+				background: $accent;
+				border-color: $accent;
+			}
+		}
+
+		// --bridge (dotted, taller, arrow below label) --
+		&--bridge {
+			flex-direction: column;
+			gap: 0;
+			padding: 0.25rem 0.375rem;
+			border-style: dotted;
+
+			&:hover {
+				border-color: $accent;
+			}
+		}
+
+		// --fulltext (distinct height, lighter weight) --
+		&--fulltext {
+			min-height: auto;
+
+			.bottom__mode-label {
+				font-weight: 300;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+			}
+		}
 	}
-}
 
-.modeButtonArrow {
-	font-size: 1.5rem;
-	// opacity: 0.6;
-	line-height: 0.75;
-	margin-top: -0.5rem;
-}
-
-.modeButtonLabelBridge {
-	// font-size: 0.75rem;
-	font-weight: 400;
-	text-transform: uppercase;
-	color: inherit;
-	// opacity: 0.5;
-}
-
-// ── Separator between primary modes and fulltext ─────────────────────────
-
-.modeSeparator {
-	width: 1px;
-	height: 1.5rem;
-	background: $border;
-	margin: 0 0.375rem;
-	flex-shrink: 0;
-}
-
-// ── Fulltext button (visually separated, distinct height) ──────────────────
-
-.modeButtonFulltext {
-	min-height: auto;
-
-	.modeButtonLabel {
-		// font-size: 0.625rem;
-		font-weight: 300;
+	&__mode-label {
+		font-weight: 500;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 	}
+
+	&__mode-arrow {
+		font-size: 1.5rem;
+		line-height: 0.75;
+		margin-top: -0.5rem;
+	}
+
+	&__mode-label-bridge {
+		font-weight: 400;
+		text-transform: uppercase;
+		color: inherit;
+	}
+
+	&__separator {
+		width: 1px;
+		height: 1.5rem;
+		background: $border;
+		margin: 0 0.375rem;
+		flex-shrink: 0;
+	}
 }
 
-// ── Player controls (bottom-right) ───────────────────────────────────────────
+// ── .player (bottom-right controls) ────────────────────────────────────────────
 
 .player {
 	display: flex;
@@ -324,81 +298,81 @@
 	border-radius: 0.5rem;
 	padding: 0.25rem 0.5rem;
 	flex-shrink: 0;
-}
 
-.playerBtn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	background: transparent;
-	border: 1px solid transparent;
-	border-radius: 0.3125rem;
-	color: $accent;
-	font-family: inherit;
-	cursor: pointer;
-	font-size: 1.125rem;
-	transition:
-		background 120ms ease,
-		color 120ms ease,
-		border-color 120ms ease;
+	&__btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 0.3125rem;
+		color: $accent;
+		font-family: inherit;
+		cursor: pointer;
+		font-size: 1.125rem;
+		transition:
+			background 120ms ease,
+			color 120ms ease,
+			border-color 120ms ease;
 
-	&:hover {
-		background: $highlight-bg;
-		border-color: $border;
-		color: $fg;
+		&:hover {
+			background: $highlight-bg;
+			border-color: $border;
+			color: $fg;
+		}
+
+		&:active {
+			background: $border;
+		}
+
+		&--active {
+			background: $accent;
+			color: #fff;
+			border-color: $accent;
+
+			&:hover {
+				background: $accent;
+				color: #fff;
+			}
+		}
 	}
 
-	&:active {
+	&__divider {
+		width: 1px;
+		height: 1.5rem;
 		background: $border;
+		margin: 0 0.25rem;
+	}
+
+	&__speed {
+		display: flex;
+		align-items: center;
+		gap: 0.125rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: $dim;
+		letter-spacing: 0.02em;
+		min-width: 2.5rem;
+		text-align: center;
+		justify-content: center;
 	}
 }
 
-.playerBtnActive {
-	background: $accent;
-	color: #fff;
-	border-color: $accent;
+// ── .progress (between stage and bottom bar) ──────────────────────────────────
 
-	&:hover {
-		background: $accent;
-		color: #fff;
+.progress {
+	&__bar {
+		font-size: 0.875rem;
+		color: $dim;
+		text-align: center;
+		padding: 0.5rem 1.25rem;
+		background: $highlight-bg;
 	}
 }
 
-.playerDivider {
-	width: 1px;
-	height: 1.5rem;
-	background: $border;
-	margin: 0 0.25rem;
-}
-
-.playerSpeed {
-	display: flex;
-	align-items: center;
-	gap: 0.125rem;
-	font-size: 0.6875rem;
-	font-weight: 600;
-	color: $dim;
-	letter-spacing: 0.02em;
-	min-width: 2.5rem;
-	text-align: center;
-	justify-content: center;
-}
-
-// ── Progress bar (between stage and bottom bar) ──────────────────────────────
-
-.progressBar {
-	font-size: 0.875rem;
-	color: $dim;
-	text-align: center;
-	padding: 0.5rem 1.25rem;
-	// padding-top: 0;
-	background: $highlight-bg;
-	// background-color: blueviolet;
-}
-
-// ── Footer ───────────────────────────────────────────────────────────────────
+// ── .footer ────────────────────────────────────────────────────────────────────
 
 .footer {
 	font-size: 0.75rem;
@@ -407,7 +381,7 @@
 	padding: 0.25rem 1.25rem;
 	border-top: 1px solid $border;
 
-	&.done {
+	&--done {
 		color: $accent;
 	}
 }

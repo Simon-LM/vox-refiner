@@ -482,18 +482,19 @@ export default function TtsDisplay() {
 
 	return (
 		<div className={styles.app}>
-			<div className={styles.status}>
-				<span className={styles.modeBadge}>{state.mode ?? "…"}</span>
-				<span className={styles.displayModeBadge}>{state.displayMode}</span>
+			<div className={styles.top}>
+				<span className={styles.top__mode}>{state.mode ?? "…"}</span>
+				<span className={styles.top__display}>{state.displayMode}</span>
 			</div>
 
 			{showTopic && (
-				<div className={styles.topicBar}>{displayChunk!.topic}</div>
+				<div className={styles.topic__bar}>{displayChunk!.topic}</div>
 			)}
 
 			<div className={styles.stage}>
 				{state.displayMode !== "fulltext" && (
-					<div className={`${styles.ctx} ${styles.before}`}>
+					<div
+						className={`${styles.stage__context} ${styles["stage__context--before"]}`}>
 						{isPreInit ? "" : beforeText}
 					</div>
 				)}
@@ -501,20 +502,26 @@ export default function TtsDisplay() {
 				<div
 					ref={bubbleRef}
 					className={[
-						styles.current,
-						isPreInit ? styles.preInit : "",
-						state.displayMode === "keywords" ? styles.keywords : "",
-						isBridgeMode ? styles.bridge : "",
-						state.displayMode === "fulltext" ? styles.fulltextSmall : "",
+						styles.stage__bubble,
+						isPreInit ? styles["stage__bubble--preinit"] : "",
+						state.displayMode === "keywords"
+							? styles["stage__bubble--keywords"]
+							: "",
+						isBridgeMode ? styles["stage__bubble--bridge"] : "",
+						state.displayMode === "fulltext"
+							? styles["stage__bubble--fulltext"]
+							: "",
 					]
 						.filter(Boolean)
 						.join(" ")}>
 					{isBridgeMode && bridgeData ? (
-						<div className={styles.bridgeInner}>
-							<div className={styles.bridgeCapsules}>
+						<div className={styles.stage__bridge}>
+							<div className={styles["stage__bridge-capsules"]}>
 								{bridgeData.keywords.join(" — ")}
 							</div>
-							<div className={styles.bridgeBody}>{bridgeData.secondary}</div>
+							<div className={styles["stage__bridge-body"]}>
+								{bridgeData.secondary}
+							</div>
 						</div>
 					) : (
 						renderMain()
@@ -522,22 +529,25 @@ export default function TtsDisplay() {
 				</div>
 
 				{state.displayMode !== "fulltext" && (
-					<div className={`${styles.ctx} ${styles.after}`}>
+					<div
+						className={`${styles.stage__context} ${styles["stage__context--after"]}`}>
 						{isPreInit ? preInitAfter : afterText}
 					</div>
 				)}
 			</div>
 
-			<div className={styles.progressBar}>{progress}</div>
+			<div className={styles.progress__bar}>{progress}</div>
 
 			{/*
         ── Bottom bar ────────────────────────────────────────────────────
         Left:   5 primary mode-selector buttons + separated "Texte exact"
         Right:  Player controls (visual only — not wired yet)
       */}
-			<div className={styles.bottomBar}>
-				<div className={styles.bottomSection}>
-					<div className={styles.modeSelector} aria-label="Mode d'affichage">
+			<div className={styles.bottom}>
+				<div className={styles.bottom__section}>
+					<div
+						className={styles.bottom__selector}
+						aria-label="Mode d'affichage">
 						{PRIMARY_MODES.map((m) => {
 							const isBridge =
 								m === "summary_keywords" || m === "keywords_quote";
@@ -546,9 +556,11 @@ export default function TtsDisplay() {
 									key={m}
 									type="button"
 									className={[
-										styles.modeButton,
-										state.displayMode === m ? styles.modeButtonActive : "",
-										isBridge ? styles.modeButtonBridge : "",
+										styles.bottom__mode,
+										state.displayMode === m
+											? styles["bottom__mode--active"]
+											: "",
+										isBridge ? styles["bottom__mode--bridge"] : "",
 									]
 										.filter(Boolean)
 										.join(" ")}
@@ -557,13 +569,13 @@ export default function TtsDisplay() {
 									title={MODE_LABEL[m]}>
 									{isBridge ? (
 										<>
-											<span className={styles.modeButtonLabelBridge}>
+											<span className={styles["bottom__mode-label-bridge"]}>
 												{MODE_LABEL[m]}
 											</span>
-											<span className={styles.modeButtonArrow}>↔</span>
+											<span className={styles["bottom__mode-arrow"]}>↔</span>
 										</>
 									) : (
-										<span className={styles.modeButtonLabel}>
+										<span className={styles["bottom__mode-label"]}>
 											{MODE_LABEL[m]}
 										</span>
 									)}
@@ -571,54 +583,58 @@ export default function TtsDisplay() {
 							);
 						})}
 
-						<span className={styles.modeSeparator} />
+						<span className={styles.bottom__separator} />
 
 						<button
 							type="button"
 							className={[
-								styles.modeButton,
-								styles.modeButtonFulltext,
-								state.displayMode === "fulltext" ? styles.modeButtonActive : "",
+								styles.bottom__mode,
+								styles["bottom__mode--fulltext"],
+								state.displayMode === "fulltext"
+									? styles["bottom__mode--active"]
+									: "",
 							]
 								.filter(Boolean)
 								.join(" ")}
 							onClick={() => onPickMode("fulltext")}
 							aria-pressed={state.displayMode === "fulltext"}
 							title={MODE_LABEL.fulltext}>
-							<span className={styles.modeButtonLabel}>
+							<span className={styles["bottom__mode-label"]}>
 								{MODE_LABEL.fulltext}
 							</span>
 						</button>
 					</div>
 				</div>
 
-				<div className={styles.bottomSection}>
+				<div className={styles.bottom__section}>
 					<div className={styles.player} aria-label="Contrôles de lecture">
 						<button
 							type="button"
-							className={styles.playerBtn}
+							className={styles.player__btn}
 							onClick={onSpeedDown}
 							title="Ralentir"
 							aria-label="Ralentir la vitesse de lecture">
 							−
 						</button>
-						<span className={styles.playerSpeed} aria-label="Vitesse actuelle">
+						<span
+							className={styles.player__speed}
+							aria-label="Vitesse actuelle">
 							×1.0
 						</span>
 						<button
 							type="button"
-							className={styles.playerBtn}
+							className={styles.player__btn}
 							onClick={onSpeedUp}
 							title="Accélérer"
 							aria-label="Accélérer la vitesse de lecture">
 							+
 						</button>
 
-						<div className={styles.playerDivider} />
+						<div className={styles.player__divider} />
 
 						<button
 							type="button"
-							className={styles.playerBtn}
+							className={styles.player__btn}
 							onClick={onPlay}
 							title="Lecture"
 							aria-label="Lecture">
@@ -626,7 +642,7 @@ export default function TtsDisplay() {
 						</button>
 						<button
 							type="button"
-							className={styles.playerBtn}
+							className={styles.player__btn}
 							onClick={onPause}
 							title="Pause"
 							aria-label="Pause">
@@ -634,7 +650,7 @@ export default function TtsDisplay() {
 						</button>
 						<button
 							type="button"
-							className={styles.playerBtn}
+							className={styles.player__btn}
 							onClick={onStop}
 							title="Arrêter"
 							aria-label="Arrêter la lecture">
@@ -644,7 +660,8 @@ export default function TtsDisplay() {
 				</div>
 			</div>
 
-			<div className={`${styles.footer}${state.done ? ` ${styles.done}` : ""}`}>
+			<div
+				className={`${styles.footer}${state.done ? ` ${styles["footer--done"]}` : ""}`}>
 				{footerText}
 			</div>
 		</div>

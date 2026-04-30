@@ -1,0 +1,24 @@
+<!-- @format -->
+
+# Git & Commit Workflow
+
+- **FORMAL PROHIBITION**: Never execute `git commit` or `git push`. You are strictly forbidden from committing code yourself.
+- **Commit Suggestions**: After a task is completed, you must suggest a clear and concise commit message in **English** (following Conventional Commits if possible, e.g., `feat: add auth logic`).
+- **Workflow**: Your job ends at the preparation of the code. The user handles all version control actions.
+
+## Quality Assurance & Testing
+
+- **Test-Driven Development**: For every new feature or logic implementation, you must write and run associated tests to verify the functionality before considering the task "done".
+- **Verification**: Always check if the new code breaks existing tests.
+
+## Environment & Build Constraints
+
+- **NO BUILDS**: Do not run `npm run build`, `pnpm run build`, or any build command. This interferes with the active `pnpm run dev` process and breaks the live preview.
+- **PNPM ONLY**: Do not use `npm` commands in this repository. Use `pnpm` instead.
+- **Manual Builds**: The user will handle production builds manually. Stick strictly to the development environment.
+
+## Documentation & Changelog
+
+- **Changelog Updates**: You must update the `CHANGELOG.md` file regularly as you progress through features.
+- **Version Tagging**: Do not increment or modify the version/tag number on your own.
+- **Sync with Commits**: When you suggest a commit message (as per Global Rules), this is the moment you should also update the changelog with the changes made, keeping the current version number unless explicitly told otherwise.

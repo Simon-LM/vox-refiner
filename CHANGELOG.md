@@ -13,6 +13,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.6] — 2026-04-29
+
+### Changed
+
+- **SCSS refactored to BEM naming with `&` nesting** (`frontend/styles/TtsDisplay.module.scss`).
+  All classes reorganised into 7 semantic blocks (`.app`, `.top`, `.topic`, `.stage`, `.bottom`,
+  `.player`, `.progress`, `.footer`) with `&__element` / `&--modifier` syntax and nested
+  pseudo-classes (`:hover`, `:active`).
+- **TSX class names aligned with BEM schema** (`frontend/components/TtsDisplay.tsx`).
+  Access to hyphenated properties via bracket notation (`styles["bottom__mode-arrow"]`).
+
+---
+
 ## [4.14.5] — 2026-04-29
 
 ### Changed
