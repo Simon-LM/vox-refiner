@@ -13,6 +13,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.7] — 2026-05-01
+
+### Fixed
+
+- **Frontend (TtsDisplay)**: `before`/`after` context zones were empty in voice mode. `currentDisplayIndex` was derived from `audio.char_start` directly, which failed when the audio char position fell outside any display chunk range. Fixed: `currentDisplayIndex` now uses the same `displayChunk` reference as the main bubble (via `findDisplayChunk(charPos)`), keeping context zones always in sync with the displayed text.
+- **Frontend (TtsDisplay)**: `before`/`after` context in `keywords_quote` mode showed `summary_short` instead of `quote_short`, due to a missing `case` in `renderDcText`. Fixed: `keywords_quote` now returns `quote_short || summary_short`, consistent with the main bubble rendering.
+
+### Removed
+
+- **Frontend (TtsDisplay)**: Dead code `preInitCurrent`, `preInitAfter`, and `isInsight`. These variables populated the bubble and after-context with insight summary text before audio started — a preview that was intentionally dropped in favour of a neutral "⏳ Préparation…" state.
+
+---
+
 ## [4.14.6] — 2026-04-29
 
 ### Changed

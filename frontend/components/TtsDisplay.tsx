@@ -120,16 +120,17 @@ const mockDisplayChunks: DisplayChunk[] = (() => {
 		{
 			anchor: "Le renard brun",
 			topic: "Renard et chien",
-			keywords: ["renard", "saut", "chien"],
-			summary_short: "Le renard brun saute par-dessus le chien paresseux.",
-			quote_short: "Le renard brun saute par-dessus le chien",
+			keywords: ["2 renard", "saut", "chien"],
+			summary_short: "1 Le renard brun saute par-dessus le chien paresseux.",
+			quote_short: "3 Le renard brun saute par-dessus le chien",
 		},
 		{
 			anchor: "La migration",
 			topic: "Migration des oiseaux",
-			keywords: ["migration", "oiseaux", "routes"],
-			summary_short: "Les oiseaux suivent des routes ancestrales millénaires.",
-			quote_short: "des routes ancestrales tracées depuis des millénaires",
+			keywords: ["2 migration", "oiseaux", "routes"],
+			summary_short:
+				"1 Les oiseaux suivent des routes ancestrales millénaires.",
+			quote_short: "3 des routes ancestrales tracées depuis des millénaires",
 		},
 		{
 			anchor: "VoxRefiner",
@@ -142,17 +143,17 @@ const mockDisplayChunks: DisplayChunk[] = (() => {
 		{
 			anchor: "Les modèles",
 			topic: "Synthèse vocale naturelle",
-			keywords: ["modèles", "synthèse", "naturelle"],
+			keywords: ["2 modèles", "synthèse", "naturelle"],
 			summary_short:
-				"Les modèles permettent une synthèse vocale naturelle et expressive.",
-			quote_short: "une synthèse vocale naturelle et expressive",
+				"1 Les modèles permettent une synthèse vocale naturelle et expressive.",
+			quote_short: "3 une synthèse vocale naturelle et expressive",
 		},
 		{
 			anchor: "Fin de la",
 			topic: "Fin de lecture",
-			keywords: ["fin", "lecture", "VoxRefiner"],
-			summary_short: "Fin de la lecture, merci d'avoir utilisé VoxRefiner.",
-			quote_short: "Fin de la lecture — merci d'avoir utilisé VoxRefiner",
+			keywords: ["2fin", "lecture", "VoxRefiner"],
+			summary_short: "1 Fin de la lecture, merci d'avoir utilisé VoxRefiner.",
+			quote_short: "3Fin de la lecture — merci d'avoir utilisé VoxRefiner",
 		},
 	];
 	let pos = 0;
@@ -226,14 +227,14 @@ export default function TtsDisplay() {
 				total: 5,
 				chunks: {
 					0: {
-						text: "Le renard brun et rapide saute par-dessus le chien paresseux.",
+						text: "5 Le renard brun et rapide saute par-dessus le chien paresseux.",
 						char_start: 0,
 						char_end: 60,
 						duration_s: 3,
 						receivedAt: now,
 					},
 					1: {
-						text: "La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.",
+						text: "5 La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.",
 						char_start: 62,
 						char_end: 147,
 						duration_s: 4,
@@ -247,14 +248,14 @@ export default function TtsDisplay() {
 						receivedAt: now,
 					},
 					3: {
-						text: "Les modèles de langage permettent une synthèse vocale naturelle et expressive.",
+						text: "5Les modèles de langage permettent une synthèse vocale naturelle et expressive.",
 						char_start: 221,
 						char_end: 297,
 						duration_s: 4,
 						receivedAt: now,
 					},
 					4: {
-						text: "Fin de la lecture — merci d'avoir utilisé VoxRefiner.",
+						text: "5 Fin de la lecture — merci d'avoir utilisé VoxRefiner.",
 						char_start: 299,
 						char_end: 350,
 						duration_s: 3,
@@ -381,42 +382,10 @@ export default function TtsDisplay() {
 	// ── Derived state ───────────────────────────────────────────────────────────
 
 	const isPreInit = state.current < 0;
-	const isInsight = state.mode === "insight";
-	const source = isInsight ? state.fullChunks : null;
 
 	const currentAudio = state.chunks[state.current];
 	const currentText =
 		currentAudio?.text || state.fullChunks[state.current] || "";
-	const beforeText = !isPreInit
-		? ((source
-				? source[state.current - 1]
-				: state.chunks[state.current - 1]?.text) ?? "")
-		: "";
-	const afterText = !isPreInit
-		? ((source
-				? source[state.current + 1]
-				: state.chunks[state.current + 1]?.text) ?? "")
-		: "";
-
-	const preInitCurrent =
-		isPreInit && isInsight && state.fullChunks.length > 0
-			? state.fullChunks[0]
-			: null;
-	const preInitAfter =
-		isPreInit && isInsight ? state.fullChunks.slice(1, 3).join(" · ") : "";
-
-	const total = state.total || state.fullChunks.length || state.current + 1;
-	const progress = isPreInit
-		? state.total > 0
-			? `0 / ${state.total} passages`
-			: "en attente…"
-		: `${state.current + 1} / ${total} passages`;
-
-	const footerText = state.errorMsg
-		? `⚠ ${state.errorMsg}`
-		: state.done
-			? "✓ Lecture terminée"
-			: "";
 
 	// ── Smart display lookup ────────────────────────────────────────────────────
 	void tick;
@@ -425,12 +394,52 @@ export default function TtsDisplay() {
 		? null
 		: findDisplayChunk(state.displayChunks, charPos);
 
+	// Current display chunk index for context navigation (aligned with bubble)
+	const currentDisplayIndex = displayChunk
+		? state.displayChunks.indexOf(displayChunk)
+		: -1;
+
+	const renderDcText = (dc: DisplayChunk | null): string => {
+		if (!dc) return "";
+		switch (state.displayMode) {
+			case "keywords":
+				return dc.keywords.join(" — ");
+			case "quote":
+			case "keywords_quote":
+				return dc.quote_short || dc.summary_short || "";
+			case "summary":
+			case "summary_keywords":
+				return dc.summary_short || "";
+			default:
+				return "";
+		}
+	};
+
+	const beforeText =
+		!isPreInit && currentDisplayIndex > 0
+			? renderDcText(state.displayChunks[currentDisplayIndex - 1])
+			: "";
+	const afterText =
+		!isPreInit &&
+		currentDisplayIndex >= 0 &&
+		currentDisplayIndex < state.displayChunks.length - 1
+			? renderDcText(state.displayChunks[currentDisplayIndex + 1])
+			: "";
+
+	const total = state.total || state.fullChunks.length || state.current + 1;
+	const progress = isPreInit
+		? state.total > 0
+			? `0 / ${state.total} passages`
+			: "en attente…"
+		: `${state.current + 1} / ${total} passages`;
+
 	// ── Rendering helpers ─────────────────────────────────────────────────────
 
 	/** Returns the primary displayed text for simple modes. */
 	const renderMain = (): string => {
-		if (isPreInit) return preInitCurrent ?? "En attente de la lecture…";
 		if (state.displayMode === "fulltext") return currentText;
+		if (state.done) return "✓ Lecture terminée";
+		if (isPreInit) return "⏳ Préparation…";
 		if (!displayChunk) return currentText; // Fallback while meta is loading
 		switch (state.displayMode) {
 			case "keywords":
@@ -514,7 +523,7 @@ export default function TtsDisplay() {
 					]
 						.filter(Boolean)
 						.join(" ")}>
-					{isBridgeMode && bridgeData ? (
+					{!state.done && !isPreInit && isBridgeMode && bridgeData ? (
 						<div className={styles.stage__bridge}>
 							<div className={styles["stage__bridge-capsules"]}>
 								{bridgeData.keywords.join(" — ")}
@@ -531,12 +540,34 @@ export default function TtsDisplay() {
 				{state.displayMode !== "fulltext" && (
 					<div
 						className={`${styles.stage__context} ${styles["stage__context--after"]}`}>
-						{isPreInit ? preInitAfter : afterText}
+						{afterText}
 					</div>
 				)}
 			</div>
 
-			<div className={styles.progress__bar}>{progress}</div>
+			<div className={styles.progress__bar}>
+				<div className={styles.progress__center}>
+					<button
+						type="button"
+						className={styles["progress__nav-btn"]}
+						onClick={() => {}}
+						title="Page précédente"
+						aria-label="Page précédente">
+						◀
+					</button>
+
+					<span className={styles.progress__page}>{progress}</span>
+
+					<button
+						type="button"
+						className={styles["progress__nav-btn"]}
+						onClick={() => {}}
+						title="Page suivante"
+						aria-label="Page suivante">
+						▶
+					</button>
+				</div>
+			</div>
 
 			{/*
         ── Bottom bar ────────────────────────────────────────────────────
@@ -660,10 +691,7 @@ export default function TtsDisplay() {
 				</div>
 			</div>
 
-			<div
-				className={`${styles.footer}${state.done ? ` ${styles["footer--done"]}` : ""}`}>
-				{footerText}
-			</div>
+			<div className={styles.footer} />
 		</div>
 	);
 }
