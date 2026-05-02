@@ -257,15 +257,18 @@ _dbg.merge_into('display_meta_pipeline', {
 }
 
 _web_watch_cleaned_then_meta() {
-    # Usage: _web_watch_cleaned_then_meta <cleaned_text_file>
+    # Usage: _web_watch_cleaned_then_meta <cleaned_text_file> [original_text_file]
     # For voice mode: poll for the cleaned text file written by tts.py
     # (TTS_CLEANED_TEXT_OUT). When it appears:
-    #   - always send a `full_text` SSE event (for fulltext display mode)
-    #   - send display_meta unless in fulltext mode
+    #   - if original_text_file is provided, call display_reconstitute to rebuild
+    #     proper display paragraphs; otherwise fall back to the raw cleaned text
+    #   - send the result as a `full_text` SSE event (for fulltext display mode)
+    #   - send display_meta (on the TTS-cleaned text) unless in fulltext mode
     [ "${VOX_WEB_DISPLAY:-0}" != "1" ] && return 0
     [ -z "${_WEB_PORT:-}" ] && return 0
 
     local _file="$1"
+    local _orig_file="${2:-}"
     local _port="$_WEB_PORT"
     (
         # Wait up to 30s (cleaning should finish in 1–2s normally).
@@ -278,21 +281,52 @@ _web_watch_cleaned_then_meta() {
             local _cleaned
             _cleaned="$(cat "$_file")"
 
-            # Send full_text event so fulltext mode can paginate the cleaned text.
-            local _full_body
-            _full_body="$(VOX_FULL_TEXT="$_cleaned" "$VENV_PYTHON" -c "
+            # Fire display_meta immediately — it must not wait for display_reconstitute.
+            # display_meta uses the TTS-cleaned text (anchor positions must match the
+            # text that audio chunks were computed against).
+            [ "${VOX_WEB_DISPLAY_MODE:-summary}" != "fulltext" ] && \
+                _web_send_display_meta "$_cleaned"
+
+            # Reconstruct display pages (JSON) when original selection is available.
+            # Runs after display_meta has been dispatched (non-blocking above).
+            # Falls back to plain cleaned text when reconstruct returns empty string.
+            local _full_body=""
+            if [ -n "$_orig_file" ] && [ -s "$_orig_file" ]; then
+                local _reconstructed
+                _reconstructed="$(
+                    "$VENV_PYTHON" -m src.display_reconstitute \
+                        --original "$_orig_file" --cleaned "$_file" 2>/dev/null
+                )"
+                if [ -n "$_reconstructed" ]; then
+                    # _reconstructed is a validated JSON string {"pages": [[{type,text}]]}
+                    # Write to temp file to avoid env-var size limits.
+                    local _pages_file
+                    _pages_file="$(mktemp /tmp/vox-pages-XXXXXX)"
+                    printf '%s' "$_reconstructed" > "$_pages_file"
+                    _full_body="$(VOX_PAGES_FILE="$_pages_file" "$VENV_PYTHON" -c "
+import json, os
+with open(os.environ['VOX_PAGES_FILE'], encoding='utf-8') as f:
+    pages = json.load(f)
+print(json.dumps({'type': 'full_text', 'payload': pages}))
+" 2>/dev/null)"
+                    rm -f "$_pages_file"
+                fi
+            fi
+
+            # If reconstruct failed or was skipped, fall back to plain cleaned text.
+            if [ -z "$_full_body" ]; then
+                _full_body="$(VOX_FULL_TEXT="$_cleaned" "$VENV_PYTHON" -c "
 import json, os
 print(json.dumps({'type': 'full_text', 'payload': {'text': os.environ['VOX_FULL_TEXT']}}))
 " 2>/dev/null)"
+            fi
+
             if [ -n "$_full_body" ]; then
                 curl -s --max-time 1.0 -X POST \
                     -H "Content-Type: application/json" \
                     --data-binary "$_full_body" \
                     "http://127.0.0.1:${_port}/push" >/dev/null 2>&1
             fi
-
-            [ "${VOX_WEB_DISPLAY_MODE:-summary}" != "fulltext" ] && \
-                _web_send_display_meta "$_cleaned"
         fi
     ) &
 }

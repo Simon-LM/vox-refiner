@@ -13,6 +13,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.15.0] — 2026-05-02
+
+### Added
+
+- **`src/display_reconstitute.py`** : Le module retourne désormais un JSON structuré `{"pages": [[{"type": "heading"|"subheading"|"paragraph", "text": "..."}]]}` au lieu d'un texte brut. Le paramètre `response_format: {"type": "json_object"}` est passé à Mistral Small ; la structure est validée avant envoi (fallback silencieux sur le texte nettoyé en cas d'erreur).
+- **`src/web_display.sh`** : `_web_watch_cleaned_then_meta` envoie un payload SSE `full_text` avec `{pages: [...]}` lorsque `display_reconstitute` réussit, et repasse sur `{text: "..."}` (texte nettoyé brut) en cas d'échec.
+- **Frontend (TtsDisplay)** : Nouveau type `FulltextBlock` et `fullChunks: FulltextBlock[][]`. Le rendu "Texte exact" affiche des blocs typés : `stage__fulltext-heading` (accent + majuscules), `stage__fulltext-subheading` (italique), `stage__fulltext-paragraph` (corps). Le mode Insight reste fonctionnel via `flat()` sur toutes les pages. Le fallback `{text}` (plain) est converti en `[[{type:"paragraph", text}]]` via `splitToFulltextPages()`.
+
+---
+
 ## [4.14.8] — 2026-05-02
 
 ### Fixed

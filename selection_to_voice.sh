@@ -228,7 +228,11 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
     # Cleaned-text sidecar: tts.py writes the post-cleaning text here so the
     # display_meta branch can reuse it (no duplicated AI cleaning call).
     _CLEANED_TEXT_FILE="$REC_DIR/.cleaned.txt"
-    rm -f "$_CLEANED_TEXT_FILE"
+    _ORIGINAL_TEXT_FILE="$REC_DIR/.original_selection.txt"
+    rm -f "$_CLEANED_TEXT_FILE" "$_ORIGINAL_TEXT_FILE"
+    # Write original selection now — consumed later by display_reconstitute
+    # to reconstruct proper display paragraphs from the TTS-cleaned text.
+    printf '%s' "$selected_text" > "$_ORIGINAL_TEXT_FILE"
     printf '%s' "$selected_text" | \
         TTS_VOICE_ID="$_sel_voice" TTS_LANG="$_sel_lang" \
         TTS_CLEANED_TEXT_OUT="$_CLEANED_TEXT_FILE" \
@@ -250,9 +254,9 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
     _web_start voice
     _web_push_init voice
     # Watch the cleaned-text sidecar; when tts.py finishes cleaning (~1–2 s),
-    # send the cleaned text as `full_text` SSE event (for fulltext mode) and
-    # launch display_meta in background on the cleaned text.
-    _web_watch_cleaned_then_meta "$_CLEANED_TEXT_FILE"
+    # reconstruct display paragraphs (display_reconstitute) then send `full_text`
+    # SSE event and launch display_meta in background.
+    _web_watch_cleaned_then_meta "$_CLEANED_TEXT_FILE" "$_ORIGINAL_TEXT_FILE"
 
     # Python prints chunk file paths (or CHUNK_FAILED:<idx>) to the FIFO.
     # Retries are handled in Python to preserve per-chunk voice selection

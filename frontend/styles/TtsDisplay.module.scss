@@ -135,7 +135,35 @@
 			line-height: 1.5;
 			text-align: left;
 			padding: 1rem 1.5rem;
-			white-space: pre-line;
+		}
+
+		// -- fulltext typed blocks --
+		&__fulltext-content {
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+		}
+
+		&__fulltext-heading {
+			font-size: clamp(0.9rem, 1.8vw, 1.15rem);
+			font-weight: 700;
+			color: $accent;
+			text-transform: uppercase;
+			letter-spacing: 0.04em;
+		}
+
+		&__fulltext-subheading {
+			font-size: clamp(0.875rem, 1.6vw, 1.05rem);
+			font-weight: 600;
+			color: $dim;
+			font-style: italic;
+		}
+
+		&__fulltext-paragraph {
+			font-size: clamp(0.875rem, 1.5vw, 1.05rem);
+			font-weight: 400;
+			line-height: 1.65;
+			color: $fg;
 		}
 
 		&--bridge {

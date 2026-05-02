@@ -7,6 +7,11 @@ import styles from "@/styles/TtsDisplay.module.scss";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface FulltextBlock {
+	type: "heading" | "subheading" | "paragraph";
+	text: string;
+}
+
 interface DisplayChunk {
 	char_start: number;
 	char_end: number;
@@ -63,7 +68,7 @@ interface TtsState {
 	displayMode: DisplayMode;
 	total: number;
 	chunks: Record<number, AudioChunkInfo>;
-	fullChunks: string[];
+	fullChunks: FulltextBlock[][];
 	current: number;
 	done: boolean;
 	errorMsg: string | null;
@@ -93,6 +98,14 @@ function findDisplayChunk(
 	if (charPos >= chunks[chunks.length - 1].char_start)
 		return chunks[chunks.length - 1];
 	return chunks[0];
+}
+
+function splitToFulltextPages(text: string): FulltextBlock[][] {
+	return text
+		.split(/\n\s*\n+/)
+		.map((s) => s.trim())
+		.filter(Boolean)
+		.map((s) => [{ type: "paragraph" as const, text: s }]);
 }
 
 function estimateCharPos(
@@ -290,10 +303,7 @@ export default function TtsDisplay() {
 						receivedAt: now,
 					},
 				},
-				fullChunks: mockSourceText
-					.split(/\n\s*\n+/)
-					.map((s) => s.trim())
-					.filter(Boolean),
+				fullChunks: splitToFulltextPages(mockSourceText),
 				current: 2,
 				done: false,
 				errorMsg: null,
@@ -324,12 +334,7 @@ export default function TtsDisplay() {
 					next.fulltextPage = 0;
 					next.manualDisplayPage = null;
 					const fullText = payload?.full_text as string | undefined;
-					next.fullChunks = fullText
-						? fullText
-								.split(/\n\s*\n+/)
-								.map((s) => s.trim())
-								.filter(Boolean)
-						: [];
+					next.fullChunks = fullText ? splitToFulltextPages(fullText) : [];
 				} else if (type === "chunk") {
 					const idx = typeof payload?.idx === "number" ? payload.idx : -1;
 					if (idx >= 0) {
@@ -357,12 +362,13 @@ export default function TtsDisplay() {
 					next.displayChunks = chunks;
 					next.totalChars = (payload?.total_chars as number) || 0;
 				} else if (type === "full_text") {
+					const pages = payload?.pages as FulltextBlock[][] | undefined;
 					const text = payload?.text as string | undefined;
-					if (text) {
-						next.fullChunks = text
-							.split(/\n\s*\n+/)
-							.map((s) => s.trim())
-							.filter(Boolean);
+					if (pages && Array.isArray(pages) && pages.length > 0) {
+						next.fullChunks = pages;
+						next.fulltextPage = 0;
+					} else if (text) {
+						next.fullChunks = splitToFulltextPages(text);
 						next.fulltextPage = 0;
 					}
 				} else if (type === "done") {
@@ -429,8 +435,7 @@ export default function TtsDisplay() {
 	const isPreInit = state.current < 0;
 
 	const currentAudio = state.chunks[state.current];
-	const currentText =
-		currentAudio?.text || state.fullChunks[state.current] || "";
+	const currentText = currentAudio?.text || "";
 
 	// ── Smart display lookup ────────────────────────────────────────────────────
 	void tick;
@@ -486,12 +491,29 @@ export default function TtsDisplay() {
 
 	// ── Rendering helpers ─────────────────────────────────────────────────────
 
-	/** Returns the primary displayed text for simple modes. */
-	const renderMain = (): string => {
+	const BLOCK_CLASS: Record<FulltextBlock["type"], string> = {
+		heading: styles["stage__fulltext-heading"],
+		subheading: styles["stage__fulltext-subheading"],
+		paragraph: styles["stage__fulltext-paragraph"],
+	};
+
+	/** Returns the primary displayed content for the current mode. */
+	const renderMain = (): React.ReactNode => {
 		if (state.displayMode === "fulltext") {
-			if (state.fullChunks.length === 0) return currentText;
-			if (state.mode === "insight") return state.fullChunks.join("\n\n");
-			return state.fullChunks[state.fulltextPage] ?? currentText;
+			const blocks =
+				state.mode === "insight"
+					? state.fullChunks.flat()
+					: (state.fullChunks[state.fulltextPage] ?? []);
+			if (blocks.length === 0) return currentText;
+			return (
+				<div className={styles["stage__fulltext-content"]}>
+					{blocks.map((block, i) => (
+						<div key={i} className={BLOCK_CLASS[block.type]}>
+							{block.text}
+						</div>
+					))}
+				</div>
+			);
 		}
 		if (state.done && currentDisplayIndex >= state.displayChunks.length)
 			return "✓ Lecture terminée";
