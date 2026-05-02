@@ -259,13 +259,14 @@ _dbg.merge_into('display_meta_pipeline', {
 _web_watch_cleaned_then_meta() {
     # Usage: _web_watch_cleaned_then_meta <cleaned_text_file>
     # For voice mode: poll for the cleaned text file written by tts.py
-    # (TTS_CLEANED_TEXT_OUT). When it appears, launch _web_send_display_meta
-    # in background. No-op when web display is off or in fulltext mode.
+    # (TTS_CLEANED_TEXT_OUT). When it appears:
+    #   - always send a `full_text` SSE event (for fulltext display mode)
+    #   - send display_meta unless in fulltext mode
     [ "${VOX_WEB_DISPLAY:-0}" != "1" ] && return 0
-    [ "${VOX_WEB_DISPLAY_MODE:-summary}" = "fulltext" ] && return 0
     [ -z "${_WEB_PORT:-}" ] && return 0
 
     local _file="$1"
+    local _port="$_WEB_PORT"
     (
         # Wait up to 30s (cleaning should finish in 1–2s normally).
         local _i
@@ -276,7 +277,22 @@ _web_watch_cleaned_then_meta() {
         if [ -s "$_file" ]; then
             local _cleaned
             _cleaned="$(cat "$_file")"
-            _web_send_display_meta "$_cleaned"
+
+            # Send full_text event so fulltext mode can paginate the cleaned text.
+            local _full_body
+            _full_body="$(VOX_FULL_TEXT="$_cleaned" "$VENV_PYTHON" -c "
+import json, os
+print(json.dumps({'type': 'full_text', 'payload': {'text': os.environ['VOX_FULL_TEXT']}}))
+" 2>/dev/null)"
+            if [ -n "$_full_body" ]; then
+                curl -s --max-time 1.0 -X POST \
+                    -H "Content-Type: application/json" \
+                    --data-binary "$_full_body" \
+                    "http://127.0.0.1:${_port}/push" >/dev/null 2>&1
+            fi
+
+            [ "${VOX_WEB_DISPLAY_MODE:-summary}" != "fulltext" ] && \
+                _web_send_display_meta "$_cleaned"
         fi
     ) &
 }

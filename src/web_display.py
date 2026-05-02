@@ -58,6 +58,7 @@ class _Broadcaster:
         self._clients: list[queue.Queue[Optional[tuple[str, str]]]] = []
         self._last_init: Optional[tuple[str, str]] = None
         self._last_display_chunks: Optional[tuple[str, str]] = None
+        self._last_full_text: Optional[tuple[str, str]] = None
         self._last_chunk: Optional[tuple[str, str]] = None
 
     def add_client(self) -> queue.Queue[Optional[tuple[str, str]]]:
@@ -69,6 +70,8 @@ class _Broadcaster:
                 q.put(self._last_init)
             if self._last_display_chunks is not None:
                 q.put(self._last_display_chunks)
+            if self._last_full_text is not None:
+                q.put(self._last_full_text)
             if self._last_chunk is not None:
                 q.put(self._last_chunk)
         return q
@@ -86,10 +89,13 @@ class _Broadcaster:
                 self._last_init = (event_type, data_json)
                 self._last_chunk = None             # new init resets chunk replay
                 self._last_display_chunks = None    # new init resets meta replay
+                self._last_full_text = None         # new init resets full_text replay
             elif event_type == "chunk":
                 self._last_chunk = (event_type, data_json)
             elif event_type == "display_chunks":
                 self._last_display_chunks = (event_type, data_json)
+            elif event_type == "full_text":
+                self._last_full_text = (event_type, data_json)
             for q in list(self._clients):
                 try:
                     q.put_nowait((event_type, data_json))

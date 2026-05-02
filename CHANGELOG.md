@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.14.8] — 2026-05-02
+
+### Fixed
+
+- **Frontend (TtsDisplay)** : Navigation manuelle (◀/▶) désormais "collante" en mode Voice — `manualDisplayPage` n'est plus réinitialisé par chaque événement SSE `chunk`, de sorte qu'un retour arrière reste stable jusqu'au clic sur le compteur (reprise auto), cohérent avec le comportement existant en mode Insight.
+- **Frontend (TtsDisplay)** : Mode "Texte exact" en Voice affiche désormais le texte nettoyé par Mistral (issu de `tts.py`) au lieu du texte brut sélectionné. Le texte nettoyé est transmis via un nouvel événement SSE `full_text` dès que `tts.py` termine son nettoyage (~1–2 s), et paginé par paragraphes.
+
+### Added
+
+- **Frontend (TtsDisplay)** : Classe `.progress__nav-arrow` pour centrer verticalement les symboles ◀ et ▶ des boutons de navigation.
+- **SSE / `web_display.py`** : Nouvel événement `full_text` (avec replay pour les connexions tardives) transmettant le texte nettoyé au browser en mode Voice.
+- **`src/web_display.sh`** : `_web_watch_cleaned_then_meta` envoie l'événement `full_text` en plus du `display_meta` ; la garde "fulltext mode = skip" est retirée (les deux modes bénéficient du texte nettoyé).
+
+---
+
 ## [4.14.7] — 2026-05-01
 
 ### Fixed

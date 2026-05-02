@@ -69,6 +69,8 @@ interface TtsState {
 	errorMsg: string | null;
 	displayChunks: DisplayChunk[];
 	totalChars: number;
+	fulltextPage: number;
+	manualDisplayPage: number | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -109,11 +111,35 @@ function estimateCharPos(
 // ── Mock state (dev preview — append ?mock to URL) ────────────────────────────
 
 const mockSourceText =
-	"• Le renard brun et rapide saute par-dessus le chien paresseux.\n\n" +
-	"• La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires.\n\n" +
-	"• VoxRefiner transforme votre texte sélectionné en audio de haute qualité.\n\n" +
-	"• Les modèles de langage permettent une synthèse vocale naturelle et expressive.\n\n" +
-	"Fin de la lecture — merci d'avoir utilisé VoxRefiner.";
+	"10 Le renard brun et rapide saute par-dessus le chien paresseux. " +
+	"Cette phrase classique est utilisée depuis des siècles pour tester les polices de caractères et les claviers, " +
+	"car elle contient toutes les lettres de l'alphabet latin. " +
+	"On l'appelle un pangramme, et elle reste une référence incontournable dans le monde de la typographie.\n\n" +
+	"11 La migration des oiseaux suit des routes ancestrales tracées depuis des millénaires. " +
+	"Ces trajectoires, transmises de génération en génération, permettent aux espèces de rejoindre " +
+	"leurs zones de reproduction ou d'hivernage avec une précision remarquable. " +
+	"Des études récentes montrent que certains oiseaux utilisent le champ magnétique terrestre " +
+	"comme boussole naturelle pour s'orienter sur des milliers de kilomètres.\n\n" +
+	"13 VoxRefiner transforme votre texte sélectionné en audio de haute qualité. " +
+	"Il suffit de sélectionner un passage dans n'importe quelle application, " +
+	"d'activer le raccourci clavier, et le texte est lu à voix haute en quelques secondes. " +
+	"Le pipeline repose exclusivement sur les modèles Mistral, " +
+	"garantissant rapidité et confidentialité sans dépendance à des services tiers.\n\n" +
+	"14 Les modèles de langage permettent une synthèse vocale naturelle et expressive. " +
+	"Grâce aux avancées récentes en apprentissage profond, les voix générées sont devenues " +
+	"quasiment indiscernables d'une voix humaine dans de nombreuses langues. " +
+	"Cette technologie ouvre de nouvelles perspectives pour l'accessibilité numérique, " +
+	"notamment pour les personnes malvoyantes ou présentant des difficultés de lecture.\n\n" +
+	"15 Les modèles de langage permettent une synthèse vocale naturelle et expressive. " +
+	"Grâce aux avancées récentes en apprentissage profond, les voix générées sont devenues " +
+	"quasiment indiscernables d'une voix humaine dans de nombreuses langues. " +
+	"Cette technologie ouvre de nouvelles perspectives pour l'accessibilité numérique, " +
+	"notamment pour les personnes malvoyantes ou présentant des difficultés de lecture.\n\n" +
+	"16 Fin de la lecture — merci d'avoir utilisé VoxRefiner. " +
+	"Vous pouvez désormais coller le texte raffiné dans votre application, " +
+	"ou relancer une nouvelle capture en sélectionnant un autre passage. " +
+	"N'hésitez pas à explorer les différents modes d'affichage disponibles " +
+	"pour trouver celui qui correspond le mieux à vos besoins.";
 
 const mockDisplayChunks: DisplayChunk[] = (() => {
 	const anchors = [
@@ -186,6 +212,8 @@ const initialState: TtsState = {
 	errorMsg: null,
 	displayChunks: [],
 	totalChars: 0,
+	fulltextPage: 0,
+	manualDisplayPage: null,
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -262,12 +290,17 @@ export default function TtsDisplay() {
 						receivedAt: now,
 					},
 				},
-				fullChunks: [],
+				fullChunks: mockSourceText
+					.split(/\n\s*\n+/)
+					.map((s) => s.trim())
+					.filter(Boolean),
 				current: 2,
 				done: false,
 				errorMsg: null,
 				displayChunks: mockDisplayChunks,
 				totalChars: mockSourceText.length,
+				fulltextPage: 0,
+				manualDisplayPage: null,
 			});
 			return;
 		}
@@ -288,6 +321,8 @@ export default function TtsDisplay() {
 					next.errorMsg = null;
 					next.displayChunks = [];
 					next.totalChars = 0;
+					next.fulltextPage = 0;
+					next.manualDisplayPage = null;
 					const fullText = payload?.full_text as string | undefined;
 					next.fullChunks = fullText
 						? fullText
@@ -321,6 +356,15 @@ export default function TtsDisplay() {
 					const chunks = (payload?.chunks as DisplayChunk[] | undefined) || [];
 					next.displayChunks = chunks;
 					next.totalChars = (payload?.total_chars as number) || 0;
+				} else if (type === "full_text") {
+					const text = payload?.text as string | undefined;
+					if (text) {
+						next.fullChunks = text
+							.split(/\n\s*\n+/)
+							.map((s) => s.trim())
+							.filter(Boolean);
+						next.fulltextPage = 0;
+					}
 				} else if (type === "done") {
 					next.done = true;
 				} else if (type === "error") {
@@ -343,6 +387,7 @@ export default function TtsDisplay() {
 		es.addEventListener("display_chunks", (e) =>
 			apply("display_chunks", parse(e)),
 		);
+		es.addEventListener("full_text", (e) => apply("full_text", parse(e)));
 		es.addEventListener("done", () => apply("done", null));
 		es.addEventListener("error", (e) => apply("error", parse(e)));
 
@@ -390,14 +435,20 @@ export default function TtsDisplay() {
 	// ── Smart display lookup ────────────────────────────────────────────────────
 	void tick;
 	const charPos = estimateCharPos(currentAudio, performance.now());
-	const displayChunk = isPreInit
+	const autoDisplayChunk = isPreInit
 		? null
 		: findDisplayChunk(state.displayChunks, charPos);
-
-	// Current display chunk index for context navigation (aligned with bubble)
-	const currentDisplayIndex = displayChunk
-		? state.displayChunks.indexOf(displayChunk)
+	const autoDisplayIndex = autoDisplayChunk
+		? state.displayChunks.indexOf(autoDisplayChunk)
 		: -1;
+
+	// Manual override (from ◀/▶) takes precedence over auto-computed index.
+	// Resets on each new audio chunk so auto-advance resumes naturally.
+	// When done with no manual override, land on the virtual N-th bubble.
+	const currentDisplayIndex =
+		state.manualDisplayPage ??
+		(state.done ? state.displayChunks.length : autoDisplayIndex);
+	const displayChunk = state.displayChunks[currentDisplayIndex] ?? null;
 
 	const renderDcText = (dc: DisplayChunk | null): string => {
 		if (!dc) return "";
@@ -437,8 +488,13 @@ export default function TtsDisplay() {
 
 	/** Returns the primary displayed text for simple modes. */
 	const renderMain = (): string => {
-		if (state.displayMode === "fulltext") return currentText;
-		if (state.done) return "✓ Lecture terminée";
+		if (state.displayMode === "fulltext") {
+			if (state.fullChunks.length === 0) return currentText;
+			if (state.mode === "insight") return state.fullChunks.join("\n\n");
+			return state.fullChunks[state.fulltextPage] ?? currentText;
+		}
+		if (state.done && currentDisplayIndex >= state.displayChunks.length)
+			return "✓ Lecture terminée";
 		if (isPreInit) return "⏳ Préparation…";
 		if (!displayChunk) return currentText; // Fallback while meta is loading
 		switch (state.displayMode) {
@@ -482,6 +538,35 @@ export default function TtsDisplay() {
 	const onPickMode = (m: DisplayMode) =>
 		setState((prev) => ({ ...prev, displayMode: m }));
 
+	// ── Display chunk navigation handlers (non-fulltext modes) ────────────────
+	const onResumeAuto = () =>
+		setState((prev) => ({ ...prev, manualDisplayPage: null }));
+	const onDisplayPrev = () =>
+		setState((prev) => ({
+			...prev,
+			manualDisplayPage: Math.max(0, currentDisplayIndex - 1),
+		}));
+	const onDisplayNext = () =>
+		setState((prev) => ({
+			...prev,
+			manualDisplayPage: Math.min(
+				prev.done ? prev.displayChunks.length : prev.displayChunks.length - 1,
+				currentDisplayIndex + 1,
+			),
+		}));
+
+	// ── Fulltext pagination handlers ───────────────────────────────────────────
+	const onFulltextPrev = () =>
+		setState((prev) => ({
+			...prev,
+			fulltextPage: Math.max(0, prev.fulltextPage - 1),
+		}));
+	const onFulltextNext = () =>
+		setState((prev) => ({
+			...prev,
+			fulltextPage: Math.min(prev.fullChunks.length - 1, prev.fulltextPage + 1),
+		}));
+
 	// ── Player button click handlers (placeholder — not wired yet) ─────────────
 	const onPlay = () => {};
 	const onPause = () => {};
@@ -523,7 +608,10 @@ export default function TtsDisplay() {
 					]
 						.filter(Boolean)
 						.join(" ")}>
-					{!state.done && !isPreInit && isBridgeMode && bridgeData ? (
+					{!isPreInit &&
+					isBridgeMode &&
+					bridgeData &&
+					!(state.done && currentDisplayIndex >= state.displayChunks.length) ? (
 						<div className={styles.stage__bridge}>
 							<div className={styles["stage__bridge-capsules"]}>
 								{bridgeData.keywords.join(" — ")}
@@ -546,27 +634,82 @@ export default function TtsDisplay() {
 			</div>
 
 			<div className={styles.progress__bar}>
-				<div className={styles.progress__center}>
-					<button
-						type="button"
-						className={styles["progress__nav-btn"]}
-						onClick={() => {}}
-						title="Page précédente"
-						aria-label="Page précédente">
-						◀
-					</button>
-
-					<span className={styles.progress__page}>{progress}</span>
-
-					<button
-						type="button"
-						className={styles["progress__nav-btn"]}
-						onClick={() => {}}
-						title="Page suivante"
-						aria-label="Page suivante">
-						▶
-					</button>
-				</div>
+				{state.displayMode === "fulltext" ? (
+					state.mode !== "insight" && state.fullChunks.length > 1 ? (
+						<div className={styles.progress__center}>
+							<button
+								type="button"
+								className={styles["progress__nav-btn"]}
+								onClick={onFulltextPrev}
+								disabled={state.fulltextPage === 0}
+								title="Page précédente"
+								aria-label="Page précédente">
+								<span className={styles["progress__nav-arrow"]}>◀</span>
+							</button>
+							<span className={styles.progress__page}>
+								{state.fulltextPage + 1} / {state.fullChunks.length}
+							</span>
+							<button
+								type="button"
+								className={styles["progress__nav-btn"]}
+								onClick={onFulltextNext}
+								disabled={state.fulltextPage >= state.fullChunks.length - 1}
+								title="Page suivante"
+								aria-label="Page suivante">
+								<span className={styles["progress__nav-arrow"]}>▶</span>
+							</button>
+						</div>
+					) : null
+				) : (
+					<div className={styles.progress__center}>
+						<button
+							type="button"
+							className={styles["progress__nav-btn"]}
+							onClick={onDisplayPrev}
+							disabled={
+								state.displayChunks.length === 0 || currentDisplayIndex <= 0
+							}
+							title="Page précédente"
+							aria-label="Page précédente">
+							<span className={styles["progress__nav-arrow"]}>◀</span>
+						</button>
+						{currentDisplayIndex >= state.displayChunks.length ? (
+							<span className={styles.progress__page}>
+								✓ / {state.displayChunks.length}
+							</span>
+						) : state.manualDisplayPage !== null ? (
+							<button
+								type="button"
+								className={`${styles.progress__page} ${styles["progress__page--manual"]}`}
+								onClick={onResumeAuto}
+								title="Reprendre le défilement automatique"
+								aria-label="Reprendre le défilement automatique">
+								{currentDisplayIndex + 1} / {state.displayChunks.length}
+							</button>
+						) : (
+							<span className={styles.progress__page}>
+								{state.displayChunks.length > 0
+									? `${currentDisplayIndex + 1} / ${state.displayChunks.length}`
+									: progress}
+							</span>
+						)}
+						<button
+							type="button"
+							className={styles["progress__nav-btn"]}
+							onClick={onDisplayNext}
+							disabled={
+								state.displayChunks.length === 0 ||
+								currentDisplayIndex >=
+									(state.done
+										? state.displayChunks.length
+										: state.displayChunks.length - 1)
+							}
+							title="Page suivante"
+							aria-label="Page suivante">
+							<span className={styles["progress__nav-arrow"]}>▶</span>
+						</button>
+					</div>
+				)}
 			</div>
 
 			{/*

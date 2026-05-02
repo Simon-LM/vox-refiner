@@ -248,10 +248,10 @@ if [ "${#selected_text}" -gt "$TTS_CHUNK_THRESHOLD" ]; then
     trap '_web_stop' EXIT
 
     _web_start voice
-    _web_push_init voice "$selected_text"
+    _web_push_init voice
     # Watch the cleaned-text sidecar; when tts.py finishes cleaning (~1–2 s),
-    # launch display_meta in background on the cleaned text — same content
-    # Voxtral will read, no re-cleaning.
+    # send the cleaned text as `full_text` SSE event (for fulltext mode) and
+    # launch display_meta in background on the cleaned text.
     _web_watch_cleaned_then_meta "$_CLEANED_TEXT_FILE"
 
     # Python prints chunk file paths (or CHUNK_FAILED:<idx>) to the FIFO.

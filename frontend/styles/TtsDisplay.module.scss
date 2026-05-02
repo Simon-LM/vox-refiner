@@ -373,7 +373,7 @@
 	&__center {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: 0.25rem;
 		margin: 0 auto;
 	}
 
@@ -381,8 +381,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 3rem;
-		height: 2rem;
+		width: 4rem;
+		height: 1.5rem;
 		background: transparent;
 		border: 1px solid $border;
 		border-radius: 0.3125rem;
@@ -395,6 +395,7 @@
 			color 120ms ease,
 			border-color 120ms ease;
 		flex-shrink: 0;
+		// background-color: aquamarine;
 
 		&:hover {
 			background: $highlight-bg;
@@ -405,12 +406,43 @@
 		&:active {
 			background: $border;
 		}
+
+		&:disabled {
+			opacity: 0.3;
+			cursor: not-allowed;
+		}
+	}
+
+	&__nav-arrow {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1rem;
+		line-height: 0.75;
+		margin-top: -0.25rem;
+		// background-color: red;
 	}
 
 	&__page {
 		font-size: 0.875rem;
 		color: $dim;
 		text-align: center;
+		min-width: 3rem;
+		// background-color: aqua;
+
+		&--manual {
+			color: $accent;
+			background: transparent;
+			border: none;
+			font-family: inherit;
+			font-size: inherit;
+			padding: 0;
+			cursor: pointer;
+			&:hover {
+				// text-decoration: underline;
+				font-weight: 700;
+			}
+		}
 	}
 }
 

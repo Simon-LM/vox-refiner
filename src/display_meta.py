@@ -61,7 +61,7 @@ _URL        = "https://api.mistral.ai/v1/chat/completions"
 _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
 _RETRY_DELAYS = (1.5, 4.0)
 
-_SYSTEM = textwrap.dedent("""
+_SYSTEM_TEMPLATE = textwrap.dedent("""
     You receive a CLEANED text that will be read aloud. Your job is to slice it into
     SHORT display chunks for an on-screen reader companion (visually impaired users
     can pick a "summary" / "keywords" / "quote" overlay instead of the full text).
@@ -70,8 +70,8 @@ _SYSTEM = textwrap.dedent("""
     OPTIMISED FOR THE EYE, not for prosody. Aim for 1–2 short sentences or 60–180
     characters per display chunk. Cut on natural sentence / clause boundaries.
 
-    TARGET COUNT: produce between 4 and 10 display chunks total. For a
-    bullet-list summary, 1 chunk per bullet is usually right.
+    TARGET COUNT: produce between {target_min} and {target_max} display chunks total.
+    For a bullet-list summary, 1 chunk per bullet is usually right.
 
     CRITICAL — STAY CLOSE TO THE SOURCE WORDING:
     The user hears the source text spoken aloud while reading the display. Every
@@ -116,6 +116,14 @@ _SYSTEM = textwrap.dedent("""
 """).strip()
 
 
+def _make_system_prompt(target_min: int, target_max: int) -> str:
+    return (
+        _SYSTEM_TEMPLATE
+        .replace("{target_min}", str(target_min))
+        .replace("{target_max}", str(target_max))
+    )
+
+
 def generate(cleaned_text: str) -> dict:
     """Call Mistral Small and return the parsed display-meta dict.
 
@@ -130,20 +138,30 @@ def generate(cleaned_text: str) -> dict:
 
     _t0 = time.perf_counter()
 
+    # Dynamic chunk target: ~1 chunk per 150 chars (min), ~1 per 80 chars (max).
+    # max_tokens scales accordingly so long texts never hit a truncation wall.
+    n = len(cleaned_text)
+    target_min = max(4, n // 150)
+    target_max = max(target_min + 2, n // 80)
+    dynamic_max_tokens = max(_MAX_TOKENS, target_max * 150)
+
     # Open the debug section eagerly so any failure leaves a trace.
     _dbg.set_section("display_meta", {
         "model": _MODEL,
-        "input_chars": len(cleaned_text),
+        "input_chars": n,
+        "target_min": target_min,
+        "target_max": target_max,
+        "max_tokens": dynamic_max_tokens,
         "status": "starting",
     })
 
     payload = {
         "model":           _MODEL,
         "temperature":     0.0,
-        "max_tokens":      _MAX_TOKENS,
+        "max_tokens":      dynamic_max_tokens,
         "response_format": {"type": "json_object"},
         "messages": [
-            {"role": "system", "content": _SYSTEM},
+            {"role": "system", "content": _make_system_prompt(target_min, target_max)},
             {"role": "user",   "content": cleaned_text},
         ],
     }
