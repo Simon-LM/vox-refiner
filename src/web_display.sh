@@ -287,6 +287,10 @@ _web_watch_cleaned_then_meta() {
             [ "${VOX_WEB_DISPLAY_MODE:-summary}" != "fulltext" ] && \
                 _web_send_display_meta "$_cleaned"
 
+            # Stagger: wait 0.5s before starting display_reconstitute to avoid
+            # simultaneous Mistral API calls competing with display_meta.
+            sleep 0.5
+
             # Reconstruct display pages (JSON) when original selection is available.
             # Runs after display_meta has been dispatched (non-blocking above).
             # Falls back to plain cleaned text when reconstruct returns empty string.

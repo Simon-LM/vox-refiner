@@ -2,6 +2,67 @@
 
 @use "../styles/variables" as *;
 
+// ── Fonts ──────────────────────────────────────────────────────────────────────
+
+@font-face {
+	font-family: "Noto Sans";
+	src: url("/fonts/NotoSans-VariableFont_wdth,wght.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Noto Sans";
+	src: url("/fonts/NotoSans-Italic-VariableFont_wdth,wght.woff2")
+		format("woff2");
+	font-weight: 100 900;
+	font-style: italic;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Inter";
+	src: url("/fonts/Inter-VariableFont_opsz,wght.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Inter";
+	src: url("/fonts/Inter-Italic-VariableFont_opsz,wght.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: italic;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Lexend Deca";
+	src: url("/fonts/LexendDeca-VariableFont_wght.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Lexend Giga";
+	src: url("/fonts/LexendGiga-VariableFont_wght.woff2") format("woff2");
+	font-weight: 100 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Quicksand";
+	src: url("/fonts/Quicksand-VariableFont_wght.woff2") format("woff2");
+	font-weight: 300 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+// ── Reset ──────────────────────────────────────────────────────────────────────
+
 *,
 *::before,
 *::after {
@@ -15,6 +76,7 @@ body {
 	height: 100%;
 	background: $bg;
 	color: $fg;
-	font-family:
-		-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	// To test another font, swap the first entry:
+	// "Inter" | "Noto Sans" | "Lexend Deca" | "Lexend Giga" | "Quicksand"
+	font-family: "Inter", sans-serif;
 }

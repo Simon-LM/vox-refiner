@@ -521,7 +521,13 @@ export default function TtsDisplay() {
 		if (!displayChunk) return currentText; // Fallback while meta is loading
 		switch (state.displayMode) {
 			case "keywords":
-				return displayChunk.keywords.join(" — ");
+				return (
+					<div className={styles["stage__keywords-list"]}>
+						{displayChunk.keywords.map((kw, i) => (
+							<div key={i}>• {kw}</div>
+						))}
+					</div>
+				);
 			case "quote":
 				return (
 					displayChunk.quote_short || displayChunk.summary_short || currentText

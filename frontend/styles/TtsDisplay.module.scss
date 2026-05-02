@@ -169,6 +169,12 @@
 		text-align: center;
 	}
 
+	// -- keywords list (centered block, items left-aligned) --
+	&__keywords-list {
+		display: inline-block;
+		text-align: left;
+	}
+
 	// -- fulltext typed blocks (elements of .stage, rendered inside the bubble) --
 	&__fulltext-content {
 		display: flex;
@@ -296,9 +302,9 @@
 	}
 
 	&__mode-arrow {
-		font-size: 1.5rem;
+		font-size: 1rem;
 		line-height: 0.75;
-		margin-top: -0.5rem;
+		// margin-top: -0.5rem;
 	}
 
 	&__mode-label-bridge {
@@ -448,7 +454,7 @@
 		justify-content: center;
 		font-size: 1rem;
 		line-height: 0.75;
-		margin-top: -0.25rem;
+		// margin-top: -0.25rem;
 		// background-color: red;
 	}
 

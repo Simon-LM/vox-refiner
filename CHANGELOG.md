@@ -13,6 +13,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.15.2] — 2026-05-03
+
+### Added
+
+- **Frontend (TtsDisplay)** : Mode "Mots-clés" — les mots-clés sont maintenant affichés un par ligne avec un `•` devant, alignés entre eux et centrés dans la bulle (via un wrapper `inline-block`). Le mode dual (bridge) est inchangé.
+- **Frontend (globals.scss)** : Intégration de 5 polices variables locales (`Inter`, `Noto Sans`, `Lexend Deca`, `Lexend Giga`, `Quicksand`) via `@font-face`. Police active : `Inter`. Les fichiers `.woff2` sont servis depuis `frontend/public/fonts/`.
+
+### Fixed
+
+- **`src/web_display.sh`** (`_web_watch_cleaned_then_meta`) : Ajout d'un `sleep 0.5` entre le lancement de `display_meta` (background) et `display_reconstitute` (bloquant) pour réduire la contention sur l'API Mistral — corrige le bug intermittent où `display_meta` retournait seulement 2 chunks au lieu de 8–12.
+
+---
+
 ## [4.15.1] — 2026-05-02
 
 ### Fixed
