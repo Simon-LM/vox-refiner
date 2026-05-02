@@ -62,6 +62,11 @@ _voice_settings_flow() {
         printf "  ${C_BOLD}[2]${C_RESET} Translation target language   : ${C_BOLD}%s (%s)${C_RESET}  ${C_DIM}(type a code to change)${C_RESET}\n" \
             "$(_lang_name "$_SETTING_VOICE_LANG")" "$_SETTING_VOICE_LANG"
         echo ""
+        local _vs_web_label="off"
+        [ "${VOX_WEB_DISPLAY:-0}" = "1" ] && _vs_web_label="on"
+        printf "  ${C_DIM}Beta${C_RESET}\n"
+        printf "  ${C_BOLD}[3]${C_RESET} Browser display               : ${C_BOLD}%s${C_RESET}  ${C_DIM}(on · off)${C_RESET}\n" "$_vs_web_label"
+        echo ""
         printf "  ${C_BOLD}[m]${C_RESET} Back\n"
         printf "  ${C_BGREEN}▸${C_RESET} "
         read -r _vs_choice
@@ -98,6 +103,30 @@ _voice_settings_flow() {
                         fi
                     fi
                     _success "Target language → $(_lang_name "$_new_lang") ($_new_lang)  (saved to .env)"
+                fi
+                ;;
+            3)
+                local _env_file="$SCRIPT_DIR/.env"
+                if [ "${VOX_WEB_DISPLAY:-0}" = "1" ]; then
+                    export VOX_WEB_DISPLAY=0
+                    if [ -f "$_env_file" ]; then
+                        if grep -q "^VOX_WEB_DISPLAY=" "$_env_file"; then
+                            sed -i "s/^VOX_WEB_DISPLAY=.*/VOX_WEB_DISPLAY=0/" "$_env_file"
+                        else
+                            printf '\nVOX_WEB_DISPLAY=0\n' >> "$_env_file"
+                        fi
+                    fi
+                    _success "Browser display off  (saved to .env)"
+                else
+                    export VOX_WEB_DISPLAY=1
+                    if [ -f "$_env_file" ]; then
+                        if grep -q "^VOX_WEB_DISPLAY=" "$_env_file"; then
+                            sed -i "s/^VOX_WEB_DISPLAY=.*/VOX_WEB_DISPLAY=1/" "$_env_file"
+                        else
+                            printf '\nVOX_WEB_DISPLAY=1\n' >> "$_env_file"
+                        fi
+                    fi
+                    _success "Browser display on (beta)  (saved to .env)"
                 fi
                 ;;
             m|M) return ;;

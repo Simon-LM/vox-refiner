@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.15.1] — 2026-05-02
+
+### Fixed
+
+- **Frontend (TtsDisplay.module.scss)** : Les blocs typés `stage__fulltext-*` étaient imbriqués dans `&__bubble` au lieu de `.stage`, générant des noms de classes CSS incorrects (`.stage__bubble__fulltext-paragraph`) non reconnus par TypeScript → les styles n'étaient pas appliqués. Déplacés au niveau `.stage` pour correspondre aux références `styles["stage__fulltext-*"]` dans le composant.
+- **Frontend (TtsDisplay.module.scss)** : Ajout de `white-space: pre-line` sur `stage__fulltext-paragraph` pour préserver les sauts de ligne (`\n`) dans les bullets du mode Insight "Texte exact".
+
+### Added
+
+- **`vox-refiner-menu.sh`** : Toggle `[w] Browser display (beta)` dans les Settings généraux — affiche le statut courant (`on` / `off`), écrit `VOX_WEB_DISPLAY` dans `.env`.
+- **`src/text_flows.sh`** (`_settings_flow`) : Nouvelle section `Beta` avec `[6] Browser display : on/off` — disponible dans les settings de Insight, Search et Fact-check.
+- **`selection_to_voice.sh`** (`_voice_settings_flow`) : Nouvelle section `Beta` avec `[3] Browser display : on/off`.
+
+---
+
 ## [4.15.0] — 2026-05-02
 
 ### Added

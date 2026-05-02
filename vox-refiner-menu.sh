@@ -1666,11 +1666,18 @@ while true; do
             ;;
         s|S)
             while true; do
+                _web_disp_cur="${VOX_WEB_DISPLAY:-0}"
+                if [ "$_web_disp_cur" = "1" ]; then
+                    _web_disp_label="${C_BGREEN}on${C_RESET}"
+                else
+                    _web_disp_label="${C_DIM}off${C_RESET}"
+                fi
                 _header "SETTINGS" "⚙"
                 echo ""
                 printf "  ${C_BOLD}[k]${C_RESET}  API Keys\n"
                 printf "  ${C_BOLD}[v]${C_RESET}  Reading voice (Selection to Voice)\n"
                 printf "  ${C_BOLD}[c]${C_RESET}  Citation voice (quoted paragraphs)\n"
+                printf "  ${C_BOLD}[w]${C_RESET}  Browser display ${C_DIM}(bêta)${C_RESET}  —  %b\n" "$_web_disp_label"
                 printf "  ${C_BOLD}[e]${C_RESET}  Edit .env\n"
                 echo ""
                 printf "  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner\n"
@@ -1686,6 +1693,18 @@ while true; do
                         ;;
                     c|C)
                         _voice_picker "TTS_QUOTE_VOICE_ID" "CITATION VOICE" "1"
+                        ;;
+                    w|W)
+                        if [ "${VOX_WEB_DISPLAY:-0}" = "1" ]; then
+                            _set_env_var "VOX_WEB_DISPLAY" "0"
+                            export VOX_WEB_DISPLAY=0
+                            _info "Browser display off."
+                        else
+                            _set_env_var "VOX_WEB_DISPLAY" "1"
+                            export VOX_WEB_DISPLAY=1
+                            _info "Browser display on (beta)."
+                        fi
+                        sleep 0.8
                         ;;
                     e|E)
                         ${EDITOR:-nano} .env
