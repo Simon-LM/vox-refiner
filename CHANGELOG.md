@@ -13,6 +13,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.15.3] — 2026-05-03
+
+### Fixed
+
+- **`src/refine.py`** : Ajout d'un bloc `_PRESERVATION_BLOCK` partagé entre les 3 tiers de prompt (short, medium, long), corrigeant trois comportements incorrects :
+  - **Destinataire** : l'IA reformulait parfois les questions comme si elles lui étaient adressées. Nouvelle règle : ne jamais supprimer ni neutraliser le destinataire (prénom, "tu", "vous", etc.).
+  - **Tutoiement/vouvoiement** : le registre d'adresse était souvent remplacé. Nouvelle règle : préserver exactement le registre du locuteur (tu/te/ton/ta/tes ↔ vous/votre/vos).
+  - **Phrases d'introduction** : les transitions ("Maintenant, on va passer à…") étaient supprimées lors de la compression. Nouvelle règle : toujours préserver les phrases introductives et transitionnelles.
+
+---
+
 ## [4.15.2] — 2026-05-03
 
 ### Added
