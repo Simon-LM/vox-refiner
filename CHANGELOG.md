@@ -13,6 +13,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.18.0] — 2026-05-04
+
+### Added
+
+- **`media_to_text.sh`** (V2 — Media Transcribe) : nouveau script pour importer un fichier audio ou vidéo, extraire l'audio via ffmpeg et le transcrire avec Voxtral. Formats acceptés : tout fichier contenant un flux audio reconnu par ffprobe (mp3, wav, m4a, ogg, flac, mp4, mkv, mov, avi, webm, …). Boucle post-action : Retry, New file, Correct, Translate, Read aloud, Summarise, Search, Fact-check, Settings, Menu.
+- **`src/correct.py`** : nouveau module de correction contextuelle. Prend le texte transcrit (stdin) et un contexte utilisateur (termes techniques, noms propres, sujet) en argument CLI, appelle Mistral Small pour corriger uniquement les erreurs de reconnaissance sans reformuler ni supprimer de contenu. Modèle : `REFINE_MODEL_SHORT` (défaut `mistral-small-latest`), fallback `mistral-medium-latest`.
+- **`media_to_text.sh` — correction contextuelle `[c]`** : après transcription, l'utilisateur peut fournir un contexte en 3 modes — saisie clavier `[k]`, chargement d'un fichier `.md/.txt` `[f]`, ou enregistrement vocal `[v]` (pipeline V1 avec `OUTPUT_PROFILE=markdown`). Le contexte est transmis à `src/correct.py` ; le texte corrigé s'affiche sous la transcription brute et est copié dans le presse-papiers.
+
+### Changed
+
+- **`vox-refiner-menu.sh`** : `v2)` pointe désormais sur `media_to_text.sh` (fonctionnalité implémentée, suppression du placeholder *coming soon*).
+
+---
+
 ## [4.17.0] — 2026-05-03
 
 ### Changed

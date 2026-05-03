@@ -1656,8 +1656,7 @@ while true; do
             done
             ;;
         v2)
-            _coming_soon "Media Transcribe" \
-                "Import an audio or video file and extract its transcription to text."
+            VOXREFINER_MENU=1 ./media_to_text.sh
             ;;
         v3)
             _coming_soon "Media Translate" \
