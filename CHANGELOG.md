@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.16.0] — 2026-05-03
+
+### Added
+
+- **`vox-refiner-menu.sh`** (Speak & Refine) : Nouvelle option `[r] Model routing per tier` — permet de choisir le modèle Mistral pour chacun des 3 tiers de longueur (Short < 80 mots, Medium 80–240 mots, Long > 240 mots). Choix permanent (`.env`) ou session uniquement. Le box d'état affiche les modèles courants (S / M / L).
+  - Short : `mistral-small-latest`, `mistral-medium-3.5`, `mistral-medium-latest`, `magistral-small-latest`
+  - Medium : idem + `magistral-medium-latest`
+  - Long : `magistral-medium-latest`, `mistral-medium-3.5`, `mistral-medium-latest`, `magistral-small-latest`
+
+### Changed
+
+- **`src/refine.py`** : `_REASONING_CAPABLE_MODEL` (string) → `_REASONING_CAPABLE_MODELS` (set) — `mistral-medium-3.5` ajouté aux modèles supportant `reasoning_effort`. `_PARAMS_LONG` inclut désormais `reasoning_effort: "high"` (strippé automatiquement pour les modèles non-capables comme `magistral-medium-latest` qui raisonne nativement).
+
+---
+
 ## [4.15.3] — 2026-05-03
 
 ### Fixed

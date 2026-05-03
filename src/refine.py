@@ -48,11 +48,11 @@ _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-med
 # It is automatically stripped for any other model at call time.
 _PARAMS_SHORT: Dict[str, Any] = {"temperature": 0.2, "top_p": 0.85}
 _PARAMS_MEDIUM: Dict[str, Any] = {"temperature": 0.3, "top_p": 0.9, "reasoning_effort": "high"}
-_PARAMS_LONG: Dict[str, Any] = {"temperature": 0.4, "top_p": 0.9}
+_PARAMS_LONG: Dict[str, Any] = {"temperature": 0.4, "top_p": 0.9, "reasoning_effort": "high"}
 _PARAMS_HISTORY: Dict[str, Any] = {"reasoning_effort": "high"}
 
-# Only this model supports the reasoning_effort parameter.
-_REASONING_CAPABLE_MODEL = "mistral-small-latest"
+# Models that support the reasoning_effort parameter.
+_REASONING_CAPABLE_MODELS = {"mistral-small-latest", "mistral-medium-3.5"}
 
 _ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "false").lower() in ("true", "1", "yes")
 _HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "80"))
@@ -466,7 +466,7 @@ def _strip_unsupported_params(model: str, params: Optional[Dict[str, Any]]) -> D
     if not params:
         return {}
     filtered = dict(params)
-    if model != _REASONING_CAPABLE_MODEL and "reasoning_effort" in filtered:
+    if model not in _REASONING_CAPABLE_MODELS and "reasoning_effort" in filtered:
         del filtered["reasoning_effort"]
     return filtered
 

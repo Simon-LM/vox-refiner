@@ -1335,6 +1335,9 @@ while true; do
             while true; do
                 _STT_FORMAT="${OUTPUT_PROFILE:-prose}"  # prose is the default
                 _STT_LANG="${OUTPUT_LANG:-auto}"
+                _STT_MODEL_SHORT="${REFINE_MODEL_SHORT:-mistral-small-latest}"
+                _STT_MODEL_MEDIUM="${REFINE_MODEL_MEDIUM:-mistral-small-latest}"
+                _STT_MODEL_LONG="${REFINE_MODEL_LONG:-magistral-medium-latest}"
                 clear
                 echo ""
                 echo "╔══════════════════════════════════════════════════════════════════╗"
@@ -1357,12 +1360,14 @@ while true; do
                 else
                     printf "║  ${C_DIM}History :${C_RESET}      ${C_DIM}%-20s${C_RESET}                            ║\n" "off"
                 fi
+                printf "║  ${C_DIM}Models :${C_RESET}  ${C_CYAN}S:%-16s M:%-16s L:%-9s${C_RESET}║\n" "$_STT_MODEL_SHORT" "$_STT_MODEL_MEDIUM" "$_STT_MODEL_LONG"
                 echo "║                                                                  ║"
                 echo "╠══════════════════════════════════════════════════════════════════╣"
                 echo "║                                                                  ║"
                 printf "║  ${C_BOLD}[Enter]${C_RESET}  Start recording                                        ║\n"
                 printf "║  ${C_BOLD}[f]${C_RESET}      Change format                                          ║\n"
                 printf "║  ${C_BOLD}[l]${C_RESET}      Change output language                                 ║\n"
+                printf "║  ${C_BOLD}[r]${C_RESET}      Model routing per tier                                 ║\n"
                 printf "║  ${C_BOLD}[c]${C_RESET}      Compare models                                         ║\n"
                 printf "║  ${C_BOLD}[h]${C_RESET}      Toggle history (permanent)                             ║\n"
                 printf "║  ${C_BOLD}[b]${C_RESET}      Max bullets in history file (permanent)                ║\n"
@@ -1378,6 +1383,7 @@ while true; do
                 case "$_stt_choice" in
                     "")
                         OUTPUT_PROFILE="$_STT_FORMAT" OUTPUT_LANG="$_STT_LANG" REFINE_COMPARE_MODELS="${REFINE_COMPARE_MODELS:-false}" \
+                            REFINE_MODEL_SHORT="$_STT_MODEL_SHORT" REFINE_MODEL_MEDIUM="$_STT_MODEL_MEDIUM" REFINE_MODEL_LONG="$_STT_MODEL_LONG" \
                             ./record_and_transcribe_local.sh
                         while true; do
                             echo ""
@@ -1387,10 +1393,12 @@ while true; do
                             case "$_post_action" in
                                 r|R)
                                     OUTPUT_PROFILE="$_STT_FORMAT" OUTPUT_LANG="$_STT_LANG" REFINE_COMPARE_MODELS="${REFINE_COMPARE_MODELS:-false}" \
+                                        REFINE_MODEL_SHORT="$_STT_MODEL_SHORT" REFINE_MODEL_MEDIUM="$_STT_MODEL_MEDIUM" REFINE_MODEL_LONG="$_STT_MODEL_LONG" \
                                         ./record_and_transcribe_local.sh --retry
                                     ;;
                                 n|N)
                                     OUTPUT_PROFILE="$_STT_FORMAT" OUTPUT_LANG="$_STT_LANG" REFINE_COMPARE_MODELS="${REFINE_COMPARE_MODELS:-false}" \
+                                        REFINE_MODEL_SHORT="$_STT_MODEL_SHORT" REFINE_MODEL_MEDIUM="$_STT_MODEL_MEDIUM" REFINE_MODEL_LONG="$_STT_MODEL_LONG" \
                                         ./record_and_transcribe_local.sh
                                     ;;
                                 v|V)
@@ -1426,6 +1434,77 @@ while true; do
                             _info "Compare models on — fallback model will run in parallel."
                         fi
                         export REFINE_COMPARE_MODELS
+                        ;;
+                    r|R)
+                        echo ""
+                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        printf "  ${C_BGREEN}MODEL ROUTING${C_RESET}\n"
+                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        echo ""
+                        printf "  ${C_BOLD}SHORT${C_RESET} ${C_DIM}(< 80 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_SHORT}${C_RESET}\n"
+                        printf "  ${C_BOLD}[1]${C_RESET} mistral-small-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
+                        printf "  Enter = keep current: "
+                        read -r _rm
+                        case "$_rm" in
+                            1) _new_short="mistral-small-latest" ;;
+                            2) _new_short="mistral-medium-3.5" ;;
+                            3) _new_short="mistral-medium-latest" ;;
+                            4) _new_short="magistral-small-latest" ;;
+                            *) _new_short="$_STT_MODEL_SHORT" ;;
+                        esac
+                        echo ""
+                        printf "  ${C_BOLD}MEDIUM${C_RESET} ${C_DIM}(80–240 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_MEDIUM}${C_RESET}\n"
+                        printf "  ${C_BOLD}[1]${C_RESET} mistral-small-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
+                        printf "  ${C_BOLD}[5]${C_RESET} magistral-medium-latest\n"
+                        printf "  Enter = keep current: "
+                        read -r _rm
+                        case "$_rm" in
+                            1) _new_medium="mistral-small-latest" ;;
+                            2) _new_medium="mistral-medium-3.5" ;;
+                            3) _new_medium="mistral-medium-latest" ;;
+                            4) _new_medium="magistral-small-latest" ;;
+                            5) _new_medium="magistral-medium-latest" ;;
+                            *) _new_medium="$_STT_MODEL_MEDIUM" ;;
+                        esac
+                        echo ""
+                        printf "  ${C_BOLD}LONG${C_RESET} ${C_DIM}(> 240 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_LONG}${C_RESET}\n"
+                        printf "  ${C_BOLD}[1]${C_RESET} magistral-medium-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
+                        printf "  Enter = keep current: "
+                        read -r _rm
+                        case "$_rm" in
+                            1) _new_long="magistral-medium-latest" ;;
+                            2) _new_long="mistral-medium-3.5" ;;
+                            3) _new_long="mistral-medium-latest" ;;
+                            4) _new_long="magistral-small-latest" ;;
+                            *) _new_long="$_STT_MODEL_LONG" ;;
+                        esac
+                        echo ""
+                        printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_DIM}[Enter]${C_RESET} session only: "
+                        read -r _persist
+                        case "$_persist" in
+                            p|P)
+                                _set_env_var "REFINE_MODEL_SHORT" "$_new_short"
+                                _set_env_var "REFINE_MODEL_MEDIUM" "$_new_medium"
+                                _set_env_var "REFINE_MODEL_LONG" "$_new_long"
+                                set -a; source .env; set +a
+                                _success "Model routing saved to .env (permanent)."
+                                ;;
+                            *)
+                                _info "Applied for this session only."
+                                ;;
+                        esac
+                        export REFINE_MODEL_SHORT="$_new_short"
+                        export REFINE_MODEL_MEDIUM="$_new_medium"
+                        export REFINE_MODEL_LONG="$_new_long"
                         ;;
                     f|F)
                         echo ""
