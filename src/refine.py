@@ -70,6 +70,12 @@ _HISTORY_TIMEOUT_MULTIPLIER = float(os.environ.get("HISTORY_TIMEOUT_MULTIPLIER",
 # returned and copied to clipboard — this option only adds a display.
 _COMPARE_MODELS = os.environ.get("REFINE_COMPARE_MODELS", "false").lower() in ("true", "1", "yes")
 
+# When false, the per-tier fallback model is never tried after the primary fails
+# (ProviderError due to timeout or network). Set to false when you want the raw
+# transcription returned immediately rather than silently switching to a heavier
+# model (e.g. mistral-medium-3.5 → magistral-medium-latest).
+_REFINE_TIMEOUT_FALLBACK_ENABLED = os.environ.get("REFINE_TIMEOUT_FALLBACK_ENABLED", "false").lower() in ("true", "1", "yes")
+
 # Output formatting profile — only applied to MEDIUM and LONG tiers.
 # plain         : no structural formatting (default, preserves current behaviour)
 # prose         : clean paragraphs, no lists — best for general use and screen readers
@@ -657,6 +663,8 @@ def refine(raw_text: str) -> str:
     succeeded_model = None
     succeeded_result: Optional[CallResult] = None
     for model in (primary, fallback):
+        if model == fallback and not _REFINE_TIMEOUT_FALLBACK_ENABLED:
+            break
         try:
             params = primary_params if model == primary else None
             timeout = _effective_timeout(base_timeout, model, params)

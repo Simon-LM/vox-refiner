@@ -50,6 +50,7 @@ def _clear_refine_env(monkeypatch):
 def _get_refine(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
     monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")
+    monkeypatch.setenv("REFINE_TIMEOUT_FALLBACK_ENABLED", "true")
     if "src.refine" in sys.modules:
         del sys.modules["src.refine"]
     import src.refine as refine
@@ -411,6 +412,7 @@ class TestCompareModels:
     def _load(self, monkeypatch):
         monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
         monkeypatch.setenv("REFINE_COMPARE_MODELS", "true")
+        monkeypatch.setenv("REFINE_TIMEOUT_FALLBACK_ENABLED", "true")
         if "src.refine" in sys.modules:
             del sys.modules["src.refine"]
         import src.refine as refine
@@ -603,8 +605,10 @@ class TestModelParams:
     def _load(self, monkeypatch):
         monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
         monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")
+        monkeypatch.setenv("REFINE_TIMEOUT_FALLBACK_ENABLED", "true")
         # Force code defaults — load_dotenv() in refine.py may override from .env.
         monkeypatch.setenv("REFINE_MODEL_MEDIUM", "mistral-small-latest")
+        monkeypatch.setenv("REFINE_MODEL_LONG", "magistral-medium-latest")
         monkeypatch.setenv("HISTORY_EXTRACTION_MODEL", "mistral-small-latest")
         if "src.refine" in sys.modules:
             del sys.modules["src.refine"]

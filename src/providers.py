@@ -204,6 +204,8 @@ MISTRAL_FALLBACK_MAP: dict[str, str] = {
     "mistral-medium-latest":                   "mistral-large-latest",
     "mistral-large-latest":                    "",  # no further fallback
     "magistral-small-latest":                  "mistral-medium-latest",
+    "mistral-medium-3.5":                      "mistral-large-latest",
+    "mistral-medium-3.5+reasoning_effort":     "magistral-medium-latest",
 }
 
 # Layer 1 (xAI direct): canonical Grok model -> fallback on xAI direct.
@@ -238,10 +240,11 @@ PERPLEXITY_FALLBACK_MAP: dict[str, str] = {
 EDEN_MODEL_MAP: dict[str, str] = {
     # Mistral
     "mistral-small-latest":    "mistral/mistral-small-latest",
+    "mistral-medium-3.5":      "mistral/mistral-medium-latest",
     "mistral-medium-latest":   "mistral/mistral-medium-latest",
     "mistral-large-latest":    "mistral/mistral-large-latest",
-    "magistral-medium-latest": "mistral/magistral-medium-latest",
     "magistral-small-latest":  "mistral/magistral-small-latest",
+    "magistral-medium-latest": "mistral/magistral-medium-latest",
     # Perplexity
     "sonar":                   "perplexityai/sonar",
     "sonar-pro":               "perplexityai/sonar-pro",
@@ -262,6 +265,10 @@ EDEN_MODEL_MAP: dict[str, str] = {
 EDEN_SUBSTITUTIONS: dict[str, dict] = {
     "mistral-small-latest+reasoning_effort": {
         "model": "mistral/magistral-small-latest",
+        "strip": ["reasoning_effort"],
+    },
+    "mistral-medium-3.5+reasoning_effort": {
+        "model": "mistral/magistral-medium-latest",
         "strip": ["reasoning_effort"],
     },
 }

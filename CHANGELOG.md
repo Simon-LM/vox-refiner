@@ -13,6 +13,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.16.2] — 2026-05-03
+
+### Fixed
+
+- **`src/providers.py`** : Cascade 429 complète pour `mistral-medium-3.5` — ajout dans `MISTRAL_FALLBACK_MAP` (sans reasoning → `mistral-large-latest` ; avec `reasoning_effort` → `magistral-medium-latest`), dans `EDEN_MODEL_MAP` (traduit en `mistral/mistral-medium-latest` sur Eden), et dans `EDEN_SUBSTITUTIONS` (`reasoning_effort` strippé, substitution par `mistral/magistral-medium-latest` côté Eden).
+
+### Changed
+
+- **`src/refine.py`** : Nouveau flag `REFINE_TIMEOUT_FALLBACK_ENABLED` (défaut `false`) — le modèle de fallback par tier n'est plus tenté automatiquement après un échec du primaire (timeout / réseau) ; retour immédiat à la transcription brute. Mettre à `true` pour rétablir l'ancien comportement.
+
+---
+
 ## [4.16.1] — 2026-05-03
 
 ### Fixed
