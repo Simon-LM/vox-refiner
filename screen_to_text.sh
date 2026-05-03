@@ -92,7 +92,11 @@ _run_ocr() {
 # Restored immediately after maim/scrot returns.
 _win_id=""
 if command -v xdotool >/dev/null 2>&1; then
-    _win_id=$(xdotool getactivewindow 2>/dev/null || true)
+    # Prefer $WINDOWID (set by the terminal emulator at startup) so we always
+    # minimize the VoxRefiner terminal, not whatever window has focus right now
+    # (which could be the browser the user wants to screenshot).
+    _win_id="${WINDOWID:-}"
+    [ -z "$_win_id" ] && _win_id=$(xdotool getactivewindow 2>/dev/null || true)
     [ -n "$_win_id" ] && xdotool windowminimize "$_win_id" 2>/dev/null || true
     sleep 0.2
 fi

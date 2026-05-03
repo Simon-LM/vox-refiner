@@ -13,6 +13,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.16.3] — 2026-05-03
+
+### Fixed
+
+- **`screen_to_text.sh`** : La minimisation ciblait la mauvaise fenêtre lorsque le raccourci F8 était déclenché depuis une autre application (ex. navigateur). Correction : priorité à `$WINDOWID` (variable posée par l'émulateur de terminal à son démarrage, toujours la fenêtre VoxRefiner) plutôt que `xdotool getactivewindow` (fenêtre active au moment de l'appel). `getactivewindow` reste en fallback si `$WINDOWID` est absent.
+
+---
+
 ## [4.16.2] — 2026-05-03
 
 ### Fixed
