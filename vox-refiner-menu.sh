@@ -1200,24 +1200,21 @@ show_menu() {
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
     echo "║  🎙 VOICE                                                                   ║"
     echo "║                                                                            ║"
-    printf "║  ${C_BOLD}[0]${C_RESET}  🎙→📋  ${C_BOLD}Speak & Transcribe${C_RESET} ${C_DIM}raw Voxtral text, refine on demand${C_RESET}          ║\n"
-    printf "║  ${C_BOLD}[1]${C_RESET}  🎙→📋  ${C_BOLD}Speak & Refine${C_RESET}     ${C_DIM}speak, AI cleans it, paste${C_RESET}                  ║\n"
-    printf "║  ${C_BOLD}[2]${C_RESET}  🎞→📋  ${C_BOLD}Media Translate${C_RESET}    ${C_DIM}audio/video file → translated text${C_RESET}          ║\n"
-    printf "║  ${C_BOLD}[3]${C_RESET}  🎙→🔊  ${C_BOLD}Speak & Translate${C_RESET}  ${C_DIM}hear your voice in another language${C_RESET}         ║\n"
-    printf "║  ${C_BOLD}[4]${C_RESET}  🎙→🔊  ${C_BOLD}Live Translate${C_RESET}     ${C_DIM}real-time bilingual conversation${C_RESET}            ║\n"
+    printf "║  ${C_BOLD}[V0]${C_RESET} 🎙→📋  ${C_BOLD}Speak & Transcribe${C_RESET}  ${C_DIM}raw Voxtral text, refine on demand${C_RESET}         ║\n"
+    printf "║  ${C_BOLD}[V1]${C_RESET} 🎙→📋  ${C_BOLD}Speak & Refine${C_RESET}      ${C_DIM}speak, AI cleans it, paste${C_RESET}                 ║\n"
+    printf "║  ${C_BOLD}[V2]${C_RESET} 🎞→📋  ${C_BOLD}Media Transcribe${C_RESET}    ${C_DIM}audio/video file → transcription${C_RESET}           ║\n"
+    printf "║  ${C_BOLD}[V3]${C_RESET} 🎞→📋  ${C_BOLD}Media Translate${C_RESET}     ${C_DIM}audio/video file → translated text${C_RESET}         ║\n"
+    printf "║  ${C_BOLD}[V4]${C_RESET} 🎙→🔊  ${C_BOLD}Speak & Translate${C_RESET}   ${C_DIM}hear your voice in another language${C_RESET}        ║\n"
+    printf "║  ${C_BOLD}[V5]${C_RESET} 🎙→🔊  ${C_BOLD}Live Translate${C_RESET}      ${C_DIM}real-time bilingual conversation${C_RESET}           ║\n"
     echo "║                                                                            ║"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
-    echo "║  ⌨  SELECTION                                                              ║"
+    echo "║  ⌨🖼 SELECTION & SCREEN                                                    ║"
     echo "║                                                                            ║"
-    printf "║  ${C_BOLD}[5]${C_RESET}  ⌨→🔊  ${C_BOLD}Selection to Voice${C_RESET}      ${C_DIM}selected text → read aloud instantly${C_RESET}   ║\n"
-    printf "║  ${C_BOLD}[6]${C_RESET}  ⌨→💡  ${C_BOLD}Selection to Insight${C_RESET}    ${C_DIM}summary + search                      ${C_RESET} ║\n"
-    printf "║  ${C_BOLD}[7]${C_RESET}  ⌨→🔍  ${C_BOLD}Selection to Search${C_RESET}     ${C_DIM}selected text → search directly       ${C_RESET} ║\n"
-    printf "║  ${C_BOLD}[8]${C_RESET}  ⌨→🔬  ${C_BOLD}Selection to Fact-check${C_RESET} ${C_DIM}selected text → fact-check            ${C_RESET} ║\n"
-    echo "║                                                                            ║"
-    echo "╠════════════════════════════════════════════════════════════════════════════╣"
-    echo "║  🖼  SCREEN                                                                 ║"
-    echo "║                                                                            ║"
-    printf "║  ${C_BOLD}[9]${C_RESET}  🖼→📋  ${C_BOLD}Screen to Text${C_RESET}  ${C_DIM}screenshot → OCR → clipboard + search/voice${C_RESET}    ║\n"
+    printf "║  ${C_BOLD}[S0]${C_RESET} 🖼→📋  ${C_BOLD}Screen to Text${C_RESET}         ${C_DIM}screenshot → OCR → clipboard${C_RESET}             ║\n"
+    printf "║  ${C_BOLD}[S1]${C_RESET} ⌨→🔊  ${C_BOLD}Selection to Voice${C_RESET}     ${C_DIM}selected text → read aloud instantly${C_RESET}     ║\n"
+    printf "║  ${C_BOLD}[S2]${C_RESET} ⌨→💡  ${C_BOLD}Selection to Insight${C_RESET}   ${C_DIM}summary + search                      ${C_RESET}   ║\n"
+    printf "║  ${C_BOLD}[S3]${C_RESET} ⌨→🔍  ${C_BOLD}Selection to Search${C_RESET}    ${C_DIM}selected text → search directly       ${C_RESET}   ║\n"
+    printf "║  ${C_BOLD}[S4]${C_RESET} ⌨→🔬  ${C_BOLD}Selection to Fact-check${C_RESET} ${C_DIM}selected text → fact-check           ${C_RESET}   ║\n"
     echo "║                                                                            ║"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
@@ -1249,8 +1246,8 @@ while true; do
     printf "  ${C_BGREEN}▸${C_RESET} "
     read -r choice
 
-    case "$choice" in
-        0)
+    case "${choice,,}" in
+        v0)
             # ── Speak & Transcribe — record immediately, no sub-menu ──────
             _f0_refined=0
             ENABLE_REFINE=false ENABLE_HISTORY=false \
@@ -1330,7 +1327,7 @@ while true; do
                 esac
             done
             ;;
-        1)
+        v1)
             # ── Speak & Refine sub-menu ──────────────────────────────────
             while true; do
                 _STT_FORMAT="${OUTPUT_PROFILE:-prose}"  # prose is the default
@@ -1658,11 +1655,15 @@ while true; do
                 esac
             done
             ;;
-        2)
+        v2)
+            _coming_soon "Media Transcribe" \
+                "Import an audio or video file and extract its transcription to text."
+            ;;
+        v3)
             _coming_soon "Media Translate" \
                 "Extract audio from a video or audio file, then translate it to text."
             ;;
-        3)
+        v4)
             # ── Speak & Translate submenu ─────────────────────────────────
             while true; do
                 # Resolve profile status
@@ -1712,30 +1713,30 @@ while true; do
                 esac
             done
             ;;
-        4)
+        v5)
             _coming_soon "Live Translate" \
                 "Real-time bilingual conversation mode — translate both speakers instantly."
             ;;
-        5)
-            VOXREFINER_MENU=0 ./selection_to_voice.sh
-            ;;
-        6)
-            ./selection_to_insight.sh
-            ;;
-        7)
-            ./selection_to_search.sh
-            ;;
-        8)
-            ./selection_to_factcheck.sh
-            ;;
-        9)
+        s0)
             VOXREFINER_MENU=0 ./screen_to_text.sh
             ;;
-        W1|w1)
+        s1)
+            VOXREFINER_MENU=0 ./selection_to_voice.sh
+            ;;
+        s2)
+            ./selection_to_insight.sh
+            ;;
+        s3)
+            ./selection_to_search.sh
+            ;;
+        s4)
+            ./selection_to_factcheck.sh
+            ;;
+        w1)
             _coming_soon "Speak & Post" \
                 "Speak, then get a generated tweet or LinkedIn post — with context per platform."
             ;;
-        P0|p0)
+        p0)
             _coming_soon "Your Workflows" \
                 "Create and manage your own custom workflows by combining VoxRefiner features."
             ;;
@@ -1743,7 +1744,7 @@ while true; do
             _coming_soon "Create a workflow" \
                 "Workflow builder coming soon — chain features into your own personal pipeline."
             ;;
-        s|S)
+        s)
             while true; do
                 _web_disp_cur="${VOX_WEB_DISPLAY:-0}"
                 if [ "$_web_disp_cur" = "1" ]; then
@@ -1796,7 +1797,7 @@ while true; do
                 esac
             done
             ;;
-        c|C)
+        c)
             if [ ! -f context.txt ]; then
                 echo ""
                 _info "context.txt does not exist yet."
@@ -1813,7 +1814,7 @@ while true; do
             fi
             [ -f context.txt ] && ${EDITOR:-nano} context.txt
             ;;
-        u|U)
+        u)
             while true; do
                 _header "UPDATE" "🔄"
                 echo ""
@@ -1905,7 +1906,7 @@ while true; do
                 esac
             done
             ;;
-        q|Q)
+        q)
             printf "\n  ${C_DIM}Bye!${C_RESET}\n\n"
             exit 0
             ;;

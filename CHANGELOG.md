@@ -13,6 +13,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.17.0] — 2026-05-03
+
+### Changed
+
+- **`vox-refiner-menu.sh`** : Réorganisation du menu principal en deux catégories préfixées — **V** (Voice) et **S** (Selection & Screen) — remplaçant les anciens numéros `[0]`–`[9]`. Mapping : V0 Speak & Transcribe, V1 Speak & Refine, V2 Media Transcribe *(coming soon)*, V3 Media Translate *(coming soon)*, V4 Speak & Translate, V5 Live Translate *(coming soon)*, S0 Screen to Text, S1 Selection to Voice, S2 Selection to Insight, S3 Selection to Search, S4 Selection to Fact-check. La saisie est insensible à la casse (`${choice,,}`). W1, P0, +, s, c, u, ?, q restent inchangés.
+
+### Added
+
+- **`vox-refiner-menu.sh`** : Ajout de l'entrée **V2 — Media Transcribe** (coming soon) entre V1 et V3, réservant un slot pour la future fonctionnalité d'import de fichiers audio/vidéo vers transcription texte.
+
+---
+
 ## [4.16.4] — 2026-05-03
 
 ### Fixed
