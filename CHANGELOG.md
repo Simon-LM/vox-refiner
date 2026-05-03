@@ -13,6 +13,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.16.4] — 2026-05-03
+
+### Fixed
+
+- **`screen_to_text.sh`** : Après une traduction, le texte traduit n'était affiché que 1-2 secondes avant d'être effacé par le redessinage du menu. Correction : le texte original (OCR) et la traduction sont désormais affichés en permanence dans le corps du menu — la traduction apparaît sous le texte original dès qu'elle est disponible et reste visible à chaque itération. L'option `[e] Replay translation` (redondante) a été supprimée.
+
+---
+
 ## [4.16.3] — 2026-05-03
 
 ### Fixed

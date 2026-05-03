@@ -150,10 +150,15 @@ while true; do
     _header "SCREEN TO TEXT" "🖼→📋"
     echo ""
     printf "${C_BG_CYAN} %s ${C_RESET}\n" "$ocr_text"
+    if [ "$_translate_done" -eq 1 ]; then
+        echo ""
+        _header "TRANSLATION → $(_lang_name "$_SETTING_TRANSLATE_LANG") — mistral-small-latest" "🌐"
+        echo ""
+        printf "${C_BG_BLUE} %s ${C_RESET}\n" "$translated_text"
+    fi
     echo ""
     _sep
     _menu_line="  ${C_BOLD}[r]${C_RESET} Retry OCR  ${C_BOLD}[n]${C_RESET} New capture  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
-    [ "$_translate_done" -eq 1 ] && _menu_line="$_menu_line  ${C_BOLD}[e]${C_RESET} Replay translation"
     _menu_line="$_menu_line  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner"
     printf "  %b: " "$_menu_line"
     read -r _action
@@ -184,15 +189,6 @@ while true; do
         f|F)
             printf '%s' "$ocr_text" | xclip -selection primary
             VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_factcheck.sh"
-            ;;
-        e|E)
-            [ "$_translate_done" -eq 1 ] && {
-                echo ""
-                _header "TRANSLATION — mistral-small-latest" "🌐"
-                echo ""
-                printf "${C_BG_BLUE} %s ${C_RESET}\n" "$translated_text"
-                echo ""
-            }
             ;;
         s|S) _settings_flow ;;
         m|M)
