@@ -88,14 +88,20 @@ _run_ocr() {
 
 # ─── Capture ─────────────────────────────────────────────────────────────────
 
-clear
-echo ""
-_header "SCREEN TO TEXT" "🖼→📋"
-echo ""
-_info "Select a region of the screen to capture."
-echo ""
+# Minimize the terminal so it doesn't cover the area to capture.
+# Restored immediately after maim/scrot returns.
+_win_id=""
+if command -v xdotool >/dev/null 2>&1; then
+    _win_id=$(xdotool getactivewindow 2>/dev/null || true)
+    [ -n "$_win_id" ] && xdotool windowminimize "$_win_id" 2>/dev/null || true
+    sleep 0.2
+fi
 
 if ! _capture_screen; then
+    [ -n "$_win_id" ] && xdotool windowactivate --sync "$_win_id" 2>/dev/null || true
+    clear
+    echo ""
+    _header "SCREEN TO TEXT" "🖼→📋"
     echo ""
     if [ "${VOXREFINER_MENU:-}" != "1" ]; then
         printf "  ${C_DIM}Press Enter to exit...${C_RESET}"
@@ -103,6 +109,8 @@ if ! _capture_screen; then
     fi
     exit 1
 fi
+
+[ -n "$_win_id" ] && xdotool windowactivate --sync "$_win_id" 2>/dev/null || true
 
 # User may press Escape in maim/scrot — no file is created
 if [ ! -f "$SCR_FILE" ]; then

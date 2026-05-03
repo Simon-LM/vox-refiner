@@ -13,6 +13,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.16.1] — 2026-05-03
+
+### Fixed
+
+- **`screen_to_text.sh`** : La fenêtre terminal se minimise automatiquement avant la capture d'écran (`xdotool windowminimize`) et se restaure après — évite que la fenêtre couvre la zone à capturer. Dégradation silencieuse si `xdotool` est absent.
+- **`install.sh`** : `xdotool` ajouté aux dépendances système (auto-install via `--install-system-deps`, warning si absent).
+- **`vox-refiner-update.sh`** : Nouvelle fonction `sync_system_deps` — installe automatiquement `xdotool` via apt lors d'une mise à jour si absent, ou affiche un message clair sur les systèmes non-apt.
+
+---
+
 ## [4.16.0] — 2026-05-03
 
 ### Added

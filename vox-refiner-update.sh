@@ -227,6 +227,20 @@ sync_python_deps() {
     echo "✓  Python dependencies up to date."
 }
 
+sync_system_deps() {
+    if command -v xdotool >/dev/null 2>&1; then
+        return
+    fi
+    echo "📦 Installing missing system dependency: xdotool..."
+    if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get install -y xdotool
+        echo "✓  xdotool installed."
+    else
+        echo "⚠️  xdotool is required for Screen to Text (hides the terminal during capture)."
+        echo "   Install it manually:  sudo apt install xdotool"
+    fi
+}
+
 run_check() {
     local upstream behind
     upstream="$(resolve_upstream)"
@@ -250,6 +264,7 @@ run_apply() {
         repair_exec_bits
         sync_env
         sync_python_deps
+        sync_system_deps
         return
     fi
 
@@ -262,6 +277,7 @@ run_apply() {
     repair_exec_bits
     sync_env
     sync_python_deps
+    sync_system_deps
     echo "Update applied successfully."
     print_status "$upstream" "$(count_behind "$upstream")"
 }

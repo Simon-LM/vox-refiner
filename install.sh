@@ -34,7 +34,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
         if command -v apt-get >/dev/null 2>&1; then
             echo "🔧 Installing system dependencies via apt..."
             sudo apt-get update
-            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm
+            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool
         else
             echo "❌ --install-system-deps is only supported automatically on apt-based systems."
             exit 1
@@ -42,7 +42,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
     else
         echo "Install them manually, for example on Ubuntu:"
         echo "  sudo apt-get update"
-        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv"
+        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xdotool"
         echo ""
         echo "Then run: ./install.sh"
         exit 1
@@ -63,6 +63,11 @@ if ! command -v maim >/dev/null 2>&1 && ! command -v scrot >/dev/null 2>&1; then
     echo "   Install one of:"
     echo "     sudo apt install maim    (recommended)"
     echo "     sudo apt install scrot   (fallback)"
+fi
+
+if ! command -v xdotool >/dev/null 2>&1; then
+    echo "⚠️  xdotool not found (needed to hide the terminal during screen capture)."
+    echo "     sudo apt install xdotool"
 fi
 
 if [ ! -d ".venv" ]; then
