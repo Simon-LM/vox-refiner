@@ -326,17 +326,22 @@ _search_flow() {
 }
 
 # ─── Translate flow ───────────────────────────────────────────────────────────
-# Usage: _translate_flow <input_text>
+# Usage: _translate_flow <input_text> [env_var_name]
 # Sets globals: translated_text, _translate_done=1 on success
 # Copies translation to both clipboards.
 # Target language: _SETTING_TRANSLATE_LANG (session) or TRANSLATE_TARGET_LANG (.env).
+# env_var_name: which .env variable to persist the chosen language to
+#   (default: TRANSLATE_TARGET_LANG — pass e.g. MEDIA_TRANSLATE_LANG for V2)
 
 _translate_flow() {
     local input_text="$1"
+    local _persist_var="${2:-TRANSLATE_TARGET_LANG}"
     local _lang_code _lang_display _input
 
-    # Use session setting, fall back to TRANSLATE_TARGET_LANG, then OUTPUT_DEFAULT_LANG, then "en"
-    _lang_code="${_SETTING_TRANSLATE_LANG:-${TRANSLATE_TARGET_LANG:-${OUTPUT_DEFAULT_LANG:-en}}}"
+    # Use session setting, fall back to the caller's env var, then OUTPUT_DEFAULT_LANG, then "en"
+    local _persist_val
+    _persist_val="${!_persist_var:-}"
+    _lang_code="${_SETTING_TRANSLATE_LANG:-${_persist_val:-${OUTPUT_DEFAULT_LANG:-en}}}"
     _lang_display="$(_lang_name "$_lang_code")"
 
     echo ""
@@ -350,13 +355,13 @@ _translate_flow() {
         _lang_code="$_input"
         _lang_display="$(_lang_name "$_lang_code")"
         _SETTING_TRANSLATE_LANG="$_lang_code"
-        # Persist to .env so the choice survives across sessions.
+        # Persist to .env under the caller-specified variable name.
         local _env_file="$SCRIPT_DIR/.env"
         if [ -f "$_env_file" ]; then
-            if grep -q "^TRANSLATE_TARGET_LANG=" "$_env_file"; then
-                sed -i "s/^TRANSLATE_TARGET_LANG=.*/TRANSLATE_TARGET_LANG=$_lang_code/" "$_env_file"
+            if grep -q "^${_persist_var}=" "$_env_file"; then
+                sed -i "s/^${_persist_var}=.*/${_persist_var}=$_lang_code/" "$_env_file"
             else
-                printf '\nTRANSLATE_TARGET_LANG=%s\n' "$_lang_code" >> "$_env_file"
+                printf '\n%s=%s\n' "$_persist_var" "$_lang_code" >> "$_env_file"
             fi
         fi
         _info "Language set to: $_lang_display ($_lang_code)  (saved to .env)"

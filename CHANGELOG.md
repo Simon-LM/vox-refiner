@@ -13,6 +13,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.18.3] — 2026-05-05
+
+### Added
+
+- **`media_to_text.sh` — menu d'accueil** : à l'ouverture, un menu propose `[n]` New transcription, `[o]` Open folder, `[d]` Delete files, sans obliger à sélectionner un fichier d'abord.
+- **`media_to_text.sh` — sauvegarde automatique** : après transcription, génération d'un slug IA via `src.slug` ; le MP3 converti et le fichier texte sont nommés `YYYY-MM-DD_HHhMM_slug.mp3/.txt` dans `recordings/media/`. Sur retry, le slug est conservé et seul le `.txt` est mis à jour.
+- **`media_to_text.sh` — sauvegarde automatique de la traduction** : dès qu'une traduction est produite via `[t]`, elle est sauvegardée automatiquement sous `YYYY-MM-DD_HHhMM_slug_<lang>.txt` dans `recordings/media/`.
+- **`media_to_text.sh`** — affichage du nombre de fichiers et de la taille totale de `recordings/media/` dans le menu d'accueil et la boucle post-action.
+- **`media_to_text.sh` — `[x]` Export** : ouvre un dialog zenity `--file-selection --save` (défaut `~/Downloads/`) pour copier la transcription (corrigée si disponible) à l'emplacement choisi. Fallback sur saisie manuelle si zenity est absent.
+- **`media_to_text.sh` — `[o]` Open folder** : ouvre `recordings/media/` dans le gestionnaire de fichiers via `xdg-open`.
+- **`media_to_text.sh` — `[d]` Delete files** : liste numérotée des fichiers dans `recordings/media/` avec leur taille ; suppression par numéro, `[a]` pour tout supprimer, `[q]` pour annuler.
+- **`.env.example`** — nouvelle variable `MEDIA_TRANSLATE_LANG=en` : langue cible pour la traduction dans V2 Media Transcribe, distincte de `TRANSLATE_TARGET_LANG` (S2/OCR) et `VOICE_TRANSLATE_TARGET_LANG` (V4).
+
+### Changed
+
+- **`src/text_flows.sh` — `_translate_flow`** : accepte un second paramètre optionnel `env_var_name` (défaut `TRANSLATE_TARGET_LANG`) pour contrôler quelle variable `.env` est persistée. Permet à chaque fonctionnalité d'avoir sa propre langue par défaut sans interférer avec les autres.
+- **`media_to_text.sh`** : suppression de `[r] Retry` du menu post-action (inutile — l'audio source est fixe, retranscrire le même fichier donne le même résultat).
+
+---
+
 ## [4.18.2] — 2026-05-04
 
 ### Added
@@ -42,7 +62,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- **`vox-refiner-menu.sh`** : `v2)` pointe désormais sur `media_to_text.sh` (fonctionnalité implémentée, suppression du placeholder *coming soon*).
+- **`vox-refiner-menu.sh`** : `v2)` pointe désormais sur `media_to_text.sh` (fonctionnalité implémentée, suppression du placeholder _coming soon_).
 
 ---
 
@@ -50,7 +70,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
-- **`vox-refiner-menu.sh`** : Réorganisation du menu principal en deux catégories préfixées — **V** (Voice) et **S** (Selection & Screen) — remplaçant les anciens numéros `[0]`–`[9]`. Mapping : V0 Speak & Transcribe, V1 Speak & Refine, V2 Media Transcribe *(coming soon)*, V3 Media Translate *(coming soon)*, V4 Speak & Translate, V5 Live Translate *(coming soon)*, S0 Screen to Text, S1 Selection to Voice, S2 Selection to Insight, S3 Selection to Search, S4 Selection to Fact-check. La saisie est insensible à la casse (`${choice,,}`). W1, P0, +, s, c, u, ?, q restent inchangés.
+- **`vox-refiner-menu.sh`** : Réorganisation du menu principal en deux catégories préfixées — **V** (Voice) et **S** (Selection & Screen) — remplaçant les anciens numéros `[0]`–`[9]`. Mapping : V0 Speak & Transcribe, V1 Speak & Refine, V2 Media Transcribe _(coming soon)_, V3 Media Translate _(coming soon)_, V4 Speak & Translate, V5 Live Translate _(coming soon)_, S0 Screen to Text, S1 Selection to Voice, S2 Selection to Insight, S3 Selection to Search, S4 Selection to Fact-check. La saisie est insensible à la casse (`${choice,,}`). W1, P0, +, s, c, u, ?, q restent inchangés.
 
 ### Added
 
