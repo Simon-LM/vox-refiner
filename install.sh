@@ -34,7 +34,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
         if command -v apt-get >/dev/null 2>&1; then
             echo "🔧 Installing system dependencies via apt..."
             sudo apt-get update
-            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool
+            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool zenity
         else
             echo "❌ --install-system-deps is only supported automatically on apt-based systems."
             exit 1
@@ -70,6 +70,11 @@ if ! command -v xdotool >/dev/null 2>&1; then
     echo "     sudo apt install xdotool"
 fi
 
+if ! command -v zenity >/dev/null 2>&1; then
+    echo "⚠️  zenity not found (needed for the Media Transcribe file picker)."
+    echo "     sudo apt install zenity"
+fi
+
 if [ ! -d ".venv" ]; then
     echo "🐍 Creating virtual environment (.venv)..."
     python3 -m venv .venv
@@ -93,7 +98,7 @@ fi
 
 chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh voice_translate.sh \
          selection_to_voice.sh selection_to_insight.sh selection_to_search.sh \
-         selection_to_factcheck.sh screen_to_text.sh \
+         selection_to_factcheck.sh screen_to_text.sh media_to_text.sh \
          vox-refiner-menu.sh vox-refiner-update.sh install.sh uninstall.sh
 
 echo ""

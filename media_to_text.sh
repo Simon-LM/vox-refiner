@@ -50,6 +50,27 @@ if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; 
     exit 1
 fi
 
+# ─── File picker ─────────────────────────────────────────────────────────────
+
+_pick_media_file() {
+    if command -v zenity >/dev/null 2>&1; then
+        zenity --file-selection \
+            --title="Media Transcribe — Select audio/video file" \
+            --file-filter="Audio/Video|*.mp3 *.wav *.m4a *.ogg *.flac *.aac *.opus *.mp4 *.mkv *.mov *.avi *.webm *.ts *.flv" \
+            --file-filter="All files|*" \
+            2>/dev/null
+        return
+    fi
+    # Fallback: manual input via /dev/tty (survives $() subshell)
+    printf '\n  %b\n' "${C_DIM}zenity not found — type the file path manually.${C_RESET}" >/dev/tty
+    printf '  Install: sudo apt install zenity\n\n' >/dev/tty
+    printf '  Path to audio/video file: ' >/dev/tty
+    read -r _manual_path </dev/tty
+    _manual_path="$(printf '%s' "$_manual_path" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _manual_path="${_manual_path/#\~/$HOME}"
+    printf '%s' "$_manual_path"
+}
+
 # ─── File input ──────────────────────────────────────────────────────────────
 
 clear
@@ -58,16 +79,32 @@ _header "MEDIA TRANSCRIBE" "🎞→📋"
 echo ""
 printf "  ${C_DIM}Accepted: mp3, wav, m4a, ogg, flac, mp4, mkv, mov, avi, webm, …${C_RESET}\n"
 echo ""
-printf "  Path to audio/video file: "
-read -r _media_file
 
-# Trim leading/trailing whitespace + expand ~
-_media_file="$(printf '%s' "$_media_file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-_media_file="${_media_file/#\~/$HOME}"
+while true; do
+    _media_file=$(_pick_media_file)
 
-if [ -z "$_media_file" ]; then
-    exit 0
-fi
+    # Trim leading/trailing whitespace + expand ~ (needed for fallback path)
+    _media_file="$(printf '%s' "$_media_file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _media_file="${_media_file/#\~/$HOME}"
+
+    if [ -z "$_media_file" ]; then
+        exit 0
+    fi
+
+    # Show file name + size and ask for confirmation
+    _file_size=$(du -h "$_media_file" 2>/dev/null | cut -f1)
+    echo ""
+    printf "  ${C_BOLD}%s${C_RESET}  ${C_DIM}(%s)${C_RESET}\n" \
+        "$(basename "$_media_file")" "${_file_size:-?}"
+    echo ""
+    printf "  ${C_BOLD}[Entrée]${C_RESET} Confirmer  ${C_BOLD}[n]${C_RESET} Choisir un autre fichier  ${C_BOLD}[q]${C_RESET} Annuler : "
+    read -r _confirm
+    case "$_confirm" in
+        n|N) continue ;;
+        q|Q) exit 0 ;;
+        *) break ;;
+    esac
+done
 
 if [ ! -f "$_media_file" ]; then
     echo ""

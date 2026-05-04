@@ -13,6 +13,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.18.2] — 2026-05-04
+
+### Added
+
+- **`media_to_text.sh`** — sélection du fichier via `zenity --file-selection` (dialog GTK natif avec filtre audio/vidéo). Fallback automatique sur saisie manuelle via `/dev/tty` si zenity est absent, avec message d'installation affiché dans le terminal.
+- **`media_to_text.sh`** — confirmation systématique après sélection : affichage du nom et de la taille du fichier avant de lancer la conversion, avec options `[Entrée]` confirmer / `[n]` choisir un autre fichier / `[q]` annuler.
+- **`install.sh`** — ajout de `zenity` dans la commande `apt-get install` (installation automatique via `--install-system-deps`) ; avertissement si `zenity` n'est pas présent ; ajout de `media_to_text.sh` dans la liste `chmod +x`.
+
+---
+
 ## [4.18.1] — 2026-05-04
 
 ### Added
