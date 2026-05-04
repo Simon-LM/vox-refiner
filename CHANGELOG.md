@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.18.1] — 2026-05-04
+
+### Added
+
+- **`src/transcribe.py`** — diarisation activée par défaut pour V2 : ajout du flag `--diarize` (CLI), envoi de `diarize=true` + `timestamp_granularities=segment` à l'API Voxtral via champs multipart répétés. Nouvelle fonction `_format_diarized` : regroupe les segments consécutifs par locuteur et formate la sortie en blocs `[Speaker N]\ntexte`. Fallback sur le champ `text` brut si les segments sont vides.
+- **`media_to_text.sh`** — appel à `src.transcribe` toujours avec `--diarize` ; la transcription affichée identifie les locuteurs.
+
+---
+
 ## [4.18.0] — 2026-05-04
 
 ### Added

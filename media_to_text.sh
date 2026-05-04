@@ -123,7 +123,7 @@ _run_transcription() {
     _process "Transcribing with Voxtral..."
     echo ""
 
-    raw_text=$("$VENV_PYTHON" -m src.transcribe "$MP3_FILE" 2>&3)
+    raw_text=$("$VENV_PYTHON" -m src.transcribe "$MP3_FILE" --diarize 2>&3)
 
     if [ -z "$raw_text" ]; then
         echo ""

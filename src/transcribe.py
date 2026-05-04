@@ -43,7 +43,40 @@ def _get_timeout(file_size: int) -> int:
     return 55                  # < ~60 min
 
 
-def _transcribe_single(audio_path: str, api_key: str) -> str:
+def _format_diarized(segments: list) -> str:
+    """Group consecutive same-speaker segments into labelled blocks.
+
+    speaker_1 → [Speaker 1], speaker_2 → [Speaker 2], etc.
+    """
+    groups: List[tuple] = []
+    current_speaker = None
+    current_parts: List[str] = []
+
+    for seg in segments:
+        speaker = seg.get("speaker_id") or "speaker_0"
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        if speaker != current_speaker:
+            if current_parts:
+                groups.append((current_speaker, " ".join(current_parts)))
+            current_speaker = speaker
+            current_parts = [text]
+        else:
+            current_parts.append(text)
+
+    if current_parts:
+        groups.append((current_speaker, " ".join(current_parts)))
+
+    blocks = []
+    for speaker_id, text in groups:
+        label = speaker_id.replace("_", " ").title()  # "speaker_1" → "Speaker 1"
+        blocks.append(f"[{label}]\n{text}")
+
+    return "\n\n".join(blocks)
+
+
+def _transcribe_single(audio_path: str, api_key: str, diarize: bool = False) -> str:
     """Transcribe one audio file via Voxtral, retrying on transient errors."""
     file_size = Path(audio_path).stat().st_size
     timeout = _get_timeout(file_size)
@@ -59,15 +92,40 @@ def _transcribe_single(audio_path: str, api_key: str) -> str:
             )
             time.sleep(_TRANSCRIBE_RETRY_DELAY)
         try:
-            response = requests.post(
-                _API_URL,
-                headers={"Authorization": f"Bearer {api_key}"},
-                files={"file": (Path(audio_path).name, audio_data, "audio/mpeg")},
-                data={"model": _MODEL},
-                timeout=timeout,
-            )
+            if diarize:
+                # Diarization requires timestamp_granularities=segment.
+                # Use list-of-tuples to pass repeated multipart fields alongside the file.
+                multipart = [
+                    ("model", (None, _MODEL)),
+                    ("diarize", (None, "true")),
+                    ("timestamp_granularities", (None, "segment")),
+                    ("file", (Path(audio_path).name, audio_data, "audio/mpeg")),
+                ]
+                response = requests.post(
+                    _API_URL,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    files=multipart,
+                    timeout=timeout,
+                )
+            else:
+                response = requests.post(
+                    _API_URL,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    files={"file": (Path(audio_path).name, audio_data, "audio/mpeg")},
+                    data={"model": _MODEL},
+                    timeout=timeout,
+                )
             response.raise_for_status()
             body = response.json()
+
+            if diarize:
+                segments = body.get("segments") or []
+                if segments:
+                    return _format_diarized(segments)
+                # Fallback: segments empty (shouldn't happen) — use flat text
+                text = body.get("text", "")
+                return text
+
             text = body.get("text")
             if not isinstance(text, str):
                 raise RuntimeError(
@@ -185,7 +243,7 @@ def _split_audio(audio_path: str) -> List[str]:
     return chunks
 
 
-def transcribe(audio_path: str) -> str:
+def transcribe(audio_path: str, diarize: bool = False) -> str:
     api_key = os.environ.get("MISTRAL_API_KEY")
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY is not set. Check your .env file.")
@@ -199,28 +257,32 @@ def transcribe(audio_path: str) -> str:
         texts = []
         for i, chunk in enumerate(chunks, 1):
             process(f"Transcribing chunk {i}/{len(chunks)} via Voxtral…")
-            texts.append(_transcribe_single(chunk, api_key))
+            texts.append(_transcribe_single(chunk, api_key, diarize=diarize))
             if chunk != audio_path:
                 try:
                     Path(chunk).unlink()
                 except OSError:
                     pass
-        return " ".join(texts)
+        sep = "\n\n---\n\n" if diarize else " "
+        return sep.join(texts)
 
     process("Transcribing via Mistral Voxtral...")
-    return _transcribe_single(audio_path, api_key)
+    return _transcribe_single(audio_path, api_key, diarize=diarize)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: transcribe.py <audio_file>", file=sys.stderr)
+    diarize = "--diarize" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--diarize"]
+
+    if len(args) != 1:
+        print("Usage: transcribe.py <audio_file> [--diarize]", file=sys.stderr)
         sys.exit(1)
 
-    audio_file = sys.argv[1]
+    audio_file = args[0]
 
     if not Path(audio_file).exists():
         error(f"File not found: {audio_file}")
         sys.exit(1)
 
-    result = transcribe(audio_file)
+    result = transcribe(audio_file, diarize=diarize)
     print(result)  # stdout only — captured by the shell script
