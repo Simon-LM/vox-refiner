@@ -1,6 +1,6 @@
 #!/bin/bash
 # VoxRefiner — Media Transcribe (V2)
-# Import an audio/video file, transcribe with Voxtral, optionally correct with context.
+# Import an audio/video file → text transcription or SRT subtitles.
 # Can be launched standalone (keyboard shortcut) or called from the menu.
 
 cd "$(dirname "$0")"
@@ -33,10 +33,10 @@ exec 3>&2
 MEDIA_DIR="$SCRIPT_DIR/recordings/media"
 mkdir -p "$MEDIA_DIR"
 
-# Session timestamp — shared by MP3 and TXT filenames
-_TIMESTAMP=$(date '+%Y-%m-%d_%Hh%M')
-MP3_FILE="$MEDIA_DIR/${_TIMESTAMP}.mp3"
-_BASE_NAME=""  # set after slug generation (post-transcription)
+# Session timestamp and state — set when user chooses [n]/[s]/[a]
+_TIMESTAMP=""
+MP3_FILE=""
+_BASE_NAME=""
 
 # ─── Dependency check ────────────────────────────────────────────────────────
 
@@ -65,7 +65,6 @@ _pick_media_file() {
             2>/dev/null
         return
     fi
-    # Fallback: manual input via /dev/tty (survives $() subshell)
     printf '\n  %b\n' "${C_DIM}zenity not found — type the file path manually.${C_RESET}" >/dev/tty
     printf '  Install: sudo apt install zenity\n\n' >/dev/tty
     printf '  Path to audio/video file: ' >/dev/tty
@@ -88,7 +87,59 @@ _show_storage_info() {
     fi
 }
 
-# ─── Landing menu ────────────────────────────────────────────────────────────
+# ─── Rename helper — renames all files sharing the same base name ─────────────
+
+_do_rename() {
+    local _old_base="$1" _new_base="$2"
+    [ -z "$_old_base" ] || [ -z "$_new_base" ] && return 1
+    local _f _suffix
+    for _f in "$MEDIA_DIR"/"${_old_base}"*; do
+        [ -f "$_f" ] || continue
+        _suffix="${_f#$MEDIA_DIR/$_old_base}"
+        mv -- "$_f" "$MEDIA_DIR/${_new_base}${_suffix}"
+    done
+}
+
+# ─── Context collection sub-menu (shared by [c] handlers) ─────────────────────
+# Sets global $_context. Returns 1 to signal cancellation.
+
+_collect_context() {
+    _context=""
+    printf "  How to provide context?\n"
+    printf "  ${C_BOLD}[k]${C_RESET} Type/paste  ${C_BOLD}[f]${C_RESET} Load file  ${C_BOLD}[v]${C_RESET} Record voice  ${C_BOLD}[m]${C_RESET} Cancel: "
+    read -r _ctx_mode
+    case "$_ctx_mode" in
+        k|K)
+            echo ""
+            printf "  Context (technical terms, names, topic…): "
+            read -r _context
+            ;;
+        f|F)
+            echo ""
+            printf "  Path to context file (.md, .txt): "
+            read -r _ctx_file
+            _ctx_file="$(printf '%s' "$_ctx_file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            _ctx_file="${_ctx_file/#\~/$HOME}"
+            if [ ! -f "$_ctx_file" ]; then
+                _error "File not found."
+                return 1
+            fi
+            _context=$(cat "$_ctx_file")
+            ;;
+        v|V)
+            echo ""
+            _info "Recording context — speak the technical terms and names..."
+            echo ""
+            ENABLE_REFINE=true OUTPUT_PROFILE=markdown \
+                "$SCRIPT_DIR/record_and_transcribe_local.sh"
+            _context=$(xclip -o -selection clipboard 2>/dev/null)
+            ;;
+        m|M|*) return 1 ;;
+    esac
+    return 0
+}
+
+# ─── Delete helper (shared by landing + post-action) ─────────────────────────
 
 _landing_delete() {
     echo ""
@@ -137,6 +188,10 @@ _landing_delete() {
     esac
 }
 
+# ─── Landing menu ─────────────────────────────────────────────────────────────
+
+_MODE=""
+
 while true; do
     clear
     echo ""
@@ -146,10 +201,18 @@ while true; do
     printf "  ${C_DIM}Accepted: mp3, wav, m4a, ogg, flac, mp4, mkv, mov, avi, webm, …${C_RESET}\n"
     echo ""
     _sep
-    printf "  ${C_BOLD}[n]${C_RESET} New transcription  ${C_BOLD}[o]${C_RESET} Open folder  ${C_BOLD}[d]${C_RESET} Delete files  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner  ${C_BOLD}[q]${C_RESET} Quit: "
+    printf "  ${C_BOLD}[n]${C_RESET} New transcription\n"
+    echo ""
+    printf "  Subtitles:\n"
+    printf "  ${C_BOLD}[s]${C_RESET} Standard SRT\n"
+    printf "  ${C_BOLD}[a]${C_RESET} Standard SRT + Accessibility (named speakers)\n"
+    echo ""
+    printf "  ${C_BOLD}[o]${C_RESET} Open folder  ${C_BOLD}[d]${C_RESET} Delete files  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner  ${C_BOLD}[q]${C_RESET} Quit: "
     read -r _landing
     case "$_landing" in
-        n|N) break ;;
+        n|N) _MODE="text";  break ;;
+        s|S) _MODE="srt";   break ;;
+        a|A) _MODE="srt_a"; break ;;
         o|O)
             xdg-open "$MEDIA_DIR" 2>/dev/null &
             echo ""
@@ -167,24 +230,23 @@ while true; do
     esac
 done
 
-# ─── File input ──────────────────────────────────────────────────────────────
+# ─── Session timestamp (set once user has chosen a mode) ─────────────────────
 
-# Refresh timestamp now that we know a transcription is starting
 _TIMESTAMP=$(date '+%Y-%m-%d_%Hh%M')
 MP3_FILE="$MEDIA_DIR/${_TIMESTAMP}.mp3"
+
+# ─── File input ──────────────────────────────────────────────────────────────
 
 while true; do
     _media_file=$(_pick_media_file)
 
-    # Trim leading/trailing whitespace + expand ~ (needed for fallback path)
     _media_file="$(printf '%s' "$_media_file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     _media_file="${_media_file/#\~/$HOME}"
 
     if [ -z "$_media_file" ]; then
-        exit 0
+        exec "$0"
     fi
 
-    # Show file name + size and ask for confirmation
     _file_size=$(du -h "$_media_file" 2>/dev/null | cut -f1)
     echo ""
     printf "  ${C_BOLD}%s${C_RESET}  ${C_DIM}(%s)${C_RESET}\n" \
@@ -194,7 +256,7 @@ while true; do
     read -r _confirm
     case "$_confirm" in
         n|N) continue ;;
-        q|Q) exit 0 ;;
+        q|Q) exec "$0" ;;
         *) break ;;
     esac
 done
@@ -243,9 +305,13 @@ if ! ffmpeg -y -i "$_media_file" -vn -ar 16000 -ac 1 \
     exit 1
 fi
 
-# ─── Post-transcription save ─────────────────────────────────────────────────
-# First call: generates slug, renames MP3, saves TXT.
-# Subsequent calls (retry): overwrites TXT only, keeps existing slug/name.
+# ═════════════════════════════════════════════════════════════════════════════
+# MODE: TEXT TRANSCRIPTION
+# ═════════════════════════════════════════════════════════════════════════════
+
+if [ "$_MODE" = "text" ]; then
+
+# ─── Post-transcription save (slug + rename) ─────────────────────────────────
 
 _finalize_session() {
     if [ -z "$_BASE_NAME" ]; then
@@ -266,7 +332,7 @@ _finalize_session() {
     _success "Saved: ${_BASE_NAME}.txt"
 }
 
-# ─── Transcription helper ────────────────────────────────────────────────────
+# ─── Transcription helper ─────────────────────────────────────────────────────
 
 _run_transcription() {
     clear
@@ -311,7 +377,7 @@ translated_text=""
 
 _SETTING_TRANSLATE_LANG="${MEDIA_TRANSLATE_LANG:-${OUTPUT_DEFAULT_LANG:-en}}"
 
-# ─── Post-action menu ────────────────────────────────────────────────────────
+# ─── Text post-action menu ────────────────────────────────────────────────────
 
 while true; do
     clear
@@ -334,59 +400,21 @@ while true; do
     fi
     echo ""
     _sep
-    _menu_line="  ${C_BOLD}[n]${C_RESET} New file  ${C_BOLD}[c]${C_RESET} Correct  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud"
+    _menu_line="  ${C_BOLD}[n]${C_RESET} New file  ${C_BOLD}[c]${C_RESET} Fix errors (AI context)  ${C_BOLD}[e]${C_RESET} Rename files  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud"
     _menu_line="$_menu_line  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
     _menu_line="$_menu_line  ${C_BOLD}[x]${C_RESET} Export  ${C_BOLD}[o]${C_RESET} Open folder  ${C_BOLD}[d]${C_RESET} Delete files"
     _menu_line="$_menu_line  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner"
     printf "  %b: " "$_menu_line"
     read -r _action
     case "$_action" in
-        n|N)
-            exec "$0"
-            ;;
+        n|N) exec "$0" ;;
         c|C)
             echo ""
             _sep
-            printf "  How to provide context?\n"
-            printf "  ${C_BOLD}[k]${C_RESET} Type/paste  ${C_BOLD}[f]${C_RESET} Load file  ${C_BOLD}[v]${C_RESET} Record voice  ${C_BOLD}[m]${C_RESET} Cancel: "
-            read -r _ctx_mode
-            _context=""
-            case "$_ctx_mode" in
-                k|K)
-                    echo ""
-                    printf "  Context (technical terms, names, topic…): "
-                    read -r _context
-                    ;;
-                f|F)
-                    echo ""
-                    printf "  Path to context file (.md, .txt): "
-                    read -r _ctx_file
-                    _ctx_file="$(printf '%s' "$_ctx_file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-                    _ctx_file="${_ctx_file/#\~/$HOME}"
-                    if [ ! -f "$_ctx_file" ]; then
-                        _error "File not found."
-                        continue
-                    fi
-                    _context=$(cat "$_ctx_file")
-                    ;;
-                v|V)
-                    echo ""
-                    _info "Recording context — speak the technical terms and names..."
-                    echo ""
-                    ENABLE_REFINE=true OUTPUT_PROFILE=markdown \
-                        "$SCRIPT_DIR/record_and_transcribe_local.sh"
-                    _context=$(xclip -o -selection clipboard 2>/dev/null)
-                    ;;
-                m|M|*)
-                    continue
-                    ;;
-            esac
-            if [ -z "$_context" ]; then
-                _warn "No context provided."
-                continue
-            fi
+            if ! _collect_context; then continue; fi
+            if [ -z "$_context" ]; then _warn "No context provided."; continue; fi
             echo ""
-            _process "Correcting transcription with context..."
+            _process "Fixing transcription errors with AI context..."
             echo ""
             _new_corrected=$(printf '%s' "$raw_text" | \
                 "$VENV_PYTHON" -m src.correct "$_context" 2>&3)
@@ -396,10 +424,27 @@ while true; do
                 printf '%s' "$corrected_text" | xclip -selection primary
                 _correct_done=1
                 echo ""
-                _success "Corrected text copied to clipboard"
+                _success "Fixed text copied to clipboard"
             else
-                _warn "Correction returned empty."
+                _warn "Fix returned empty."
             fi
+            ;;
+        e|E)
+            if [ -z "$_BASE_NAME" ]; then _warn "No file saved yet."; continue; fi
+            _current_slug="${_BASE_NAME#${_TIMESTAMP}_}"
+            echo ""
+            printf "  Current: %s\n" "$_BASE_NAME"
+            printf "  New name [%s]: " "$_current_slug"
+            read -r _new_slug
+            _new_slug="$(printf '%s' "$_new_slug" | tr -cd '[:print:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            _new_slug="${_new_slug:-$_current_slug}"
+            if [ "$_new_slug" = "$_current_slug" ]; then continue; fi
+            _new_base="${_TIMESTAMP}_${_new_slug}"
+            _do_rename "$_BASE_NAME" "$_new_base"
+            MP3_FILE="$MEDIA_DIR/${_new_base}.mp3"
+            _BASE_NAME="$_new_base"
+            echo ""
+            _success "Renamed to: $_new_base"
             ;;
         t|T)
             _prev_translate_done="$_translate_done"
@@ -413,8 +458,7 @@ while true; do
             fi
             ;;
         l|L)
-            _read_text="${corrected_text:-$raw_text}"
-            printf '%s' "$_read_text" | xclip -selection primary
+            printf '%s' "${corrected_text:-$raw_text}" | xclip -selection primary
             VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_voice.sh"
             ;;
         z|Z)
@@ -430,30 +474,26 @@ while true; do
             VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_factcheck.sh"
             ;;
         x|X)
-            _export_text="${corrected_text:-$raw_text}"
             _export_base="${_BASE_NAME:-transcription}"
+            _txt_file="$MEDIA_DIR/${_export_base}.txt"
             if command -v zenity >/dev/null 2>&1; then
                 _dest=$(zenity --file-selection --save \
                     --title="Export transcription" \
-                    --filename="$HOME/Downloads/${_export_base}.txt" \
+                    --filename="$_txt_file" \
                     2>/dev/null)
             else
                 echo ""
-                printf "  Export path [default: %s]: " \
-                    "$HOME/Downloads/${_export_base}.txt"
+                printf "  Export path [default: %s]: " "$HOME/Downloads/${_export_base}.txt"
                 read -r _dest
                 _dest="${_dest:-$HOME/Downloads/${_export_base}.txt}"
                 _dest="$(printf '%s' "$_dest" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
                 _dest="${_dest/#\~/$HOME}"
             fi
-            if [ -n "$_dest" ]; then
-                printf '%s' "$_export_text" > "$_dest"
+            if [ -n "$_dest" ] && [ "$_dest" != "$_txt_file" ]; then
+                printf '%s' "${corrected_text:-$raw_text}" > "$_dest"
                 echo ""
                 _success "Exported: $_dest"
             fi
-            echo ""
-            printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
-            read -r
             ;;
         o|O)
             xdg-open "$MEDIA_DIR" 2>/dev/null &
@@ -463,18 +503,512 @@ while true; do
             printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
             read -r
             ;;
-        d|D)
-            _landing_delete
-            ;;
-        s|S)
-            _settings_flow
-            ;;
+        d|D) _landing_delete ;;
+        s|S) _settings_flow ;;
         m|M)
             if [ -n "${VOXREFINER_MENU:-}" ]; then exit 0; fi
             exec "$SCRIPT_DIR/vox-refiner-menu.sh"
             ;;
-        *)
-            break
-            ;;
+        *) break ;;
     esac
 done
+
+fi  # end text mode
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MODE: STANDARD SRT
+# ═════════════════════════════════════════════════════════════════════════════
+
+if [ "$_MODE" = "srt" ]; then
+
+clear
+echo ""
+_header "MEDIA TRANSCRIBE — Standard SRT" "🎞→💬"
+echo ""
+_process "Generating subtitles via Voxtral..."
+echo ""
+
+_srt_content=$("$VENV_PYTHON" -m src.subtitles "$MP3_FILE" 2>&3)
+
+if [ -z "$_srt_content" ]; then
+    echo ""
+    _error "Subtitle generation returned empty."
+    echo ""
+    printf "  ${C_DIM}Press Enter to exit...${C_RESET}"
+    read -r
+    exec "$0"
+fi
+
+# Save with slug-based name
+_process "Generating filename..."
+_srt_text=$(printf '%s' "$_srt_content" | grep -Ev '^[0-9]+$|-->|^[[:space:]]*$')
+_slug=$(printf '%s' "$_srt_text" | "$VENV_PYTHON" -m src.slug 2>&3)
+_slug="${_slug:-subtitles}"
+_BASE_NAME="${_TIMESTAMP}_${_slug}"
+
+# Rename MP3
+_new_mp3="$MEDIA_DIR/${_BASE_NAME}.mp3"
+if [ -f "$MP3_FILE" ] && [ "$MP3_FILE" != "$_new_mp3" ]; then
+    mv "$MP3_FILE" "$_new_mp3"
+    MP3_FILE="$_new_mp3"
+fi
+
+_SRT_FILE="$MEDIA_DIR/${_BASE_NAME}.srt"
+printf '%s' "$_srt_content" > "$_SRT_FILE"
+
+echo ""
+_header "SUBTITLES — Standard SRT" "💬"
+_success "Saved: ${_BASE_NAME}.srt"
+echo ""
+printf "${C_BG_CYAN} %s ${C_RESET}\n" "$_srt_content"
+echo ""
+
+# ─── SRT post-action menu ─────────────────────────────────────────────────────
+
+_SETTING_TRANSLATE_LANG="${MEDIA_TRANSLATE_LANG:-${OUTPUT_DEFAULT_LANG:-en}}"
+# Plain dialogue text (no timecodes) for tools that expect plain text
+_srt_plain="$_srt_text"
+_translate_done=0
+translated_text=""
+_SRT_CORRECTED_FILE=""
+
+while true; do
+    echo ""
+    _sep
+    printf "  ${C_BOLD}[c]${C_RESET} Fix errors (AI context)  ${C_BOLD}[e]${C_RESET} Rename files  ${C_BOLD}[x]${C_RESET} Export SRT"
+    printf "  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud"
+    printf "  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
+    printf "  ${C_BOLD}[o]${C_RESET} Open folder  ${C_BOLD}[d]${C_RESET} Delete"
+    printf "  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner: "
+    read -r _action
+    case "$_action" in
+        c|C)
+            echo ""
+            _sep
+            if ! _collect_context; then continue; fi
+            if [ -z "$_context" ]; then _warn "No context provided."; continue; fi
+            _srt_ctx="$(printf '[SRT format — preserve all timecodes, block numbers, and blank lines between blocks]\n%s' "$_context")"
+            echo ""
+            _process "Fixing subtitle errors with AI context..."
+            echo ""
+            _fixed=$(printf '%s' "$_srt_content" | \
+                "$VENV_PYTHON" -m src.correct "$_srt_ctx" 2>&3)
+            if [ -n "$_fixed" ]; then
+                # First correction: create _corrected file; subsequent: update it
+                [ -z "$_SRT_CORRECTED_FILE" ] && \
+                    _SRT_CORRECTED_FILE="$MEDIA_DIR/${_BASE_NAME}_corrected.srt"
+                printf '%s' "$_fixed" > "$_SRT_CORRECTED_FILE"
+                _srt_content="$_fixed"
+                _srt_plain=$(printf '%s' "$_srt_content" | grep -Ev '^[0-9]+$|-->|^[[:space:]]*$')
+                printf '%s' "$_fixed" | xclip -selection clipboard
+                printf '%s' "$_fixed" | xclip -selection primary
+                echo ""
+                _success "Saved: $(basename "$_SRT_CORRECTED_FILE")  ${C_DIM}(original preserved)${C_RESET}"
+                echo ""
+                printf "${C_BG_CYAN} %s ${C_RESET}\n" "$_fixed"
+                echo ""
+            else
+                _warn "Fix returned empty."
+            fi
+            ;;
+        e|E)
+            _current_slug="${_BASE_NAME#${_TIMESTAMP}_}"
+            echo ""
+            printf "  Current: %s\n" "$_BASE_NAME"
+            printf "  New name [%s]: " "$_current_slug"
+            read -r _new_slug
+            _new_slug="$(printf '%s' "$_new_slug" | tr -cd '[:print:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            _new_slug="${_new_slug:-$_current_slug}"
+            if [ "$_new_slug" = "$_current_slug" ]; then continue; fi
+            _new_base="${_TIMESTAMP}_${_new_slug}"
+            _do_rename "$_BASE_NAME" "$_new_base"
+            MP3_FILE="$MEDIA_DIR/${_new_base}.mp3"
+            _SRT_FILE="$MEDIA_DIR/${_new_base}.srt"
+            [ -n "$_SRT_CORRECTED_FILE" ] && \
+                _SRT_CORRECTED_FILE="$MEDIA_DIR/${_new_base}_corrected.srt"
+            _BASE_NAME="$_new_base"
+            echo ""
+            _success "Renamed to: $_new_base"
+            ;;
+        x|X)
+            _export_src="${_SRT_CORRECTED_FILE:-$_SRT_FILE}"
+            if [ -n "$_SRT_CORRECTED_FILE" ] && [ ! -f "$_SRT_CORRECTED_FILE" ]; then
+                _warn "Corrected file not found, exporting original: $(basename "$_SRT_FILE")"
+                _export_src="$_SRT_FILE"
+            fi
+            echo ""
+            _info "Exporting: $(basename "$_export_src")"
+            if command -v zenity >/dev/null 2>&1; then
+                _dest=$(zenity --file-selection --save \
+                    --title="Export SRT" \
+                    --filename="$_export_src" \
+                    2>/dev/null)
+            else
+                echo ""
+                printf "  Export path [default: %s]: " "$HOME/Downloads/${_BASE_NAME}.srt"
+                read -r _dest
+                _dest="${_dest:-$HOME/Downloads/${_BASE_NAME}.srt}"
+                _dest="$(printf '%s' "$_dest" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                _dest="${_dest/#\~/$HOME}"
+            fi
+            if [ -n "$_dest" ] && [ "$_dest" != "$_export_src" ]; then
+                cp "$_export_src" "$_dest"
+                echo ""
+                _success "Exported: $_dest"
+            fi
+            ;;
+        t|T)
+            _prev_translate_done="$_translate_done"
+            _translate_flow "$_srt_plain" "MEDIA_TRANSLATE_LANG"
+            if [ "$_translate_done" -eq 1 ] && [ "$_prev_translate_done" -eq 0 ] \
+                && [ -n "$_BASE_NAME" ] && [ -n "$translated_text" ]; then
+                _lang_suffix="${_SETTING_TRANSLATE_LANG:-en}"
+                _trans_file="$MEDIA_DIR/${_BASE_NAME}_${_lang_suffix}.txt"
+                printf '%s' "$translated_text" > "$_trans_file"
+                _success "Saved: $(basename "$_trans_file")"
+            fi
+            ;;
+        l|L)
+            printf '%s' "$_srt_plain" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_voice.sh"
+            ;;
+        z|Z)
+            printf '%s' "$_srt_plain" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_insight.sh"
+            ;;
+        p|P)
+            printf '%s' "$_srt_plain" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_search.sh"
+            ;;
+        f|F)
+            printf '%s' "$_srt_plain" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_factcheck.sh"
+            ;;
+        o|O)
+            xdg-open "$MEDIA_DIR" 2>/dev/null &
+            echo ""
+            _info "Opening folder: $MEDIA_DIR"
+            echo ""
+            printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+            read -r
+            ;;
+        d|D) _landing_delete ;;
+        s|S) _settings_flow ;;
+        n|N) exec "$0" ;;
+        m|M)
+            if [ -n "${VOXREFINER_MENU:-}" ]; then exit 0; fi
+            exec "$SCRIPT_DIR/vox-refiner-menu.sh"
+            ;;
+        *) break ;;
+    esac
+done
+
+fi  # end srt mode
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MODE: ACCESSIBILITY SRT
+# ═════════════════════════════════════════════════════════════════════════════
+
+if [ "$_MODE" = "srt_a" ]; then
+
+clear
+echo ""
+_header "MEDIA TRANSCRIBE — Accessibility SRT" "🎞→💬"
+echo ""
+_process "Transcribing with diarization via Voxtral..."
+echo ""
+
+_SEGMENTS_FILE="$MEDIA_DIR/${_TIMESTAMP}_segments.json"
+
+# Step 1: transcribe + dump segments, print speaker_ids to stdout
+_speaker_list=$("$VENV_PYTHON" -m src.subtitles "$MP3_FILE" \
+    --diarize \
+    --dump-segments "$_SEGMENTS_FILE" 2>&3)
+
+if [ -z "$_speaker_list" ] || [ ! -f "$_SEGMENTS_FILE" ]; then
+    echo ""
+    _error "Transcription returned no speakers."
+    echo ""
+    rm -f "$_SEGMENTS_FILE"
+    printf "  ${C_DIM}Press Enter to exit...${C_RESET}"
+    read -r
+    exec "$0"
+fi
+
+# Keep segments file alive until script exits (needed for [r] Rename)
+# shellcheck disable=SC2064
+trap "rm -f '$_SEGMENTS_FILE'" EXIT
+
+# Step 2: show dialogue preview so user knows who says what before naming
+echo ""
+_header "DIALOGUE PREVIEW" "👁"
+echo ""
+_preview_text=$("$VENV_PYTHON" -m src.subtitles --preview "$_SEGMENTS_FILE" 2>&3)
+printf '%s\n' "$_preview_text"
+echo ""
+_sep
+
+# Step 3: AI name suggestions (used as defaults in naming prompts)
+echo ""
+_ai_suggestions=$("$VENV_PYTHON" -m src.subtitles \
+    --suggest-names "$_SEGMENTS_FILE" 2>&3) || true
+
+declare -A _suggestions
+declare -A _cur_names
+if [ -n "$_ai_suggestions" ]; then
+    while IFS='=' read -r _k _v; do
+        [ -n "$_k" ] && _suggestions["$_k"]="${_v}"
+    done <<< "$_ai_suggestions"
+fi
+
+# Step 4: name each speaker interactively (AI suggestion shown as default)
+echo ""
+_header "NAME THE SPEAKERS" "🎙"
+echo ""
+printf "  ${C_DIM}Press Enter to accept the suggestion, or type a custom name.${C_RESET}\n"
+echo ""
+
+_speaker_map=""
+_idx=1
+while IFS= read -r _sid <&4; do
+    _default="${_suggestions[$_sid]:-$_sid}"
+    printf "  ${C_BOLD}[%d]${C_RESET} %s → name [${C_DIM}%s${C_RESET}]: " "$_idx" "$_sid" "$_default"
+    read -r _name
+    _name="${_name:-$_default}"
+    _cur_names["$_sid"]="$_name"
+    if [ -n "$_speaker_map" ]; then
+        _speaker_map="${_speaker_map},${_sid}=${_name}"
+    else
+        _speaker_map="${_sid}=${_name}"
+    fi
+    _idx=$((_idx + 1))
+done 4<<< "$_speaker_list"
+
+# Step 5: generate SRT from cached segments (no second API call)
+echo ""
+_process "Generating accessibility SRT..."
+echo ""
+
+_srt_content=$("$VENV_PYTHON" -m src.subtitles \
+    --from-segments "$_SEGMENTS_FILE" \
+    --speaker-map "$_speaker_map" 2>&3)
+
+if [ -z "$_srt_content" ]; then
+    echo ""
+    _error "SRT generation returned empty."
+    echo ""
+    printf "  ${C_DIM}Press Enter to exit...${C_RESET}"
+    read -r
+    exec "$0"
+fi
+
+# Save with slug-based name
+_process "Generating filename..."
+_srt_text=$(printf '%s' "$_srt_content" | grep -Ev '^[0-9]+$|-->|^[[:space:]]*$')
+_slug=$(printf '%s' "$_srt_text" | "$VENV_PYTHON" -m src.slug 2>&3)
+_slug="${_slug:-subtitles-accessibility}"
+_BASE_NAME="${_TIMESTAMP}_${_slug}"
+
+# Rename MP3
+_new_mp3="$MEDIA_DIR/${_BASE_NAME}.mp3"
+if [ -f "$MP3_FILE" ] && [ "$MP3_FILE" != "$_new_mp3" ]; then
+    mv "$MP3_FILE" "$_new_mp3"
+    MP3_FILE="$_new_mp3"
+fi
+
+_SRT_FILE="$MEDIA_DIR/${_BASE_NAME}_accessibility.srt"
+printf '%s' "$_srt_content" > "$_SRT_FILE"
+
+echo ""
+_header "SUBTITLES — Accessibility SRT" "💬"
+_success "Saved: ${_BASE_NAME}_accessibility.srt"
+echo ""
+printf "${C_BG_CYAN} %s ${C_RESET}\n" "$_srt_content"
+echo ""
+
+# ─── Accessibility SRT post-action menu ──────────────────────────────────────
+
+_SETTING_TRANSLATE_LANG="${MEDIA_TRANSLATE_LANG:-${OUTPUT_DEFAULT_LANG:-en}}"
+_translate_done=0
+translated_text=""
+_SRT_CORRECTED_FILE=""
+
+while true; do
+    echo ""
+    _sep
+    printf "  ${C_BOLD}[r]${C_RESET} Rename speakers  ${C_BOLD}[c]${C_RESET} Fix errors (AI context)  ${C_BOLD}[e]${C_RESET} Rename files  ${C_BOLD}[x]${C_RESET} Export SRT"
+    printf "  ${C_BOLD}[t]${C_RESET} Translate  ${C_BOLD}[l]${C_RESET} Read aloud"
+    printf "  ${C_BOLD}[z]${C_RESET} Summarise  ${C_BOLD}[p]${C_RESET} Search  ${C_BOLD}[f]${C_RESET} Fact-check"
+    printf "  ${C_BOLD}[o]${C_RESET} Open folder  ${C_BOLD}[d]${C_RESET} Delete"
+    printf "  ${C_BOLD}[s]${C_RESET} Settings  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner: "
+    read -r _action
+    case "$_action" in
+        r|R)
+            echo ""
+            _header "DIALOGUE PREVIEW" "👁"
+            echo ""
+            printf '%s\n' "$_preview_text"
+            echo ""
+            _sep
+            echo ""
+            _header "RENAME SPEAKERS" "✏"
+            echo ""
+            printf "  ${C_DIM}Press Enter to keep the current name.${C_RESET}\n"
+            echo ""
+            _speaker_map=""
+            _idx=1
+            while IFS= read -r _sid <&4; do
+                _cur_name="${_cur_names[$_sid]:-$_sid}"
+                printf "  ${C_BOLD}[%d]${C_RESET} %s → name [${C_DIM}%s${C_RESET}]: " "$_idx" "$_sid" "$_cur_name"
+                read -r _name
+                _name="${_name:-$_cur_name}"
+                _cur_names["$_sid"]="$_name"
+                if [ -n "$_speaker_map" ]; then
+                    _speaker_map="${_speaker_map},${_sid}=${_name}"
+                else
+                    _speaker_map="${_sid}=${_name}"
+                fi
+                _idx=$((_idx + 1))
+            done 4<<< "$_speaker_list"
+
+            echo ""
+            _process "Regenerating SRT..."
+            echo ""
+            _srt_content=$("$VENV_PYTHON" -m src.subtitles \
+                --from-segments "$_SEGMENTS_FILE" \
+                --speaker-map "$_speaker_map" 2>&3)
+
+            if [ -n "$_srt_content" ]; then
+                printf '%s' "$_srt_content" > "$_SRT_FILE"
+                echo ""
+                _header "SUBTITLES — Accessibility SRT (updated)" "💬"
+                _success "Saved: ${_BASE_NAME}_accessibility.srt"
+                echo ""
+                printf "${C_BG_CYAN} %s ${C_RESET}\n" "$_srt_content"
+                echo ""
+            else
+                _warn "SRT regeneration failed."
+            fi
+            ;;
+        x|X)
+            _export_src="${_SRT_CORRECTED_FILE:-$_SRT_FILE}"
+            if [ -n "$_SRT_CORRECTED_FILE" ] && [ ! -f "$_SRT_CORRECTED_FILE" ]; then
+                _warn "Corrected file not found, exporting original: $(basename "$_SRT_FILE")"
+                _export_src="$_SRT_FILE"
+            fi
+            echo ""
+            _info "Exporting: $(basename "$_export_src")"
+            if command -v zenity >/dev/null 2>&1; then
+                _dest=$(zenity --file-selection --save \
+                    --title="Export accessibility SRT" \
+                    --filename="$_export_src" \
+                    2>/dev/null)
+            else
+                echo ""
+                printf "  Export path [default: %s]: " \
+                    "$HOME/Downloads/${_BASE_NAME}_accessibility.srt"
+                read -r _dest
+                _dest="${_dest:-$HOME/Downloads/${_BASE_NAME}_accessibility.srt}"
+                _dest="$(printf '%s' "$_dest" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                _dest="${_dest/#\~/$HOME}"
+            fi
+            if [ -n "$_dest" ] && [ "$_dest" != "$_export_src" ]; then
+                cp "$_export_src" "$_dest"
+                echo ""
+                _success "Exported: $_dest"
+            fi
+            ;;
+        c|C)
+            echo ""
+            _sep
+            if ! _collect_context; then continue; fi
+            if [ -z "$_context" ]; then _warn "No context provided."; continue; fi
+            _srt_ctx="$(printf '[SRT format — preserve all timecodes, block numbers, and blank lines between blocks]\n%s' "$_context")"
+            echo ""
+            _process "Fixing subtitle errors with AI context..."
+            echo ""
+            _fixed=$(printf '%s' "$_srt_content" | \
+                "$VENV_PYTHON" -m src.correct "$_srt_ctx" 2>&3)
+            if [ -n "$_fixed" ]; then
+                # First correction: create _corrected file; subsequent: update it
+                [ -z "$_SRT_CORRECTED_FILE" ] && \
+                    _SRT_CORRECTED_FILE="$MEDIA_DIR/${_BASE_NAME}_accessibility_corrected.srt"
+                printf '%s' "$_fixed" > "$_SRT_CORRECTED_FILE"
+                _srt_content="$_fixed"
+                printf '%s' "$_fixed" | xclip -selection clipboard
+                printf '%s' "$_fixed" | xclip -selection primary
+                echo ""
+                _success "Saved: $(basename "$_SRT_CORRECTED_FILE")  ${C_DIM}(original preserved)${C_RESET}"
+                echo ""
+                printf "${C_BG_CYAN} %s ${C_RESET}\n" "$_fixed"
+                echo ""
+            else
+                _warn "Fix returned empty."
+            fi
+            ;;
+        e|E)
+            _current_slug="${_BASE_NAME#${_TIMESTAMP}_}"
+            echo ""
+            printf "  Current: %s\n" "$_BASE_NAME"
+            printf "  New name [%s]: " "$_current_slug"
+            read -r _new_slug
+            _new_slug="$(printf '%s' "$_new_slug" | tr -cd '[:print:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            _new_slug="${_new_slug:-$_current_slug}"
+            if [ "$_new_slug" = "$_current_slug" ]; then continue; fi
+            _new_base="${_TIMESTAMP}_${_new_slug}"
+            _do_rename "$_BASE_NAME" "$_new_base"
+            MP3_FILE="$MEDIA_DIR/${_new_base}.mp3"
+            _SRT_FILE="$MEDIA_DIR/${_new_base}_accessibility.srt"
+            [ -n "$_SRT_CORRECTED_FILE" ] && \
+                _SRT_CORRECTED_FILE="$MEDIA_DIR/${_new_base}_accessibility_corrected.srt"
+            _BASE_NAME="$_new_base"
+            echo ""
+            _success "Renamed to: $_new_base"
+            ;;
+        t|T)
+            _prev_translate_done="$_translate_done"
+            _translate_flow "$_preview_text" "MEDIA_TRANSLATE_LANG"
+            if [ "$_translate_done" -eq 1 ] && [ "$_prev_translate_done" -eq 0 ] \
+                && [ -n "$_BASE_NAME" ] && [ -n "$translated_text" ]; then
+                _lang_suffix="${_SETTING_TRANSLATE_LANG:-en}"
+                _trans_file="$MEDIA_DIR/${_BASE_NAME}_${_lang_suffix}.txt"
+                printf '%s' "$translated_text" > "$_trans_file"
+                _success "Saved: $(basename "$_trans_file")"
+            fi
+            ;;
+        l|L)
+            printf '%s' "$_preview_text" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_voice.sh"
+            ;;
+        z|Z)
+            printf '%s' "$_preview_text" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_insight.sh"
+            ;;
+        p|P)
+            printf '%s' "$_preview_text" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_search.sh"
+            ;;
+        f|F)
+            printf '%s' "$_preview_text" | xclip -selection primary
+            VOXREFINER_MENU=1 "$SCRIPT_DIR/selection_to_factcheck.sh"
+            ;;
+        o|O)
+            xdg-open "$MEDIA_DIR" 2>/dev/null &
+            echo ""
+            _info "Opening folder: $MEDIA_DIR"
+            echo ""
+            printf "  ${C_DIM}Press Enter to continue...${C_RESET}"
+            read -r
+            ;;
+        d|D) _landing_delete ;;
+        s|S) _settings_flow ;;
+        n|N) exec "$0" ;;
+        m|M)
+            if [ -n "${VOXREFINER_MENU:-}" ]; then exit 0; fi
+            exec "$SCRIPT_DIR/vox-refiner-menu.sh"
+            ;;
+        *) break ;;
+    esac
+done
+
+fi  # end srt_a mode

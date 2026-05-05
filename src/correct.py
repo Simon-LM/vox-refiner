@@ -89,6 +89,12 @@ def correct(raw_text: str, context: str) -> str:
                 retry_delay=retry_delay,
                 retries=_REQUEST_RETRIES,
             )
+            result = result.strip()
+            # Strip <transcription> wrapper echoed by the model due to SECURITY_BLOCK
+            if result.startswith("<transcription>"):
+                result = result[len("<transcription>"):].lstrip("\n")
+            if result.endswith("</transcription>"):
+                result = result[: -len("</transcription>")].rstrip("\n")
             return result.strip()
         except requests.HTTPError as exc:
             status = exc.response.status_code if exc.response is not None else "?"

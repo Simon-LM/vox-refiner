@@ -13,6 +13,29 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.19.0] — 2026-05-05
+
+### Added
+
+- **`src/subtitles.py`** : nouveau module de génération de sous-titres SRT depuis les segments timestampés Voxtral (`timestamp_granularities=segment`). Deux modes : standard (sans diarisation) et accessibilité (avec diarisation + labels locuteurs). Découpage automatique des segments > 7s. CLI : `--dump-segments` (étape 1 accessibilité, cache segments JSON sans second appel API), `--from-segments` + `--speaker-map` (étape 2), `--preview <path.json>`, `--suggest-names <path.json>`.
+- **`src/subtitles.py`** — `format_dialogue_preview(segments)` : aperçu lisible du dialogue (sans timecodes, groupé par locuteur) affiché avant le nommage des locuteurs.
+- **`src/subtitles.py`** — `suggest_speaker_names(segments, api_key)` : interroge Mistral pour proposer un nom ou rôle par `speaker_id` selon le contenu, dans la langue du transcript.
+- **`media_to_text.sh`** — menu d'accueil étendu : `[s]` Subtitles Standard SRT et `[a]` Subtitles Accessibility en plus de `[n]` New transcription.
+- **`media_to_text.sh` — mode `[s]` Standard SRT** : appel Voxtral sans diarisation, génération SRT, sauvegarde `YYYY-MM-DD_HHhMM_slug.srt`. Menu post-action complet : `[c]` Fix errors, `[e]` Rename files, `[x]` Export, `[t]` Translate (auto-sauvegardée), `[l]` Read aloud, `[z]` Summarise, `[p]` Search, `[f]` Fact-check, `[o]` Open folder, `[d]` Delete.
+- **`media_to_text.sh` — mode `[a]` Accessibility SRT** : appel Voxtral avec diarisation, aperçu dialogue, suggestions de noms par IA, nommage interactif, génération SRT avec labels `[Nom]:`, sauvegarde `_accessibility.srt`. Un seul appel API (segments mis en cache JSON). Menu post-action complet incluant `[r]` Rename speakers (sans retranscrire).
+- **`media_to_text.sh` — `[c]` Fix errors (AI context)** (modes SRT) : conserve le fichier SRT original intact, crée un `_corrected.srt` séparé. Hint de préservation des timecodes transmis à `src/correct.py`. Exports et traductions utilisent la version corrigée si disponible.
+- **`media_to_text.sh` — `[e]` Rename files** (tous modes) : renomme en groupe tous les fichiers du même enregistrement (`.mp3`, `.srt`, `_corrected.srt`, `_lang.txt`) via glob sur le nom de base. ESC = annuler, Entrée = conserver le nom actuel, caractères non-imprimables filtrés.
+- **`media_to_text.sh` — `[x]` Export** (modes SRT) : vérifie l'existence du fichier source avant d'ouvrir zenity, exporte la version corrigée si disponible, affiche le nom du fichier dans le terminal. Suppression de la pause "Press Enter to continue".
+- **`media_to_text.sh`** — `_do_rename()` : helper interne, renomme en une passe tous les fichiers d'un groupe par glob sur le nom de base.
+- **`media_to_text.sh`** — `_collect_context()` : helper partagé pour la collecte de contexte (`[k]` saisie / `[f]` fichier / `[v]` voix).
+
+### Changed
+
+- **`src/subtitles.py` — `format_srt()`** : format des labels locuteurs `- Nom:` → `[Nom]:` (convention d'accessibilité standard). Label émis uniquement au changement de locuteur, pas à chaque bloc.
+- **`src/correct.py`** : suppression du wrapper `<transcription>…</transcription>` parfois réécrit par le modèle en réponse au `SECURITY_BLOCK`.
+
+---
+
 ## [4.18.3] — 2026-05-05
 
 ### Added
