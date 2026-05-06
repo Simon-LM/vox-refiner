@@ -13,6 +13,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.20.4] — 2026-05-07
+
+### Changed
+
+- **`CLAUDE.md` — règle de commit renforcée** : l'assistant n'a pas le droit de committer ou pousser en aucune circonstance. Il propose uniquement un nom de commit, après que l'utilisateur a testé la fonctionnalité lui-même.
+
+---
+
 ## [4.20.3] — 2026-05-07
 
 ### Added

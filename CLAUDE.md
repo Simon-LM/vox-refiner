@@ -65,14 +65,14 @@ Once the feature is finished, tested, and explicitly validated by the user:
 
 1. **Update all relevant documentation** — `Readme.md`, `docs/`, `CLAUDE.md` if architecture changed.
 2. **Update `CHANGELOG.md`** — add entries under `[Unreleased]` during work; move to a versioned section at release time.
-3. **Propose** a commit message and a version tag (following the rules below) — but **never commit or push without explicit user confirmation**.
+3. **Propose** a commit message and a version tag (following the rules below) — only once the user has personally tested the feature. Never commit or push under any circumstances.
 
 ### Before every commit
 
 1. Documentation and `CHANGELOG.md` must already be up to date.
 2. Follow [Semantic Versioning](https://semver.org/): PATCH for fixes, MINOR for new features, MAJOR for breaking changes.
 3. Commit format: `<type>: <short description>` (types: feat / fix / chore / docs / refactor / style).
-4. **Never commit or push without explicit user confirmation.**
+4. **Never commit or push, period.** Only propose a commit name — the user commits.
 5. **Never touch `.env` or any gitignored file.**
 
 ## Key technical decisions — do not change without discussion
