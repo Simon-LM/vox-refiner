@@ -30,7 +30,7 @@ Environment variables (loaded from .env):
   INSIGHT_SUMMARY_MODEL        — model for summarize (default: mistral-small-latest)
   INSIGHT_SYNTHESIS_MODEL      — model for factcheck synthesis (default: mistral-small-latest)
   INSIGHT_PERPLEXITY_MODEL     — Perplexity model (default: sonar-pro)
-  INSIGHT_GROK_MODEL           — Grok model (default: grok-3)
+  INSIGHT_GROK_MODEL           — Grok model (default: grok-4.3)
   INSIGHT_SEARCH_ENGINE        — search engine: auto | perplexity | grok | both
                                   auto = Perplexity if available, else Grok (default)
   INSIGHT_FACTCHECK_ENGINE     — fact-check sources: both | perplexity | grok (default: both)
@@ -70,7 +70,7 @@ _PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 _SUMMARY_MODEL    = os.environ.get("INSIGHT_SUMMARY_MODEL",    "mistral-small-latest")
 _SYNTHESIS_MODEL  = os.environ.get("INSIGHT_SYNTHESIS_MODEL",  "mistral-small-latest")
 _PERPLEXITY_MODEL = os.environ.get("INSIGHT_PERPLEXITY_MODEL", "sonar-pro")
-_GROK_MODEL       = os.environ.get("INSIGHT_GROK_MODEL",       "grok-4-1-fast-non-reasoning")
+_GROK_MODEL       = os.environ.get("INSIGHT_GROK_MODEL",       "grok-4.3")
 
 # ── API keys ──────────────────────────────────────────────────────────────────
 _MISTRAL_KEY    = os.environ.get("MISTRAL_API_KEY",    "")

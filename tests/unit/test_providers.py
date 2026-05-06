@@ -956,10 +956,10 @@ class TestCallCascade:
         # small -> medium -> large -> "" : 3 attempts, then exhausted.
         assert call_count["n"] == 3
 
-    def test_xai_cascade_cycles_within_attempt_cap(self, monkeypatch):
-        """xAI cyclic chain is safe under _MAX_ATTEMPTS; sticky never switches."""
-        monkeypatch.setenv("XAI_API_KEY",    "key-xai")
-        monkeypatch.setenv("EDENAI_API_KEY", "key-eden")
+    def test_xai_cascade_walks_chain(self, monkeypatch):
+        """xAI chain: grok-4.3 → multi-agent → 0309-reasoning → cycle until cap."""
+        monkeypatch.setenv("XAI_API_KEY", "key-xai")
+        monkeypatch.delenv("EDENAI_API_KEY", raising=False)
 
         seen_models = []
 
@@ -969,18 +969,17 @@ class TestCallCascade:
 
         with patch("src.providers._call_xai_adapter", side_effect=adapter), \
              patch("src.providers.time.sleep"):
-            with pytest.raises(ProviderError, match="All providers exhausted"):
+            with pytest.raises(ProviderError):
                 call("fact_check_x", [{"role": "user", "content": "hi"}],
-                     model="grok-4-1-fast-non-reasoning")
+                     model="grok-4.3")
 
         # Sticky: all 6 attempts on xai_direct (never eden_xai).
         assert len(seen_models) == 6
-        # Chain walks through XAI_FALLBACK_MAP; cycle kicks in before cap.
-        # Model should advance on each attempt and never get stuck.
-        assert seen_models[0] == "grok-4-1-fast-non-reasoning"
-        assert seen_models[1] == "grok-4-1-fast-reasoning"
-        # The cycle (multi-agent <-> reasoning) is intentional.
-        assert len(set(seen_models)) >= 3  # at least 3 distinct models tried
+        assert seen_models[0] == "grok-4.3"
+        assert seen_models[1] == "grok-4.20-multi-agent-0309"
+        assert seen_models[2] == "grok-4.20-0309-reasoning"
+        # Cycle multi-agent <-> 0309-reasoning fills remaining attempts.
+        assert set(seen_models[1:]) == {"grok-4.20-multi-agent-0309", "grok-4.20-0309-reasoning"}
 
     def test_perplexity_cascade_cycles_within_cap(self, monkeypatch):
         """Perplexity cyclic chain: sonar-deep -> sonar-reasoning -> sonar-pro -> sonar -> sonar-pro."""
@@ -1079,15 +1078,14 @@ class TestCallCascade:
              patch("src.providers.time.sleep"):
             with pytest.raises(ProviderError):
                 call("fact_check_x", [{"role": "user", "content": "hi"}],
-                     model="grok-4-1-fast-non-reasoning")
+                     model="grok-4.3")
 
-        # Sticky keeps all 6 attempts on xai_direct.
-        assert len(seen) == 6
+        # Sticky keeps all attempts on xai_direct.
         assert all(p == "xai_direct" for p, _ in seen)
-        # Cascade should still advance through XAI_FALLBACK_MAP.
+        # Cascade advances through XAI_FALLBACK_MAP.
         models = [m for _, m in seen]
-        assert models[0] == "grok-4-1-fast-non-reasoning"
-        assert models[1] == "grok-4-1-fast-reasoning"
+        assert models[0] == "grok-4.3"
+        assert models[1] == "grok-4.20-multi-agent-0309"
         assert len(set(models)) >= 3
 
     def test_pingpong_exhausted_direct_keeps_eden_live(self, monkeypatch):

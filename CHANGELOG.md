@@ -13,6 +13,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.20.1] — 2026-05-06
+
+### Fixed
+
+- **Migration Grok — retrait des modèles retirés (deadline xAI : 15 mai 2026)** : `grok-4-1-fast-non-reasoning` et `grok-4-1-fast-reasoning` retirés du service xAI. Nouveau primaire : `grok-4.3` (meilleur score agentic tool-calling, recommandé par xAI pour reasoning workloads).
+  - `src/providers.py` — `XAI_FALLBACK_MAP` : nouvelle cascade `grok-4.3` → `grok-4.20-multi-agent-0309` → `grok-4.20-0309-reasoning` (cycle jusqu'au cap). Entrées backward-compat conservées (`grok-4-1-fast-*` → `grok-4.3`) pour les utilisateurs avec ancienne `.env`.
+  - `src/providers.py` — `EDEN_MODEL_MAP` : `grok-4.3` mappé vers `xai/grok-4.20-multi-agent-beta-0309` (meilleur modèle Grok disponible sur Eden). `grok-4.20-multi-agent-0309` mis à jour avec le nouveau nom Eden (`xai/grok-4.20-multi-agent-beta-0309`). Entrées retirées supprimées. Backward-compat ajouté pour `grok-4-1-fast-*`.
+  - `src/providers.py` — `EDEN_FALLBACK_CHAINS` : chaîne Grok réécrite autour de `xai/grok-4.20-multi-agent-beta-0309`. Fallback croisé `perplexityai/sonar → xai/grok-4-1-fast-*` supprimé.
+  - `src/providers.py` — `eden_xai` `ping_model_id` mis à jour : `xai/grok-4-1-fast` → `xai/grok-4.20-multi-agent-beta-0309`.
+  - `src/insight.py` : défaut `_GROK_MODEL` : `grok-4-1-fast-non-reasoning` → `grok-4.3`.
+  - `.env.example` : `INSIGHT_GROK_MODEL` : `grok-4-fast` → `grok-4.3`.
+
+---
+
 ## [4.20.0] — 2026-05-06
 
 ### Added

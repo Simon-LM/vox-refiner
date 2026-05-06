@@ -213,12 +213,14 @@ MISTRAL_FALLBACK_MAP: dict[str, str] = {
 # Canonical format = xAI API model name (no "xai/" prefix — that's Eden's format).
 # Empty value = end of chain, no further fallback.
 XAI_FALLBACK_MAP: dict[str, str] = {
-    "grok-4-1-fast-non-reasoning":    "grok-4-1-fast-reasoning",
-    "grok-4-1-fast-reasoning":        "grok-4.20-0309-non-reasoning",
-    "grok-4.20-0309-non-reasoning":   "grok-4.20-0309-reasoning",
-    "grok-4.20-0309-reasoning":       "grok-4.20-multi-agent-0309",
-    "grok-4.20-multi-agent-0309":     "grok-4.20-0309-reasoning",
-}
+    "grok-4.3":                     "grok-4.20-multi-agent-0309",
+    "grok-4.20-multi-agent-0309":   "grok-4.20-0309-reasoning",
+    "grok-4.20-0309-non-reasoning": "grok-4.20-multi-agent-0309",
+    "grok-4.20-0309-reasoning":     "grok-4.20-multi-agent-0309",
+    # Backward compat: redirect retired models to new primary
+    "grok-4-1-fast-non-reasoning":  "grok-4.3",
+    "grok-4-1-fast-reasoning":      "grok-4.3",
+    }
 
 # Layer 1 (Perplexity direct): canonical Sonar model -> fallback on Perplexity direct.
 # Used when PERPLEXITY_API_KEY is present and the primary model degrades.
@@ -251,11 +253,13 @@ EDEN_MODEL_MAP: dict[str, str] = {
     "sonar-reasoning-pro":     "perplexityai/sonar-reasoning-pro",
     "sonar-deep-research":     "perplexityai/sonar-deep-research",
     # xAI
-    "grok-4-1-fast-non-reasoning":    "xai/grok-4-1-fast-non-reasoning-latest",
-    "grok-4-1-fast-reasoning":        "xai/grok-4-1-fast-reasoning-latest",
-    "grok-4.20-0309-non-reasoning":   "xai/grok-4.20-beta-0309-non-reasoning",
-    "grok-4.20-0309-reasoning":       "xai/grok-4.20-beta-0309-reasoning",
-    "grok-4.20-multi-agent-0309":     "xai/grok-4.20-beta-0309-reasoning",
+    "grok-4.3":                     "xai/grok-4.20-multi-agent-beta-0309",  # best Grok on Eden    
+    "grok-4.20-multi-agent-0309":   "xai/grok-4.20-multi-agent-beta-0309",
+    "grok-4.20-0309-non-reasoning": "xai/grok-4.20-beta-0309-non-reasoning",
+    "grok-4.20-0309-reasoning":     "xai/grok-4.20-beta-0309-reasoning",
+    # Backward compat: retired models redirected to best available on Eden
+    "grok-4-1-fast-non-reasoning":  "xai/grok-4.20-multi-agent-beta-0309",
+    "grok-4-1-fast-reasoning":      "xai/grok-4.20-multi-agent-beta-0309",
 }
 
 # Layer 2b: Substitutions when a model + option is unsupported on Eden.
@@ -286,12 +290,11 @@ EDEN_FALLBACK_CHAINS: dict[str, list[str]] = {
     "mistral/magistral-medium-latest": ["amazon/qwen.qwen3-next-80b-a3b"],
     "mistral/magistral-small-latest":  ["amazon/mistral.magistral-small-2509"],
     
-    "xai/grok-4-1-fast-non-reasoning-latest":     ["xai/grok-4-fast-non-reasoning"],
-    "xai/grok-4-1-fast-reasoning-latest":         ["xai/grok-4-fast-reasoning"], 
-    "xai/grok-4.20-beta-0309-non-reasoning":      ["xai/grok-4"],
-    "xai/grok-4.20-beta-0309-reasoning":          ["xai/grok-4"],
+    "xai/grok-4.20-multi-agent-beta-0309":   ["xai/grok-4.20-0309-reasoning"],
+    "xai/grok-4.20-0309-reasoning":         ["xai/grok-4.20-beta-0309-non-reasoning"],
+    "xai/grok-4.20-beta-0309-non-reasoning": ["xai/grok-4.20-beta-0309-reasoning"],
 
-    "perplexityai/sonar":          ["xai/grok-4-1-fast-non-reasoning-latest"],
+    "perplexityai/sonar":          ["perplexityai/sonar-pro"],
     "perplexityai/sonar-pro":          ["perplexityai/sonar"],
     "perplexityai/sonar-reasoning-pro": ["perplexityai/sonar-pro"],
     "perplexityai/sonar-deep-research": ["perplexityai/sonar-reasoning-pro"],
@@ -344,7 +347,7 @@ PROVIDERS: dict[str, Provider] = {
         ping_url         = EDEN_CHAT_URL,
         ping_method      = "POST",
         endpoint         = EDEN_CHAT_URL,
-        ping_model_id    = "xai/grok-4-1-fast",
+        ping_model_id    = "xai/grok-4.20-multi-agent-beta-0309",
         adapter_type     = "openai",
         is_eden          = True,
     ),
