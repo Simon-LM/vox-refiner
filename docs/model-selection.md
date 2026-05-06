@@ -95,8 +95,8 @@ with acceptable quality for extended transcriptions when magistral-medium is una
 
 | Role     | Model                   |
 | -------- | ----------------------- |
-| Primary  | `devstral-small-latest` |
-| Fallback | `mistral-small-latest`  |
+| Primary  | `mistral-small-latest`  |
+| Fallback | `mistral-medium-latest` |
 
 **Why mistral-small:**
 History extraction is a structured extraction task: parse existing bullets, identify new
@@ -105,9 +105,9 @@ timestamps, max N entries). The critical quality is instruction-following discip
 not hallucinating, not inventing bullets, not drifting from the format.
 
 `mistral-small-latest` v4 (MoE with devstral-small) covers this well: fast, cheap, and
-no rate-limit contention with the MEDIUM refinement tier (magistral-small). As a
-background task where the user is not waiting, it is the right balance of quality and
-cost. Upgrade to `devstral-latest` via `.env` if extraction quality proves insufficient.
+no rate-limit contention with other refinement tiers. As a background task where the
+user is not waiting, it is the right balance of quality and cost.
+Upgrade via `HISTORY_EXTRACTION_MODEL=devstral-latest` in `.env` if needed.
 
 ---
 
@@ -118,7 +118,7 @@ cost. Upgrade to `devstral-latest` via `.env` if extraction quality proves insuf
 | SHORT | < 80 | `mistral-small-latest` | `mistral-medium-latest` | temp=0.2, top_p=0.85 | Confirmed |
 | MEDIUM | 80-240 | `mistral-small-latest` | `mistral-medium-latest` | temp=0.3, top_p=0.9, reasoning=high | Confirmed |
 | LONG | > 240 | `magistral-medium-latest` | `mistral-medium-latest` | temp=0.4, top_p=0.9 | Confirmed |
-| HISTORY | any | `mistral-small-latest` | `mistral-medium-latest` | reasoning=high | Confirmed |
+| HISTORY | any | `mistral-small-latest` | `mistral-medium-latest` | — | Confirmed |
 
 All model and parameter values are overridable via `.env` — see `.env.example` for the
 full list of configurable parameters. Per-tier parameters (temperature, top_p,

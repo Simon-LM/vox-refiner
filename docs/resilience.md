@@ -46,8 +46,10 @@ reducing failures after interrupted or abnormal recording sessions.
 Retries are triggered **only on transient HTTP errors**: 429 (rate limit),
 500, 502, 503 (server errors).
 
-- **Timeout** and **ConnectionError** are NOT retried — there is no point waiting
-  again if the server did not respond at all. The fallback model is tried immediately.
+- **Timeout** and **ConnectionError** are NOT retried. Whether the fallback model
+  is tried depends on `REFINE_TIMEOUT_FALLBACK_ENABLED` (commented out in
+  `.env.example`, meaning disabled by default). When disabled, a timeout returns
+  the raw transcription immediately without attempting the fallback.
 - **401 / 403** (authentication) and **404** are never retried.
 - On 429, the stderr message explicitly says "rate limit" to distinguish it from
   server errors.
@@ -139,21 +141,45 @@ speed factor (see below).
 
 Magistral models produce chain-of-thought reasoning before their final answer,
 making them intrinsically 3–4.5× slower than plain completion models.
-A per-model factor is applied to prevent premature timeouts:
+When `reasoning_effort=high` is active on a Mistral model, the compound key
+`model+reasoning_effort` is looked up first; unknown models with reasoning fall
+back to a generic × 1.8 multiplier applied on top of the base factor.
 
-| Model                     | Factor | Notes                       |
-| ------------------------- | ------ | --------------------------- |
-| `devstral-small-latest`   | × 1.0  |                             |
-| `mistral-small-latest`    | × 1.0  |                             |
-| `mistral-medium-latest`   | × 1.2  | Slightly heavier than small |
-| `magistral-small-latest`  | × 3.0  | Chain-of-thought reasoning  |
-| `magistral-medium-latest` | × 4.5  | Chain-of-thought reasoning  |
-| `mistral-large-latest`    | × 1.5  |                             |
+| Model / compound key                        | Factor | Notes                                |
+| ------------------------------------------- | ------ | ------------------------------------ |
+| `devstral-small-latest`                     | × 1.0  | Deprecated — kept for safety         |
+| `devstral-latest`                           | × 1.0  | Replaces devstral-small-latest       |
+| `mistral-small-latest`                      | × 1.0  |                                      |
+| `mistral-medium-latest`                     | × 1.2  | Slightly heavier than small          |
+| `mistral-medium-3.5`                        | × 1.2  |                                      |
+| `magistral-small-latest`                    | × 3.0  | Native chain-of-thought              |
+| `magistral-medium-latest`                   | × 4.5  | Native chain-of-thought              |
+| `mistral-large-latest`                      | × 1.5  |                                      |
+| `mistral-small-latest+reasoning_effort`     | × 3.0  | Compound key: reasoning_effort=high  |
+| `mistral-medium-3.5+reasoning_effort`       | × 4.0  | Compound key: reasoning_effort=high  |
+| `mistral-medium-latest+reasoning_effort`    | × 4.0  | Compound key: reasoning_effort=high  |
 
-Unknown models default to × 1.0.
+Unknown models default to × 1.0 (× 1.8 if `reasoning_effort=high` is active).
 
 **Example:** 202 words → base = 8 s. With `magistral-medium-latest` (× 4.5)
-the effective timeout is **36 s**.
+the effective timeout is **36 s**. With `mistral-small-latest` + reasoning (× 3.0)
+the effective timeout is **24 s**.
+
+---
+
+## Timeout enabled flag
+
+By default, **`ENABLE_TIMEOUT=false`** — VoxRefiner sets no timeout on AI calls.
+Requests wait as long as the server needs. This prevents silent failures caused by
+slow reasoning models or brief API load spikes.
+
+Set `ENABLE_TIMEOUT=true` in `.env` to activate per-model, word-count-based limits.
+Use this only in automated pipelines where predictable upper bounds are required.
+With slow models (`magistral-medium-latest`) or large texts, the computed limit may
+still be too short and produce unexpected "model failed" errors.
+
+When `ENABLE_TIMEOUT=false`, all timeout computations in this document are inert —
+they run but return `None`, which disables the timeout entirely on the HTTP request.
 
 ---
 

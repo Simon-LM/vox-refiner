@@ -89,4 +89,4 @@ the missing package. From v4.3.1 onwards, `--apply` does this automatically.
 
 ## More help
 
-Report issues at: [github.com/Simon-LM/voxtral-paste/issues](https://github.com/Simon-LM/voxtral-paste/issues)
+Report issues at: [github.com/Simon-LM/vox-refiner/issues](https://github.com/Simon-LM/vox-refiner/issues)

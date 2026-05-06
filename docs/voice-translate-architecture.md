@@ -8,7 +8,7 @@ Speak in one language, get an audio translation in your own voice.
 
 ## Pipeline
 
-```
+```text
 Mic → rec (WAV, 16 kHz mono)                          vox-refiner-menu.sh
   → silence removal + speed-up → MP3                   ffmpeg
   → Voxtral STT → raw text                             src/transcribe.py
@@ -34,7 +34,7 @@ Everything after is specific to Voice Translate.
 
 ## Files
 
-```
+```text
 vox-refiner-menu.sh        ← interactive menu + Voice Translate orchestration
 src/voice_rewrite.py       ← clean + adapt for speech + translate (Mistral chat)
 src/tts.py                 ← Voxtral TTS API (text + voice clone → MP3)
@@ -80,7 +80,7 @@ Fallback order: voice cloning → preset voice → TTS failure (text still in cl
 - **Minimum for voice cloning:** 10s of usable audio (after skip)
 - **All files** in `recordings/voice-translate/`, fixed names, overwritten each run
 
-```
+```text
 recordings/voice-translate/
 ├── source.wav              ← raw recording
 ├── source.mp3              ← processed (silence removal + speed-up)
@@ -134,7 +134,7 @@ clipboard is the minimum viable output.
 ## Configuration (.env)
 
 ```bash
-TRANSLATE_TARGET_LANG=en                    # Default target language
+VOICE_TRANSLATE_TARGET_LANG=en              # Default target language for Voice Translate
 TTS_MODEL=voxtral-mini-tts-2603            # TTS model
 TTS_DEFAULT_VOICE_ID=c69964a6-...          # Preset voice UUID (Paul - Neutral)
 TTS_LOUDNESS=-16                            # EBU R128 target (LUFS)

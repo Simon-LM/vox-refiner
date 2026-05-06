@@ -10,20 +10,25 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-**VoxRefiner — Speak naturally. AI refines it. Just paste.**
+**VoxRefiner — Speak. Transcribe. Translate. Insight.**
 
 ---
 
 ## What is VoxRefiner?
 
-VoxRefiner turns your voice into clean, ready-to-paste text — instantly. Speak naturally,
-let AI refine your words, and paste the result anywhere. No typing, no manual cleanup.
+VoxRefiner is a voice-first productivity toolkit for Linux. Five modes, one launcher:
+
+- **Speak & Refine** — dictate anything, AI refines it, paste anywhere
+- **Voice Translate** — speak in your language, hear the translation in your own cloned voice
+- **Selection to Voice** — read any selected text aloud with AI preprocessing
+- **Selection to Insight** — summarise, search (Perplexity), and fact-check (Grok) any selected text
+- **Media Transcribe** — import an audio or video file, transcribe it with Voxtral, optionally correct with context
 
 Powered by a personal context file (your projects, tech stack, vocabulary) and a smart
 history that gets better the more you use it, VoxRefiner understands you — not just
 your words.
 
-One API key. No complex UI. Just speak → paste.
+One required API key (Mistral). No complex UI. Just speak → paste.
 
 ---
 
@@ -52,15 +57,17 @@ One API key. No complex UI. Just speak → paste.
 
 The refinement step automatically selects the right model based on the length of the transcription:
 
-| Transcription length | Primary model             | Fallback                |
-| -------------------- | ------------------------- | ----------------------- |
-| < 80 words           | `mistral-small-latest`    | `mistral-medium-latest` |
-| 80 – 240 words       | `magistral-small-latest`  | `mistral-medium-latest` |
-| > 240 words          | `magistral-medium-latest` | `mistral-medium-latest` |
+| Transcription length | Primary model                              | Fallback                |
+| -------------------- | ------------------------------------------ | ----------------------- |
+| < 80 words           | `mistral-small-latest`                     | `mistral-medium-latest` |
+| 80 – 240 words       | `mistral-small-latest` + reasoning         | `mistral-medium-latest` |
+| > 240 words          | `magistral-medium-latest`                  | `mistral-medium-latest` |
 
-Magistral models (reasoning) are used as primary because they follow instructions more
-faithfully — they won't add content, answer questions or deviate from the transcription.
-Mistral models serve as fast emergency fallbacks.
+The medium tier runs `mistral-small-latest` with `reasoning_effort=high` (via the `+reasoning`
+suffix in `REFINE_MODEL_MEDIUM`). Reasoning models follow instructions more faithfully — they
+won't add content, answer questions, or deviate from the transcription.
+Magistral (native reasoning) is reserved for long texts where depth matters most.
+Mistral models serve as fast emergency fallbacks at every tier.
 
 If a model is unavailable (rate limit, timeout), the next one is tried automatically.
 If all models fail, the raw Voxtral transcription is returned — the tool never crashes.
@@ -114,7 +121,7 @@ your longer transcriptions. Enable it with `ENABLE_HISTORY=true` in your `.env`.
   understand your work over time
 - Each bullet carries a `[YYYY-MM-DD HH:MM:SS]` timestamp, added by the application (not the AI)
 - On each update the model consolidates the list: duplicates are removed, stale facts are
-  dropped and new ones are merged within the `HISTORY_MAX_BULLETS` limit (default: 100)
+  dropped and new ones are merged within the `HISTORY_MAX_BULLETS` limit (default: 80)
 - To avoid saturation, the app only sends the most recent 80% of history entries to the
   model, keeping 20% capacity available for new bullets on each update
 
@@ -132,17 +139,17 @@ parameters (`HISTORY_MAX_BULLETS`, `HISTORY_EXTRACTION_MODEL`, `HISTORY_TIMEOUT_
 
 ---
 
-## Speak & Translate
+## Voice Translate
 
 Speak in your language, get an audio translation played back in your own cloned voice.
 
-1. Press your `--speak-translate` shortcut (or choose **Speak & Translate** from the menu)
+1. Press your `--speak-translate` shortcut (or choose **Voice Translate** from the menu)
 2. Speak — recording starts immediately
 3. Stop with **Ctrl+C**
 4. VoxRefiner transcribes, translates to the target language, synthesises the result in
    your own voice, and plays it automatically
 
-The target language is configurable in `.env` (`TRANSLATE_TARGET_LANG=en` by default).
+The target language is configurable in `.env` (`VOICE_TRANSLATE_TARGET_LANG=en` by default).
 You can also change it on the fly from the interactive settings menu.
 
 Your voice is cloned from a short audio sample captured at the start of recording —
@@ -226,6 +233,49 @@ A warning is displayed at launch if keys are missing — the summary still works
 
 ---
 
+## Media Transcribe
+
+Import any audio or video file and extract its transcription with Voxtral. Optionally
+correct the result by providing context (technical terms, speaker names).
+
+1. Choose **Media Transcribe** from the menu (or launch `media_to_text.sh` directly)
+2. Enter the path to your file (mp3, wav, m4a, mp4, mkv, mov, avi, webm, flac, ogg…)
+3. VoxRefiner converts the audio with ffmpeg and sends it to Voxtral
+4. The raw transcription is copied to clipboard and displayed in the terminal
+5. From the post-transcription menu, choose what to do next
+
+**Post-transcription menu:**
+
+| Key   | Action                                                            |
+| ----- | ----------------------------------------------------------------- |
+| `[r]` | Retry — re-transcribe the same file                               |
+| `[n]` | New file — start over with a different file                       |
+| `[c]` | Correct with context — fix transcription errors using your notes  |
+| `[t]` | Translate to another language                                     |
+| `[l]` | Read aloud                                                        |
+| `[z]` | Summarise                                                         |
+| `[p]` | Search                                                            |
+| `[f]` | Fact-check                                                        |
+| `[s]` | Settings                                                          |
+| `[m]` | Back to menu                                                      |
+
+**Contextual correction (`[c]`):**
+
+Provide a context note describing the topic, technical terms, or speaker names.
+Mistral corrects only clear transcription errors — homophones, misrecognised proper nouns,
+technical vocabulary — without rephrasing or removing any content.
+
+Context can be provided three ways:
+
+- `[k]` Type or paste it directly
+- `[f]` Load from a `.txt` or `.md` file
+- `[v]` Record it with your voice (uses the Speak & Refine pipeline)
+
+**Supported formats:** any container/codec that ffprobe can decode with an audio stream.
+Files larger than ~19 MB are automatically chunked by the transcription module.
+
+---
+
 ## Advanced options
 
 ### Voxtral-only mode (no AI refinement)
@@ -259,6 +309,17 @@ Set `REFINE_COMPARE_MODELS=true` in `.env` to run the primary and fallback model
   3. `[3] Fallback (model-name)`
 
 This mode is useful for evaluating model quality and tuning your routing configuration.
+
+### Timeouts
+
+By default (`ENABLE_TIMEOUT=false`), VoxRefiner sets **no timeout** on AI calls — requests
+wait as long as the server needs. This prevents silent failures caused by slow reasoning
+models or brief API load spikes.
+
+Set `ENABLE_TIMEOUT=true` in `.env` to enable per-model, word-count-based time limits.
+Use this only in automated pipelines where predictable upper bounds are required; with
+slow models (`magistral-medium-latest`) or large texts, the computed limit may still
+be too short and produce unexpected "model failed" errors.
 
 ### Retry without re-recording
 
@@ -302,7 +363,7 @@ Frequent terms: API, pipeline, transcription, pull request, backend, deployment.
 ## Why VoxRefiner?
 
 - Designed for **speed and simplicity**
-- **One API key only** — Mistral
+- **One required API key** — Mistral. Optional: Perplexity, xAI, Eden AI, Gradium
 - Two-step pipeline: faithful transcription + intelligent cleanup
 - Context-aware: adapts to your domain and vocabulary
 - Perfect for:
@@ -348,7 +409,7 @@ cd ~/.local/bin/vox-refiner
 #   Speak & Refine (record, AI cleans, paste):
 #   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-refine
 #
-#   Speak & Translate (record, translate, play in your voice):
+#   Voice Translate (record, translate, play in your voice):
 #   /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-translate
 #
 #   Selection to Voice (read selected or clipboard text aloud):
@@ -426,7 +487,7 @@ Example commands to bind (replace `your-username` with your actual username):
 # Speak & Refine — bind to e.g. Super+V
 /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-refine
 
-# Speak & Translate — bind to e.g. Super+T
+# Voice Translate — bind to e.g. Super+T
 /home/your-username/.local/bin/vox-refiner/launch-vox-refiner.sh --speak-translate
 
 # Selection to Voice — bind to e.g. Super+R
@@ -477,7 +538,7 @@ update-desktop-database ~/.local/share/applications 2>/dev/null || true
 
 VoxRefiner is intentionally minimal.
 
-You provide your Mistral API key once, and the tool just works.
+You provide your Mistral API key once, and the tool just works. Everything else is optional.
 
 The goal is to remove friction between speaking and writing — including the friction caused by imperfect voice recognition.
 

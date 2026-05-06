@@ -41,11 +41,11 @@ git pull                # force a pull if needed
 
 **Fix:** reinstall using git:
 ```bash
-git clone https://github.com/Simon-LM/voxtral-paste.git ~/.local/bin/vox-refiner
+git clone https://github.com/Simon-LM/vox-refiner.git ~/.local/bin/vox-refiner
 ```
 
 ---
 
 ## More help
 
-Report issues at: https://github.com/Simon-LM/voxtral-paste/issues
+Report issues at: https://github.com/Simon-LM/vox-refiner/issues

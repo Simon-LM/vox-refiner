@@ -2,9 +2,8 @@
 
 # Eden AI — Model Catalog & Integration Strategy
 
-> **Status: Design phase.** No code integration yet. This document recenses the
-> Eden AI models under consideration and the rationale behind their potential use
-> as a redundancy / fallback layer for VoxRefiner.
+> **Status: Integrated.** Eden AI is live in `src/providers.py` as a fallback layer.
+> This document describes the model catalog and integration strategy.
 
 ---
 
@@ -55,15 +54,17 @@ Web search (Gemini only):
 
 ### xAI — Grok family
 
-| Model ID (Eden)                  | Use case                       | Notes                                          |
-| -------------------------------- | ------------------------------ | ---------------------------------------------- |
-| `xai/grok-4-1-fast`              | Fast general chat              | Balanced default for Grok-4-1 via Eden         |
-| `xai/grok-4-1-fast-reasoning`    | Short reasoning tasks          | CoT enabled                                    |
-| `xai/grok-4-1-fast-non-reasoning`| Pure generation, no CoT        | Cheapest Grok path                             |
-| `xai/grok-4-latest`              | Highest-quality Grok           | Slower, heavier                                |
+| Model ID (Eden)                           | Use case                  | Notes                                                    |
+| ----------------------------------------- | ------------------------- | -------------------------------------------------------- |
+| `xai/grok-4.20-multi-agent-beta-0309`     | General chat + web search | Primary Eden route for Grok (maps to `grok-4.3` direct)  |
+| `xai/grok-4.20-beta-0309-non-reasoning`   | Pure generation, no CoT   | Fastest Grok path via Eden                               |
+| `xai/grok-4.20-beta-0309-reasoning`       | Reasoning tasks           | CoT enabled                                              |
 
-**Direct API preferred** for fact-check / Twitter search (native tool-use).
-Eden route serves as fallback.
+> Models `grok-4-1-fast*` and `grok-4-latest` were retired by xAI on 2026-05-15.
+> Backward-compat entries in `EDEN_MODEL_MAP` redirect them to `xai/grok-4.20-multi-agent-beta-0309`.
+
+**Direct API preferred** for fact-check / X search (native tool-use, `grok-4.3`).
+Eden route (`xai/grok-4.20-multi-agent-beta-0309`) serves as fallback — X search not available via Eden.
 
 ### Perplexity — Sonar family
 
@@ -99,15 +100,15 @@ Eden route serves as fallback.
 
 ### OVHcloud — sovereign / free tier
 
-| Model ID (Eden)                          | Notes                                       |
-| ---------------------------------------- | ------------------------------------------- |
-| `ovhcloud/Mistral-Small-3.2-24B-Instruct-2506` | Europe-hosted; free but unstable       |
-| `ovhcloud/Mistral-7B-Instruct-v0.3`      | Legacy 7B, low cost                         |
-| `ovhcloud/Mixtral-8x7B-Instruct-v0.1`    | MoE baseline                                |
-| `ovhcloud/Meta-Llama-3_3-70B-Instruct`   | Non-Mistral option                          |
-| `ovhcloud/Llama-3.1-8B-Instruct`         | Lightweight Llama                           |
-| `ovhcloud/Qwen2.5-Coder-32B-Instruct`    | Code-oriented                               |
-| `ovhcloud/DeepSeek-R1-Distill-Llama-70B` | Reasoning (R1 distill)                      |
+| Model ID (Eden)                               | Notes                                       |
+| --------------------------------------------- | ------------------------------------------- |
+| `ovhcloud/Mistral-Small-3.2-24B-Instruct-2506` | Europe-hosted; free but unstable           |
+| `ovhcloud/Mistral-7B-Instruct-v0.3`           | Legacy 7B, low cost                         |
+| `ovhcloud/Mixtral-8x7B-Instruct-v0.1`         | MoE baseline                                |
+| `ovhcloud/Meta-Llama-3_3-70B-Instruct`        | Non-Mistral option                          |
+| `ovhcloud/Llama-3.1-8B-Instruct`              | Lightweight Llama                           |
+| `ovhcloud/Qwen2.5-Coder-32B-Instruct`         | Code-oriented                               |
+| `ovhcloud/DeepSeek-R1-Distill-Llama-70B`      | Reasoning (R1 distill)                      |
 
 > ⚠️ OVH model IDs change frequently (models are added, retired, renamed
 > without notice). **Run `tests/ping_eden_models.py` before relying on any OVH
@@ -115,17 +116,21 @@ Eden route serves as fallback.
 
 ---
 
-## Integration questions (open — to decide before coding)
+## Integration reference
 
-- Where does the Eden fallback plug in? Per-call helper, or transparent retry
-  layer in `insight.py` / `refine.py`?
-- How are `web_search_options` exposed to the user — a new `.env` setting
-  (`EDEN_SEARCH_DEPTH=low|medium|high`) or command-driven ("deep search")?
-- Deep-search UX: dedicated menu entry (e.g. `F10`) or modifier on existing
-  Search / Fact-check flows?
-- How do we surface provider attribution in the output (so the user knows
-  whether the answer came from Grok, Sonar, Gemini, etc.)?
-- Cost tracking — Eden's pricing is a passthrough + markup; worth a per-run log?
+Eden AI is integrated in `src/providers.py`. Key structures:
+
+- **`EDEN_MODEL_MAP`** — translates canonical model names (`grok-4.3`, `sonar-pro`…)
+  to Eden provider IDs (`xai/grok-4.20-multi-agent-beta-0309`, `perplexityai/sonar-pro`…).
+  Backward-compat entries for retired model names are included.
+- **`EDEN_FALLBACK_CHAINS`** — server-side fallback order within the Eden route,
+  keyed by Eden provider ID.
+- **`eden_xai` / `eden_perplexity` / `eden_mistral`** — registered provider instances
+  with `adapter_type="eden"` and a `ping_model_id` for availability checks.
+
+Priority rule: direct API (Mistral, xAI, Perplexity) is always tried first.
+Eden is used only as fallback (rate-limit or unavailability) or for models
+with no direct path (Gemini, OVH).
 
 ---
 

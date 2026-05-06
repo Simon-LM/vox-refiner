@@ -13,6 +13,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.20.2] — 2026-05-07
+
+### Changed
+
+- **`Readme.md` — mise à jour complète** : tableau de routage des modèles (tier MEDIUM → `mistral-small-latest + reasoning_effort=high`) ; section Media Transcribe ajoutée avec tableau post-action (10 actions) ; "Speak & Translate" renommé en "Voice Translate" ; `HISTORY_MAX_BULLETS` corrigé (100 → 80) ; mention "One required API key" clarifiée ; section Advanced `ENABLE_TIMEOUT` ajoutée.
+- **`docs/eden-ai-models.md`** : statut Eden AI mis à jour ("Design phase" → "Integrated. Live in `src/providers.py`") ; tableau Grok : modèles retirés (`grok-4-1-fast-*`) remplacés par les modèles actifs (`grok-4.20-*`) avec note de dépréciation ; table OVH : largeur colonne 1 corrigée pour les noms longs ; section "Integration questions" → "Integration reference" avec `EDEN_MODEL_MAP`, `EDEN_FALLBACK_CHAINS`, instances provider.
+- **`docs/resilience.md`** : table `_MODEL_SPEED_FACTOR` complétée (`devstral-latest`, `mistral-medium-3.5`, clés composées `+reasoning_effort`) ; nouvelle section "Timeout enabled flag" documentant `ENABLE_TIMEOUT=false` par défaut ; section retries clarifiée (`REFINE_TIMEOUT_FALLBACK_ENABLED`).
+- **`docs/model-selection.md`** : section "History extraction model" corrigée (primaire : `devstral-small-latest` → `mistral-small-latest`, fallback : `mistral-small-latest` → `mistral-medium-latest`) ; tableau récapitulatif aligné.
+- **`docs/voice-translate-architecture.md`** : variable `TRANSLATE_TARGET_LANG` → `VOICE_TRANSLATE_TARGET_LANG` ; spécificateurs de langage `text` ajoutés aux 3 blocs de code fencés.
+- **`docs/troubleshooting.md` + `docs/troubleshooting-update.md`** : URLs et commandes `git clone` corrigées (`voxtral-paste` → `vox-refiner`).
+- **`CONTRIBUTING.md` — refonte complète** : arborescence du projet mise à jour (tous les modules `src/`, scripts `.sh`, `docs/`, `tests/`, templates) ; table "Files never committed" étendue (ajout `context.txt`, `history.txt`, description `.env` enrichie) ; nouvelles sections Backend conventions (décomposition, réutilisabilité, pas de couplage fort) ; Frontend conventions (accessibilité, unités relatives, pas de CSS Grid, pas de media queries, SCSS+BEM, architecture 7-1) ; section Testing.
+- **`CLAUDE.md` — mise à jour** : aperçu étendu aux 5 modes ; architecture complète (5 points d'entrée + 8 modules Python partagés) ; seuil MEDIUM corrigé (90 → 80) ; compteur de tests mis à jour (~348) ; règle `providers.py` ajoutée ; nouvelles sections Backend rules, Frontend rules, Development workflow.
+
+---
+
 ## [4.20.1] — 2026-05-06
 
 ### Fixed
