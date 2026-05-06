@@ -77,10 +77,8 @@ def correct(raw_text: str, context: str) -> str:
         try:
             timeout = effective_timeout(base_timeout, model)
             if model == _MODEL:
-                process(
-                    f"Correcting via {model} "
-                    f"({word_count} words, timeout {timeout}s)..."
-                )
+                timeout_str = f"timeout {timeout}s" if timeout is not None else "no timeout"
+                process(f"Correcting via {model} ({word_count} words, {timeout_str})...")
             else:
                 warn(f"{_MODEL} unavailable — switching to fallback: {model}")
             result = call_model(

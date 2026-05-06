@@ -36,23 +36,54 @@ _HISTORY_FILE = Path(__file__).resolve().parent.parent / "history.txt"
 
 _THRESHOLD_SHORT = int(os.environ.get("REFINE_MODEL_THRESHOLD_SHORT", "80"))
 _THRESHOLD_LONG = int(os.environ.get("REFINE_MODEL_THRESHOLD_LONG", "240"))
-_MODEL_SHORT = os.environ.get("REFINE_MODEL_SHORT", "mistral-small-latest")
+
+# Models that support the reasoning_effort parameter.
+# Append '+reasoning' to REFINE_MODEL_* env vars to activate it for a tier.
+_REASONING_CAPABLE_MODELS: set = {"mistral-small-latest", "mistral-medium-3.5"}
+
+
+def _parse_model_spec(raw: str) -> Tuple[str, bool]:
+    """Split 'model+reasoning' into (model_name, has_reasoning).
+
+    '+reasoning' suffix activates reasoning_effort=high for that tier.
+    Only meaningful for models in _REASONING_CAPABLE_MODELS — stripped
+    automatically for other models by _strip_unsupported_params().
+    """
+    if raw.endswith("+reasoning"):
+        return raw[: -len("+reasoning")], True
+    return raw, False
+
+
+def _build_tier_params(base: Dict[str, Any], has_reasoning: bool) -> Dict[str, Any]:
+    """Build tier params, adding reasoning_effort=high only when requested."""
+    params = dict(base)
+    if has_reasoning:
+        params["reasoning_effort"] = "high"
+    return params
+
+
+_MODEL_SHORT, _REASONING_SHORT = _parse_model_spec(
+    os.environ.get("REFINE_MODEL_SHORT", "mistral-small-latest")
+)
 _MODEL_SHORT_FALLBACK = os.environ.get("REFINE_MODEL_SHORT_FALLBACK", "mistral-medium-latest")
-_MODEL_MEDIUM = os.environ.get("REFINE_MODEL_MEDIUM", "mistral-small-latest")
+
+_MODEL_MEDIUM, _REASONING_MEDIUM = _parse_model_spec(
+    os.environ.get("REFINE_MODEL_MEDIUM", "mistral-small-latest+reasoning")
+)
 _MODEL_MEDIUM_FALLBACK = os.environ.get("REFINE_MODEL_MEDIUM_FALLBACK", "mistral-medium-latest")
-_MODEL_LONG = os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
+
+_MODEL_LONG, _REASONING_LONG = _parse_model_spec(
+    os.environ.get("REFINE_MODEL_LONG", "magistral-medium-latest")
+)
 _MODEL_LONG_FALLBACK = os.environ.get("REFINE_MODEL_LONG_FALLBACK", "mistral-medium-latest")
 
 # ── Per-tier API parameters (primary models only, fallbacks use Mistral defaults) ─
-# reasoning_effort is ONLY supported by mistral-small-latest (Mistral Small 4).
-# It is automatically stripped for any other model at call time.
-_PARAMS_SHORT: Dict[str, Any] = {"temperature": 0.2, "top_p": 0.85}
-_PARAMS_MEDIUM: Dict[str, Any] = {"temperature": 0.3, "top_p": 0.9, "reasoning_effort": "high"}
-_PARAMS_LONG: Dict[str, Any] = {"temperature": 0.4, "top_p": 0.9, "reasoning_effort": "high"}
+# reasoning_effort is supported by mistral-small-latest and mistral-medium-3.5.
+# Activated per tier via '+reasoning' suffix in REFINE_MODEL_* env vars.
+_PARAMS_SHORT:   Dict[str, Any] = _build_tier_params({"temperature": 0.2, "top_p": 0.85}, _REASONING_SHORT)
+_PARAMS_MEDIUM:  Dict[str, Any] = _build_tier_params({"temperature": 0.3, "top_p": 0.9}, _REASONING_MEDIUM)
+_PARAMS_LONG:    Dict[str, Any] = _build_tier_params({"temperature": 0.4, "top_p": 0.9}, _REASONING_LONG)
 _PARAMS_HISTORY: Dict[str, Any] = {"reasoning_effort": "high"}
-
-# Models that support the reasoning_effort parameter.
-_REASONING_CAPABLE_MODELS = {"mistral-small-latest", "mistral-medium-3.5"}
 
 _ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "false").lower() in ("true", "1", "yes")
 _HISTORY_MAX_BULLETS = int(os.environ.get("HISTORY_MAX_BULLETS", "80"))
@@ -75,6 +106,7 @@ _COMPARE_MODELS = os.environ.get("REFINE_COMPARE_MODELS", "false").lower() in ("
 # transcription returned immediately rather than silently switching to a heavier
 # model (e.g. mistral-medium-3.5 → magistral-medium-latest).
 _REFINE_TIMEOUT_FALLBACK_ENABLED = os.environ.get("REFINE_TIMEOUT_FALLBACK_ENABLED", "false").lower() in ("true", "1", "yes")
+_TIMEOUT_ENABLED = os.environ.get("ENABLE_TIMEOUT", "false").lower() in ("true", "1", "yes")
 
 # Output formatting profile — only applied to MEDIUM and LONG tiers.
 # plain         : no structural formatting (default, preserves current behaviour)
@@ -141,13 +173,24 @@ _FORMAT_INSTRUCTIONS: Dict[str, str] = {
 # Speed factors relative to a baseline standard model.
 # Reasoning models (magistral-*) generate a chain-of-thought before answering,
 # making them significantly slower than standard models for identical word counts.
+#
+# Compound keys ("model+reasoning_effort") give the correct factor when
+# reasoning_effort=high is active. They override the generic
+# _REASONING_EFFORT_TIMEOUT_FACTOR fallback used for unknown future models.
 _MODEL_SPEED_FACTOR: Dict[str, float] = {
-    "devstral-small-latest":   1.0,
+    "devstral-small-latest":   1.0,  # deprecated, kept for safety
+    "devstral-latest":         1.0,
     "mistral-small-latest":    1.0,
     "mistral-medium-latest":   1.2,
-    "magistral-small-latest":  3.0,  # kept for users who override REFINE_MODEL_MEDIUM
+    "mistral-medium-3.5":      1.2,
+    "magistral-small-latest":  3.0,
     "magistral-medium-latest": 4.5,
     "mistral-large-latest":    1.5,
+    # Compound keys: factor when reasoning_effort=high is active.
+    # Looked up as f"{model}+reasoning_effort" in _effective_timeout.
+    "mistral-small-latest+reasoning_effort":  3.0,  # Small 4 CoT ≈ magistral-small speed
+    "mistral-medium-3.5+reasoning_effort":    4.0,  # reasoning mode ≈ magistral-medium
+    "mistral-medium-latest+reasoning_effort": 4.0,  # future-proofing
 }
 
 _HISTORY_SECTION = "\n\n<history>\n{history}\n</history>"
@@ -446,19 +489,29 @@ def _refine_timing(word_count: int, *, background: bool = False) -> Tuple[int, f
     return t, d
 
 
-# Extra timeout multiplier when reasoning_effort is enabled on a non-reasoning model.
+# Generic fallback multiplier for unknown models with reasoning_effort=high.
+# Used only when no compound key exists in _MODEL_SPEED_FACTOR.
 _REASONING_EFFORT_TIMEOUT_FACTOR = 1.8
 
 
-def _effective_timeout(base_timeout: int, model: str, model_params: Optional[Dict[str, Any]] = None) -> int:
+def _effective_timeout(base_timeout: int, model: str, model_params: Optional[Dict[str, Any]] = None) -> Optional[int]:
     """Apply a per-model speed factor to the base word-count timeout.
 
-    When ``model_params`` contains ``reasoning_effort``, an additional factor
-    is applied to account for the extra thinking time.
+    Returns None when ENABLE_TIMEOUT is false (no HTTP timeout).
+    When model_params contains reasoning_effort, looks up a compound key
+    ("<model>+reasoning_effort") first; falls back to base factor *
+    _REASONING_EFFORT_TIMEOUT_FACTOR for unknown future models.
     """
-    factor = _MODEL_SPEED_FACTOR.get(model, 1.0)
+    if not _TIMEOUT_ENABLED:
+        return None
     if model_params and model_params.get("reasoning_effort"):
-        factor *= _REASONING_EFFORT_TIMEOUT_FACTOR
+        compound = f"{model}+reasoning_effort"
+        factor = _MODEL_SPEED_FACTOR.get(
+            compound,
+            _MODEL_SPEED_FACTOR.get(model, 1.0) * _REASONING_EFFORT_TIMEOUT_FACTOR,
+        )
+    else:
+        factor = _MODEL_SPEED_FACTOR.get(model, 1.0)
     return max(base_timeout, round(base_timeout * factor))
 
 
@@ -505,7 +558,7 @@ def _invoke(
     model: str,
     messages: List[Dict[str, str]],
     *,
-    timeout: int,
+    timeout: Optional[int],
     model_params: Optional[Dict[str, Any]] = None,
 ) -> CallResult:
     """Thin wrapper around ``providers.call`` for a single refine/history call.
@@ -547,7 +600,8 @@ def _extract_and_update_history(refined_text: str) -> None:
         try:
             h_params = _PARAMS_HISTORY if model == _HISTORY_EXTRACTION_MODEL else None
             timeout = _effective_timeout(base_timeout, model, h_params)
-            timeout = max(timeout, round(timeout * _HISTORY_TIMEOUT_MULTIPLIER))
+            if timeout is not None:
+                timeout = max(timeout, round(timeout * _HISTORY_TIMEOUT_MULTIPLIER))
             result = _invoke(
                 "history", model, messages,
                 timeout=timeout, model_params=h_params,
@@ -644,7 +698,8 @@ def refine(raw_text: str) -> str:
 
     if _COMPARE_MODELS:
         timeout_fb = _effective_timeout(base_timeout, fallback)
-        process(f"Comparing fallback ({fallback}, timeout {timeout_fb}s)...")
+        timeout_fb_str = f"timeout {timeout_fb}s" if timeout_fb is not None else "no timeout"
+        process(f"Comparing fallback ({fallback}, {timeout_fb_str})...")
 
         def _run_compare() -> None:
             try:
@@ -669,7 +724,8 @@ def refine(raw_text: str) -> str:
             params = primary_params if model == primary else None
             timeout = _effective_timeout(base_timeout, model, params)
             if model == primary:
-                process(f"Refining via {model} ({word_count} words, timeout {timeout}s)...")
+                timeout_str = f"timeout {timeout}s" if timeout is not None else "no timeout"
+                process(f"Refining via {model} ({word_count} words, {timeout_str})...")
             else:
                 warn(f"{primary} unavailable — switching to fallback: {model}")
             call_result = _invoke(

@@ -16,6 +16,11 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+# When false (default), no HTTP timeout is set on AI requests — the request
+# waits as long as the server needs.  Set ENABLE_TIMEOUT=true in .env to
+# re-enable per-call timeouts computed from word count.
+ENABLE_TIMEOUT: bool = os.environ.get("ENABLE_TIMEOUT", "false").lower() in ("true", "1", "yes")
+
 _API_URL = "https://api.mistral.ai/v1/chat/completions"
 _CONTEXT_FILE = Path(__file__).resolve().parent.parent / "context.txt"
 
@@ -36,7 +41,8 @@ SECURITY_BLOCK = (
 # ── Model speed factors ──────────────────────────────────────────────────────
 
 MODEL_SPEED_FACTOR: Dict[str, float] = {
-    "devstral-small-latest":   1.0,
+    "devstral-small-latest":   1.0,  # deprecated, kept for safety
+    "devstral-latest":         1.0,
     "mistral-small-latest":    1.0,
     "mistral-medium-latest":   1.2,
     "magistral-small-latest":  3.0,
@@ -94,12 +100,15 @@ def effective_timeout(
     base_timeout: int,
     model: str,
     model_params: Optional[Dict[str, Any]] = None,
-) -> int:
+) -> Optional[int]:
     """Apply a per-model speed factor to the base word-count timeout.
 
-    When ``model_params`` contains ``reasoning_effort``, an additional factor
+    Returns None when ENABLE_TIMEOUT is false (no HTTP timeout).
+    When model_params contains reasoning_effort, an additional factor
     is applied to account for the extra thinking time.
     """
+    if not ENABLE_TIMEOUT:
+        return None
     factor = MODEL_SPEED_FACTOR.get(model, 1.0)
     if model_params and model_params.get("reasoning_effort"):
         factor *= REASONING_EFFORT_TIMEOUT_FACTOR
@@ -113,7 +122,7 @@ def call_model(
     messages: List[Dict[str, str]],
     api_key: str,
     *,
-    timeout: int,
+    timeout: Optional[int],
     retry_delay: float,
     retries: int = 2,
     model_params: Optional[Dict[str, Any]] = None,

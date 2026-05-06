@@ -1329,6 +1329,19 @@ while true; do
             ;;
         v1)
             # ── Speak & Refine sub-menu ──────────────────────────────────
+            _abbr_model() {
+                case "$1" in
+                    mistral-small-latest+reasoning)  printf "small+r" ;;
+                    mistral-small-latest)            printf "small" ;;
+                    mistral-medium-3.5+reasoning)    printf "mid3.5+r" ;;
+                    mistral-medium-3.5)              printf "mid3.5" ;;
+                    mistral-medium-latest)           printf "medium" ;;
+                    mistral-large-latest)            printf "large" ;;
+                    magistral-small-latest)          printf "mag-sm" ;;
+                    magistral-medium-latest)         printf "mag-md" ;;
+                    *) printf "%s" "$1" ;;
+                esac
+            }
             while true; do
                 _STT_FORMAT="${OUTPUT_PROFILE:-prose}"  # prose is the default
                 _STT_LANG="${OUTPUT_LANG:-auto}"
@@ -1357,7 +1370,9 @@ while true; do
                 else
                     printf "║  ${C_DIM}History :${C_RESET}      ${C_DIM}%-20s${C_RESET}                            ║\n" "off"
                 fi
-                printf "║  ${C_DIM}Models :${C_RESET}  ${C_CYAN}S:%-16s M:%-16s L:%-9s${C_RESET}║\n" "$_STT_MODEL_SHORT" "$_STT_MODEL_MEDIUM" "$_STT_MODEL_LONG"
+                printf "║  ${C_DIM}Models :${C_RESET}  ${C_CYAN}S: %-51s${C_RESET}║\n" "$_STT_MODEL_SHORT"
+                printf "║            ${C_CYAN}M: %-51s${C_RESET}║\n" "$_STT_MODEL_MEDIUM"
+                printf "║            ${C_CYAN}L: %-51s${C_RESET}║\n" "$_STT_MODEL_LONG"
                 echo "║                                                                  ║"
                 echo "╠══════════════════════════════════════════════════════════════════╣"
                 echo "║                                                                  ║"
@@ -1385,7 +1400,7 @@ while true; do
                         while true; do
                             echo ""
                             _sep
-                            printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[v]${C_RESET} View history  ${C_BOLD}[e]${C_RESET} Edit history  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner: "
+                            printf "  ${C_BOLD}[r]${C_RESET} Retry  ${C_BOLD}[n]${C_RESET} New  ${C_BOLD}[v]${C_RESET} View history  ${C_BOLD}[e]${C_RESET} Edit history  ${C_BOLD}[m]${C_RESET} Speak & Refine: "
                             read -r _post_action
                             case "$_post_action" in
                                 r|R)
@@ -1434,54 +1449,68 @@ while true; do
                         ;;
                     r|R)
                         echo ""
-                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        _sep
                         printf "  ${C_BGREEN}MODEL ROUTING${C_RESET}\n"
-                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        _sep
                         echo ""
                         printf "  ${C_BOLD}SHORT${C_RESET} ${C_DIM}(< 80 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_SHORT}${C_RESET}\n"
                         printf "  ${C_BOLD}[1]${C_RESET} mistral-small-latest\n"
-                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
-                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
-                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-small-latest${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} mistral-medium-3.5${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[5]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[6]${C_RESET} magistral-small-latest  ${C_DIM}(native reasoning)${C_RESET}\n"
                         printf "  Enter = keep current: "
                         read -r _rm
                         case "$_rm" in
                             1) _new_short="mistral-small-latest" ;;
-                            2) _new_short="mistral-medium-3.5" ;;
-                            3) _new_short="mistral-medium-latest" ;;
-                            4) _new_short="magistral-small-latest" ;;
+                            2) _new_short="mistral-small-latest+reasoning" ;;
+                            3) _new_short="mistral-medium-3.5" ;;
+                            4) _new_short="mistral-medium-3.5+reasoning" ;;
+                            5) _new_short="mistral-medium-latest" ;;
+                            6) _new_short="magistral-small-latest" ;;
                             *) _new_short="$_STT_MODEL_SHORT" ;;
                         esac
                         echo ""
                         printf "  ${C_BOLD}MEDIUM${C_RESET} ${C_DIM}(80–240 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_MEDIUM}${C_RESET}\n"
                         printf "  ${C_BOLD}[1]${C_RESET} mistral-small-latest\n"
-                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
-                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
-                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
-                        printf "  ${C_BOLD}[5]${C_RESET} magistral-medium-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-small-latest${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} mistral-medium-3.5${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[5]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[6]${C_RESET} magistral-small-latest  ${C_DIM}(native reasoning)${C_RESET}\n"
+                        printf "  ${C_BOLD}[7]${C_RESET} magistral-medium-latest  ${C_DIM}(native reasoning)${C_RESET}\n"
                         printf "  Enter = keep current: "
                         read -r _rm
                         case "$_rm" in
                             1) _new_medium="mistral-small-latest" ;;
-                            2) _new_medium="mistral-medium-3.5" ;;
-                            3) _new_medium="mistral-medium-latest" ;;
-                            4) _new_medium="magistral-small-latest" ;;
-                            5) _new_medium="magistral-medium-latest" ;;
+                            2) _new_medium="mistral-small-latest+reasoning" ;;
+                            3) _new_medium="mistral-medium-3.5" ;;
+                            4) _new_medium="mistral-medium-3.5+reasoning" ;;
+                            5) _new_medium="mistral-medium-latest" ;;
+                            6) _new_medium="magistral-small-latest" ;;
+                            7) _new_medium="magistral-medium-latest" ;;
                             *) _new_medium="$_STT_MODEL_MEDIUM" ;;
                         esac
                         echo ""
                         printf "  ${C_BOLD}LONG${C_RESET} ${C_DIM}(> 240 words)${C_RESET}  —  current: ${C_CYAN}${_STT_MODEL_LONG}${C_RESET}\n"
-                        printf "  ${C_BOLD}[1]${C_RESET} magistral-medium-latest\n"
-                        printf "  ${C_BOLD}[2]${C_RESET} mistral-medium-3.5\n"
-                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-latest\n"
-                        printf "  ${C_BOLD}[4]${C_RESET} magistral-small-latest\n"
+                        printf "  ${C_BOLD}[1]${C_RESET} mistral-small-latest\n"
+                        printf "  ${C_BOLD}[2]${C_RESET} mistral-small-latest${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[3]${C_RESET} mistral-medium-3.5\n"
+                        printf "  ${C_BOLD}[4]${C_RESET} mistral-medium-3.5${C_CYAN}+reasoning${C_RESET}\n"
+                        printf "  ${C_BOLD}[5]${C_RESET} mistral-medium-latest\n"
+                        printf "  ${C_BOLD}[6]${C_RESET} magistral-small-latest  ${C_DIM}(native reasoning)${C_RESET}\n"
+                        printf "  ${C_BOLD}[7]${C_RESET} magistral-medium-latest  ${C_DIM}(native reasoning)${C_RESET}\n"
                         printf "  Enter = keep current: "
                         read -r _rm
                         case "$_rm" in
-                            1) _new_long="magistral-medium-latest" ;;
-                            2) _new_long="mistral-medium-3.5" ;;
-                            3) _new_long="mistral-medium-latest" ;;
-                            4) _new_long="magistral-small-latest" ;;
+                            1) _new_long="mistral-small-latest" ;;
+                            2) _new_long="mistral-small-latest+reasoning" ;;
+                            3) _new_long="mistral-medium-3.5" ;;
+                            4) _new_long="mistral-medium-3.5+reasoning" ;;
+                            5) _new_long="mistral-medium-latest" ;;
+                            6) _new_long="magistral-small-latest" ;;
+                            7) _new_long="magistral-medium-latest" ;;
                             *) _new_long="$_STT_MODEL_LONG" ;;
                         esac
                         echo ""

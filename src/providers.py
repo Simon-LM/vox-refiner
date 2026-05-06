@@ -699,7 +699,7 @@ def _prepare_eden_opts(opts: dict) -> tuple[dict, bool]:
 def _call_openai_adapter(
     provider: Provider,
     messages: list[dict],
-    timeout: int = 30,
+    timeout: int | None = None,
     **extra_payload,
 ) -> str:
     """Execute via OpenAI-compatible chat completions endpoint.

@@ -15,6 +15,7 @@ import pytest
 
 def _load_refine(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    monkeypatch.setenv("ENABLE_TIMEOUT", "true")
     if "src.refine" in sys.modules:
         del sys.modules["src.refine"]
     import src.refine as rm
@@ -54,12 +55,12 @@ class TestEffectiveTimeout:
         assert base_timeout == 8
         assert effective == 36
 
-    def test_reasoning_effort_multiplies_timeout(self, monkeypatch):
-        """reasoning_effort=high on mistral-small: base × 1.0 × 1.8 = 1.8×."""
+    def test_reasoning_effort_uses_compound_key(self, monkeypatch):
+        """reasoning_effort=high on mistral-small: compound key → ×3.0."""
         rm = _load_refine(monkeypatch)
         params = {"reasoning_effort": "high"}
         effective = rm._effective_timeout(10, "mistral-small-latest", params)
-        assert effective == 18  # 10 × 1.0 × 1.8
+        assert effective == 30  # 10 × 3.0 (compound key)
 
     def test_no_reasoning_effort_no_extra_factor(self, monkeypatch):
         """Without reasoning_effort, mistral-small keeps factor 1.0."""
@@ -67,13 +68,27 @@ class TestEffectiveTimeout:
         effective = rm._effective_timeout(10, "mistral-small-latest")
         assert effective == 10
 
-    def test_reasoning_effort_stacks_with_model_factor(self, monkeypatch):
-        """reasoning_effort on a model with factor > 1.0 stacks both multipliers."""
+    def test_reasoning_effort_compound_key_medium_latest(self, monkeypatch):
+        """reasoning_effort on mistral-medium-latest: compound key → ×4.0."""
         rm = _load_refine(monkeypatch)
         params = {"reasoning_effort": "high"}
-        # mistral-medium-latest factor=1.2, × 1.8 = 2.16 → round(21.6) = 22
         effective = rm._effective_timeout(10, "mistral-medium-latest", params)
-        assert effective == 22
+        assert effective == 40  # 10 × 4.0 (compound key)
+
+    def test_reasoning_effort_compound_key_medium_35(self, monkeypatch):
+        """reasoning_effort on mistral-medium-3.5: compound key → ×4.0."""
+        rm = _load_refine(monkeypatch)
+        params = {"reasoning_effort": "high"}
+        effective = rm._effective_timeout(10, "mistral-medium-3.5", params)
+        assert effective == 40  # 10 × 4.0 (compound key)
+
+    def test_reasoning_effort_fallback_for_unknown_model(self, monkeypatch):
+        """Unknown model with reasoning_effort falls back to base × 1.8."""
+        rm = _load_refine(monkeypatch)
+        params = {"reasoning_effort": "high"}
+        # "unknown-model" not in _MODEL_SPEED_FACTOR → base 1.0 × 1.8 = 1.8
+        effective = rm._effective_timeout(10, "unknown-future-model", params)
+        assert effective == 18  # 10 × 1.0 × 1.8 (generic fallback)
 
 
 class TestRefineTiming:

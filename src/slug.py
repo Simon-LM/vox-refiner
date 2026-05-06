@@ -18,6 +18,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from src.ui_py import process, warn
@@ -29,7 +30,8 @@ from src.common import call_model  # noqa: E402
 _MODEL_PRIMARY      = "mistral-small-latest"
 _MODEL_FALLBACK     = "mistral-medium-latest"
 _DEFAULT_FALLBACK   = "voice-translate"
-_TIMEOUT        = 5   # slug is short — 5s is more than enough
+_TIMEOUT_ENABLED    = os.environ.get("ENABLE_TIMEOUT", "false").lower() in ("true", "1", "yes")
+_TIMEOUT: Optional[int] = 5 if _TIMEOUT_ENABLED else None
 _RETRY_DELAY    = 1.5
 
 

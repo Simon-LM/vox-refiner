@@ -13,6 +13,34 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.20.0] — 2026-05-06
+
+### Added
+
+- **Routing `+reasoning` par tier (V1 Speak & Refine)** : ajout du suffixe `+reasoning` dans les variables `REFINE_MODEL_*` pour activer explicitement `reasoning_effort=high` sur les modèles qui le supportent (`mistral-small-latest`, `mistral-medium-3.5`). Les modèles `magistral-*` raisonnent nativement et ne nécessitent pas ce suffixe. Le menu `[r]` Model Routing affiche désormais les variantes `+reasoning` et indique `(native reasoning)` pour les magistral.
+  - `src/refine.py` : `_parse_model_spec()` parse les compound keys ; `_build_tier_params()` construit les params dynamiquement ; `_PARAMS_MEDIUM/LONG` ne sont plus hardcodés.
+  - `.env.example` : `REFINE_MODEL_MEDIUM=mistral-small-latest+reasoning` (comportement équivalent à l'ancien défaut).
+  - `vox-refiner-menu.sh` : menu `[r]` mis à jour avec options `+reasoning` ; ordre du tier LONG aligné sur MEDIUM ; `(native reasoning)` affiché pour les magistral.
+
+### Changed
+
+- **`ENABLE_TIMEOUT=false` (default)** : les timeouts HTTP sur les appels IA (Mistral chat, génération de slug) sont désactivés par défaut. Les requêtes attendent la réponse du serveur sans limite de temps, évitant les échecs silencieux causés par des modèles lents (magistral-medium) ou des pics de charge API. Pour réactiver les timeouts bornés par le nombre de mots, définir `ENABLE_TIMEOUT=true` dans `.env`.
+  - `src/common.py` : `effective_timeout()` retourne `None` si `ENABLE_TIMEOUT=false` ; `call_model()` accepte `timeout: Optional[int]`.
+  - `src/refine.py` : `_effective_timeout()` retourne `None` si désactivé ; messages process affichent "no timeout" au lieu de "timeout Ns".
+  - `src/correct.py` : message process adapté pour `None`.
+  - `src/slug.py` : `_TIMEOUT` conditionnel (`None` si désactivé, `5s` sinon).
+  - `src/providers.py` : `_call_openai_adapter()` accepte `timeout: int | None`.
+- **V1 menu — affichage des modèles en 3 lignes** : l'en-tête affiche désormais les noms complets S/M/L sur 3 lignes distinctes au lieu d'une ligne abrégée.
+- **V1 menu — `[m] Speak & Refine`** : renommage de `[m] Menu VoxRefiner` dans la barre post-action pour refléter le retour au workflow V1.
+
+### Fixed
+
+- **`_MODEL_SPEED_FACTOR` — clés composées pour `reasoning_effort`** : remplacement du multiplicateur global `×1.8` par des facteurs précis par modèle. `mistral-small-latest+reasoning_effort: 3.0` (CoT natif Small 4 ≈ magistral-small), `mistral-medium-3.5+reasoning_effort: 4.0` (mode reasoning ≈ magistral-medium), `mistral-medium-latest+reasoning_effort: 4.0` (futur). Fallback générique `×1.8` conservé pour les modèles non référencés.
+- **`mistral-medium-3.5` absent de `_MODEL_SPEED_FACTOR`** : facteur corrigé à `1.2` (identique à `mistral-medium-latest`). L'absence provoquait un facteur `1.0` par défaut — sous-estimation du timeout pour ce modèle.
+- **`devstral-latest` ajouté à `_MODEL_SPEED_FACTOR`** (`src/refine.py`, `src/common.py`) : successeur de `devstral-small-latest` (déprécié). `devstral-small-latest` conservé dans la table pour compatibilité.
+
+---
+
 ## [4.19.0] — 2026-05-05
 
 ### Added

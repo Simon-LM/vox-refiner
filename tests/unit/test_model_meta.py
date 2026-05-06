@@ -110,6 +110,7 @@ class TestRefineModelsFile:
     def test_models_file_contains_effective_and_provider(self, monkeypatch, tmp_path):
         monkeypatch.setenv("MISTRAL_API_KEY", "k")
         monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")
+        monkeypatch.setenv("REFINE_MODEL_SHORT", "mistral-small-latest")
 
         if "src.refine" in sys.modules:
             del sys.modules["src.refine"]
