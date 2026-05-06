@@ -208,7 +208,7 @@ repair_exec_bits() {
         screen_to_text.sh
     )
     for s in "${scripts[@]}"; do
-        [ -f "$s" ] && chmod +x "$s"
+        if [ -f "$s" ]; then chmod +x "$s"; fi
     done
 }
 

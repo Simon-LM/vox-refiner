@@ -13,6 +13,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.20.3] — 2026-05-07
+
+### Added
+
+- **Tests unitaires — couverture étendue à tous les modules Python** : 12 nouveaux fichiers de tests ajoutés (ou étendus), portant la suite de 806 à 938 tests.
+  - `tests/unit/test_web_display.py` (47 tests) — `_Broadcaster` (add_client, remove_client, broadcast, close_all : replay des événements en ordre, reset sur `init`, full-queue silencieux) ; `_is_snap_binary`, `_flatpak_app_installed`, `_vox_profile_dir`.
+  - `tests/unit/test_tts_pure.py` (90 tests) — 13 fonctions pures de `src/tts.py` : `_is_gradium_voice`, `_is_google_voice`, `_strip_markdown`, `_collapse_math_lines`, `_merge_split_identifiers`, `_expand_math_symbols`, `_expand_function_calls`, `_is_quoted_paragraph`, `_isolate_quotes`, `_split_sentences`, `_make_chunks`, `_parse_accent_tags`, `_resolve_voice_id`.
+  - `tests/unit/test_refine_pure.py` (65 tests) — fonctions pures de `src/refine.py` : `_select_models` (seuils SHORT/MEDIUM/LONG, override env), `_history_line_key` (déduplication avec ou sans timestamp), `_parse_history_lines` (filtrage des bullets valides), `_build_lang_instruction` (vide → défaut, `en` → spécifique, code connu, code inconnu), `_strip_unsupported_params` (non-mutation, modèles capables vs non-capables), `_load_history` (désactivé, fichier absent, cap `max_bullets`).
+  - `tests/unit/test_correct.py` (+4 tests) — codes HTTP 502/503, override `REFINE_MODEL_SHORT`, forwarding de la clé API vers `call_model`.
+  - `tests/unit/test_transcribe_timeout.py` (+17 tests) — couverture complète des 8 tiers de `_get_timeout` ; `_format_diarized` : groupement consécutif par speaker, label title-case, segments vides ignorés, speaker absent → fallback `speaker_0`, retour du même speaker après alternance.
+
+### Fixed
+
+- **`vox-refiner-update.sh` — `repair_exec_bits` : bug `set -e` + `&&`** : la for-loop se terminait avec le code de retour 1 quand le dernier fichier de la liste (`screen_to_text.sh`) n'existait pas dans le répertoire courant. La combinaison `[ -f "$s" ] && chmod +x "$s"` laissait l'expression `&&` retourner 1 (le test négatif), que `set -euo pipefail` interprétait comme une erreur fatale. Remplacé par `if [ -f "$s" ]; then chmod +x "$s"; fi`, ce qui neutralise ce comportement. Corrige le test d'intégration `test_apply_auto_resolves_obsolete_local_deletion` qui échouait de façon déterministe dans tout répertoire ne contenant pas tous les scripts listés.
+
+---
+
 ## [4.20.2] — 2026-05-07
 
 ### Changed
