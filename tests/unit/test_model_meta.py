@@ -138,6 +138,36 @@ class TestRefineModelsFile:
         assert lines[4] == "Mistral (direct)"
         assert lines[5] == "0"
 
+    def test_all_models_fail_writes_empty_file(self, monkeypatch, tmp_path):
+        """When all refinement models fail, VOXTRAL_MODELS_FILE is truncated to empty.
+
+        This prevents a stale file from a previous run being read by the shell,
+        which would display the wrong model label (e.g. "REFINED TEXT — mistral-small-latest"
+        instead of "RAW TRANSCRIPTION — refinement failed").
+        """
+        monkeypatch.setenv("MISTRAL_API_KEY", "k")
+        monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")
+        monkeypatch.setenv("ENABLE_REFINE", "true")
+
+        if "src.refine" in sys.modules:
+            del sys.modules["src.refine"]
+        import src.refine as refine
+
+        models_file = tmp_path / "models_info"
+        # Pre-populate with stale content from a previous successful run
+        models_file.write_text("mistral-small-latest\nmistral-medium-latest\n", encoding="utf-8")
+        monkeypatch.setenv("VOXTRAL_MODELS_FILE", str(models_file))
+
+        from src.providers import ProviderError
+        with patch("src.refine._invoke", side_effect=ProviderError("all providers down")):
+            result = refine.refine("hello world")
+
+        # Raw text is returned (graceful degradation)
+        assert result == "hello world"
+        # File must be empty so the shell's `-s` guard falls through to the
+        # "refinement failed" label branch instead of reading stale model info
+        assert models_file.read_text(encoding="utf-8") == ""
+
     def test_models_file_reflects_substitution(self, monkeypatch, tmp_path):
         monkeypatch.setenv("MISTRAL_API_KEY", "k")
         monkeypatch.setenv("REFINE_COMPARE_MODELS", "false")

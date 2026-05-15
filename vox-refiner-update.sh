@@ -206,6 +206,8 @@ repair_exec_bits() {
         selection_to_search.sh
         selection_to_factcheck.sh
         screen_to_text.sh
+        reminder.sh
+        reminder-daemon.sh
     )
     for s in "${scripts[@]}"; do
         if [ -f "$s" ]; then chmod +x "$s"; fi

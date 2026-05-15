@@ -769,14 +769,17 @@ def refine(raw_text: str) -> str:
     #   line 5: provider display name   (e.g. "Mistral (direct)", "Mistral via Eden AI")
     #   line 6: substituted flag ("1" when Eden substituted, else "0")
     models_file = os.environ.get("VOXTRAL_MODELS_FILE")
-    if models_file and succeeded_model:
-        lines = [succeeded_model, fallback]
-        if succeeded_result is not None:
-            lines.append(succeeded_result.effective_model or "")
-            lines.append(succeeded_result.provider.name or "")
-            lines.append(succeeded_result.provider.display_name or "")
-            lines.append("1" if succeeded_result.substituted else "0")
-        Path(models_file).write_text("\n".join(lines), encoding="utf-8")
+    if models_file:
+        if succeeded_model:
+            lines = [succeeded_model, fallback]
+            if succeeded_result is not None:
+                lines.append(succeeded_result.effective_model or "")
+                lines.append(succeeded_result.provider.name or "")
+                lines.append(succeeded_result.provider.display_name or "")
+                lines.append("1" if succeeded_result.substituted else "0")
+            Path(models_file).write_text("\n".join(lines), encoding="utf-8")
+        else:
+            Path(models_file).write_text("", encoding="utf-8")
 
     return result
 

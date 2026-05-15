@@ -2,7 +2,7 @@
 
 ## Project overview
 
-VoxRefiner is a Linux voice-first toolkit with five modes: **Speak & Refine** (mic → Voxtral → Mistral chat → clipboard), **Voice Translate** (speak → translate → TTS in your own voice), **Selection to Voice** (read selected text aloud), **Selection to Insight** (summarise + search + fact-check), **Media Transcribe** (import audio/video → transcription).
+VoxRefiner is a Linux voice-first toolkit with six modes: **Speak & Refine** (mic → Voxtral → Mistral chat → clipboard), **Voice Translate** (speak → translate → TTS in your own voice), **Selection to Voice** (read selected text aloud), **Selection to Insight** (summarise + search + fact-check), **Media Transcribe** (import audio/video → transcription), **Reminders** (voice-driven agenda, ADHD-adapted, persistent reminders with Pomodoro awareness).
 
 **Philosophy:** "Speak. Stop. Paste." — minimal interface, one required API key (Mistral), clipboard-first.
 
@@ -15,17 +15,24 @@ vox-refiner-menu.sh / launch-vox-refiner.sh   ← interactive menu + keyboard sh
 ├── record_and_transcribe_local.sh             ← Speak & Refine
 ├── voice_translate.sh                         ← Voice Translate
 ├── screen_to_text.sh / selection_to_*.sh      ← Selection to Voice / Insight
-└── media_to_text.sh                           ← Media Transcribe (V2)
+├── media_to_text.sh                           ← Media Transcribe (V2)
+├── reminder.sh                                ← Reminders — add / fire terminal UI
+└── reminder-daemon.sh                         ← Reminder daemon start/stop/status
 
 Shared Python modules:
-├── src/transcribe.py     ← audio → raw text (Voxtral)
-├── src/refine.py         ← raw text → refined text (Mistral chat, 3-tier routing)
-├── src/common.py         ← shared utilities, timing, security blocks
-├── src/providers.py      ← multi-provider routing (direct APIs + Eden AI fallback)
-├── src/insight.py        ← summarise, search, fact-check (Perplexity, Grok)
-├── src/tts.py            ← Voxtral TTS + voice cloning
-├── src/voice_rewrite.py  ← clean + translate text for speech
-└── src/correct.py        ← contextual correction (Media Transcribe)
+├── src/transcribe.py         ← audio → raw text (Voxtral)
+├── src/refine.py             ← raw text → refined text (Mistral chat, 3-tier routing)
+├── src/common.py             ← shared utilities, timing, security blocks
+├── src/providers.py          ← multi-provider routing (direct APIs + Eden AI fallback)
+├── src/insight.py            ← summarise, search, fact-check (Perplexity, Grok)
+├── src/tts.py                ← Voxtral TTS + voice cloning
+├── src/voice_rewrite.py      ← clean + translate text for speech
+├── src/correct.py            ← contextual correction (Media Transcribe)
+├── src/reminder_db.py        ← SQLite CRUD layer (reminders.db, 4 tables)
+├── src/reminder_add.py       ← parse text/OCR → extract reminder → store in DB
+├── src/reminder_notify.py    ← context detection (screensaver, DND, lock, fullscreen)
+├── src/reminder_converse.py  ← AI conversation, response interpretation, escalation
+└── src/reminder_daemon.py    ← 60s scheduler loop, Pomodoro logic, dispatch
 ```
 
 Key design constraints:
@@ -40,6 +47,14 @@ Key design constraints:
 - **Maximum component decomposition** — each module does one thing and exposes a clean interface (CLI arg or function). No monolithic scripts.
 - **Reusability first** — components must work standalone and be composable into new workflows without modification. Think of every module as a building block.
 - **No tight coupling** — a script that needs feature X must call the existing module for X, not re-implement it inline.
+
+## Terminal UI conventions (Bash menus)
+
+- **Enter = validate only.** Enter is only valid when the user has explicitly typed something to confirm (a text input, a numeric choice). Never use Enter as a navigation key, a default fallback, or an implicit option.
+- **`[m]` = back to previous menu.** Every menu must offer `[m]` as the only way to return. No Enter alternative.
+- **Never use Enter as an implicit option in a choice list** — e.g. `[Enter] keep current` or `[Enter] session only` are forbidden. Make every option explicit with a labelled key.
+- **Avoid "Press Enter to continue…" pauses.** They use Enter as a pseudo-Escape and should be replaced with a labelled key (e.g. `[m] Menu`) wherever possible.
+- These rules exist because VoxRefiner targets users unfamiliar with the terminal. Explicit, visible keys are always clearer than implicit Enter behaviour.
 
 ## Frontend rules (Next.js + SCSS)
 

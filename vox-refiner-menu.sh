@@ -1221,6 +1221,11 @@ show_menu() {
     echo "║  🔧 WORKFLOWS                                                              ║"
     echo "║                                                                            ║"
     printf "║  ${C_BOLD}[W1]${C_RESET} 🎙→📱  ${C_BOLD}Speak & Post${C_RESET}  ${C_DIM}generate a tweet or LinkedIn post${C_RESET}                ║\n"
+    if [ "${REMINDER_ENABLED:-false}" = "true" ]; then
+        printf "║  ${C_BOLD}[W2]${C_RESET} 🔔→📅  ${C_BOLD}Add Reminder${C_RESET}  ${C_DIM}type, speak, or screenshot → agenda${C_RESET}               ║\n"
+    else
+        printf "║  ${C_DIM}[W2]  🔔→📅  Add Reminder  disabled — set REMINDER_ENABLED=true in .env${C_RESET}          ║\n"
+    fi
     echo "║                                                                            ║"
     echo "╠════════════════════════════════════════════════════════════════════════════╣"
     echo "║  ✦  YOUR WORKFLOWS                                                         ║"
@@ -1555,7 +1560,7 @@ while true; do
                         esac
                         if [ "$_fmt" != "" ]; then
                             echo ""
-                            printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_BOLD}[t]${C_RESET} this session only  ${C_DIM}[Enter] session${C_RESET}: "
+                            printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_BOLD}[t]${C_RESET} this session only  ${C_BOLD}[m]${C_RESET} Menu Settings: "
                             read -r _persist
                             case "$_persist" in
                                 p|P)
@@ -1606,7 +1611,7 @@ while true; do
                         esac
                         if [ "$_lng" != "" ]; then
                             echo ""
-                            printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_BOLD}[t]${C_RESET} this session only  ${C_DIM}[Enter] session${C_RESET}: "
+                            printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_BOLD}[t]${C_RESET} this session only  ${C_BOLD}[m]${C_RESET} Menu Settings: "
                             read -r _persist
                             case "$_persist" in
                                 p|P)
@@ -1760,6 +1765,30 @@ while true; do
         s4)
             ./selection_to_factcheck.sh
             ;;
+        w2)
+            if [ "${REMINDER_ENABLED:-false}" != "true" ]; then
+                echo ""
+                _warn "Reminders are disabled on this installation."
+                echo ""
+                printf "  ${C_BOLD}[y]${C_RESET} Enable on this installation   ${C_BOLD}[n]${C_RESET} Cancel: "
+                read -r -n1 _enable_choice
+                echo ""
+                case "$_enable_choice" in
+                    y|Y)
+                        _set_env_var "REMINDER_ENABLED" "true"
+                        export REMINDER_ENABLED=true
+                        _success "Reminders enabled."
+                        echo ""
+                        VOXREFINER_MENU=0 ./reminder.sh
+                        ;;
+                    *)
+                        ;;
+                esac
+            else
+                VOXREFINER_MENU=0 ./reminder.sh
+                if [ -f .env ]; then set -a; source .env; set +a; fi
+            fi
+            ;;
         w1)
             _coming_soon "Speak & Post" \
                 "Speak, then get a generated tweet or LinkedIn post — with context per platform."
@@ -1780,12 +1809,21 @@ while true; do
                 else
                     _web_disp_label="${C_DIM}off${C_RESET}"
                 fi
+                if [ "${REMINDER_ENABLED:-false}" = "true" ]; then
+                    _reminder_label="${C_BGREEN}on${C_RESET}"
+                else
+                    _reminder_label="${C_DIM}off${C_RESET}"
+                fi
                 _header "SETTINGS" "⚙"
                 echo ""
                 printf "  ${C_BOLD}[k]${C_RESET}  API Keys\n"
                 printf "  ${C_BOLD}[v]${C_RESET}  Reading voice (Selection to Voice)\n"
                 printf "  ${C_BOLD}[c]${C_RESET}  Citation voice (quoted paragraphs)\n"
+                printf "  ${C_BOLD}[n]${C_RESET}  Reminder coach voice\n"
+                printf "  ${C_BOLD}[l]${C_RESET}  Language  —  ${C_CYAN}${OUTPUT_LANG:-auto}${C_RESET}\n"
+                printf "  ${C_BOLD}[t]${C_RESET}  Timezone  —  %s\n" "$(python3 -c "import json; from pathlib import Path; p=Path.home()/'.local/share/vox-refiner/user_profile.json'; print(json.loads(p.read_text()).get('timezone') or 'not set')" 2>/dev/null || echo 'not set')"
                 printf "  ${C_BOLD}[w]${C_RESET}  Browser display ${C_DIM}(bêta)${C_RESET}  —  %b\n" "$_web_disp_label"
+                printf "  ${C_BOLD}[r]${C_RESET}  Reminders (W2)  —  %b\n" "$_reminder_label"
                 printf "  ${C_BOLD}[e]${C_RESET}  Edit .env\n"
                 echo ""
                 printf "  ${C_BOLD}[m]${C_RESET} Menu VoxRefiner\n"
@@ -1802,6 +1840,9 @@ while true; do
                     c|C)
                         _voice_picker "TTS_QUOTE_VOICE_ID" "CITATION VOICE" "1"
                         ;;
+                    n|N)
+                        _voice_picker "REMINDER_VOICE_ID" "REMINDER COACH VOICE" "1"
+                        ;;
                     w|W)
                         if [ "${VOX_WEB_DISPLAY:-0}" = "1" ]; then
                             _set_env_var "VOX_WEB_DISPLAY" "0"
@@ -1811,6 +1852,115 @@ while true; do
                             _set_env_var "VOX_WEB_DISPLAY" "1"
                             export VOX_WEB_DISPLAY=1
                             _info "Browser display on (beta)."
+                        fi
+                        sleep 0.8
+                        ;;
+                    l|L)
+                        echo ""
+                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        printf "  ${C_BGREEN}OUTPUT LANGUAGE${C_RESET}\n"
+                        printf "${C_DIM}──────────────────────────────────────────────────────────────────${C_RESET}\n"
+                        echo ""
+                        printf "  ${C_BOLD}[ 1]${C_RESET} Arabic        ${C_BOLD}[ 2]${C_RESET} Chinese       ${C_BOLD}[ 3]${C_RESET} Dutch\n"
+                        printf "  ${C_BOLD}[ 4]${C_RESET} English       ${C_BOLD}[ 5]${C_RESET} French        ${C_BOLD}[ 6]${C_RESET} German\n"
+                        printf "  ${C_BOLD}[ 7]${C_RESET} Hindi         ${C_BOLD}[ 8]${C_RESET} Italian       ${C_BOLD}[ 9]${C_RESET} Japanese\n"
+                        printf "  ${C_BOLD}[10]${C_RESET} Korean        ${C_BOLD}[11]${C_RESET} Portuguese    ${C_BOLD}[12]${C_RESET} Russian\n"
+                        printf "  ${C_BOLD}[13]${C_RESET} Spanish\n"
+                        printf "  ${C_BOLD}[a]${C_RESET}  auto          ${C_DIM}same as spoken input (default)${C_RESET}\n"
+                        echo ""
+                        printf "  ${C_DIM}Current: ${C_CYAN}${OUTPUT_LANG:-auto}${C_RESET}  —  Enter = keep current: "
+                        read -r _lng
+                        _new_lang=""
+                        case "$_lng" in
+                            1)   _new_lang="ar" ;;
+                            2)   _new_lang="zh" ;;
+                            3)   _new_lang="nl" ;;
+                            4)   _new_lang="en" ;;
+                            5)   _new_lang="fr" ;;
+                            6)   _new_lang="de" ;;
+                            7)   _new_lang="hi" ;;
+                            8)   _new_lang="it" ;;
+                            9)   _new_lang="ja" ;;
+                            10)  _new_lang="ko" ;;
+                            11)  _new_lang="pt" ;;
+                            12)  _new_lang="ru" ;;
+                            13)  _new_lang="es" ;;
+                            a|A) _new_lang="" ;;
+                            "")  _new_lang="${OUTPUT_LANG:-}" ;;
+                        esac
+                        if [ "$_lng" != "" ]; then
+                            echo ""
+                            printf "  Save as default? ${C_BOLD}[p]${C_RESET} permanent  ${C_BOLD}[t]${C_RESET} this session only  ${C_BOLD}[m]${C_RESET} Menu Settings: "
+                            read -r _persist
+                            case "$_persist" in
+                                p|P)
+                                    _set_env_var "OUTPUT_LANG" "$_new_lang"
+                                    python3 -c "
+import json
+from pathlib import Path
+p_path = Path.home() / '.local/share/vox-refiner/user_profile.json'
+p_path.parent.mkdir(parents=True, exist_ok=True)
+p = {}
+if p_path.exists():
+    try:
+        p = json.loads(p_path.read_text(encoding='utf-8'))
+    except Exception:
+        pass
+for k in ['timezone','language','sections','pending_questions']:
+    p.setdefault(k, None if k in ('timezone','language') else ({} if k=='sections' else []))
+p['sections'] = {s: p['sections'].get(s, []) for s in ['identity','rhythm','recurring_constraints','preferences','future_commitments','other']}
+p['language'] = '$_new_lang' if '$_new_lang' else None
+p_path.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding='utf-8')
+" 2>/dev/null
+                                    set -a; source .env; set +a
+                                    _success "Saved to .env (permanent)."
+                                    ;;
+                                *)
+                                    _info "Applied for this session only."
+                                    ;;
+                            esac
+                            OUTPUT_LANG="$_new_lang"
+                            export OUTPUT_LANG
+                        fi
+                        ;;
+                    t|T)
+                        echo ""
+                        printf "  Timezone (e.g. Europe/Paris, America/New_York): "
+                        read -r _tz
+                        if [ -n "$_tz" ]; then
+                            python3 -c "
+import json
+from pathlib import Path
+p_path = Path.home() / '.local/share/vox-refiner/user_profile.json'
+p_path.parent.mkdir(parents=True, exist_ok=True)
+p = {}
+if p_path.exists():
+    try:
+        p = json.loads(p_path.read_text(encoding='utf-8'))
+    except Exception:
+        pass
+p.setdefault('timezone', None)
+p.setdefault('language', None)
+p.setdefault('sections', {k: [] for k in ['identity','rhythm','recurring_constraints','preferences','future_commitments','other']})
+p.setdefault('pending_questions', [])
+p['timezone'] = '$_tz'
+ident = p['sections']['identity']
+p['sections']['identity'] = [e for e in ident if not e.lower().startswith('timezone')]
+p['sections']['identity'].insert(0, 'Timezone: $_tz')
+p_path.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding='utf-8')
+" 2>/dev/null && _success "Timezone set to: $_tz" || _error "Failed to update profile."
+                            sleep 0.8
+                        fi
+                        ;;
+                    r|R)
+                        if [ "${REMINDER_ENABLED:-false}" = "true" ]; then
+                            _set_env_var "REMINDER_ENABLED" "false"
+                            export REMINDER_ENABLED=false
+                            _info "Reminders off."
+                        else
+                            _set_env_var "REMINDER_ENABLED" "true"
+                            export REMINDER_ENABLED=true
+                            _success "Reminders on — use [W2] to add a reminder."
                         fi
                         sleep 0.8
                         ;;

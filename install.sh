@@ -99,7 +99,8 @@ fi
 chmod +x record_and_transcribe_local.sh launch-vox-refiner.sh voice_translate.sh \
          selection_to_voice.sh selection_to_insight.sh selection_to_search.sh \
          selection_to_factcheck.sh screen_to_text.sh media_to_text.sh \
-         vox-refiner-menu.sh vox-refiner-update.sh install.sh uninstall.sh
+         vox-refiner-menu.sh vox-refiner-update.sh install.sh uninstall.sh \
+         reminder.sh reminder-daemon.sh
 
 echo ""
 echo "✅ Installation complete."

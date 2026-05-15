@@ -13,6 +13,52 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [4.21.0] — 2026-05-15
+
+### Added
+
+- **W2 Smart Agenda & Reminders** — voice-driven reminder system, ADHD-adapted, Pomodoro-aware. Architecture documented in `docs/agenda-reminder-architecture.md`.
+
+  **New Python modules:**
+  - `src/reminder_db.py` — SQLite CRUD layer (`~/.local/share/vox-refiner/reminders.db`), 4 tables: `reminders`, `unavailability`, `business_cache`, `briefing_config`. Public API: `add_reminder`, `get_due`, `update_status`, `snooze`, `log_conversation`, `add_unavailability`, `get_unavailability`, `cache_business`, `get_cached_business`.
+  - `src/reminder_add.py` — parses free-form text (typed, voice, OCR) via Mistral Small; extracts title, category, event datetime, entities; stores via `reminder_db`.
+  - `src/reminder_notify.py` — context detection: screen lock (GNOME ScreenSaver DBus), DND (`gsettings`), VoxRefiner lock file, fullscreen app (`xdotool`). `choose_intervention()` decision matrix: notify / tts_only / queue / defer_unlock.
+  - `src/reminder_converse.py` — ADHD coach persona (supportive, non-guilt-inducing, action-oriented). `interpret_response()` classifies user response (done/snooze/going_to_do/cancel/unavailable). `compute_next_trigger()` escalation schedule for appointments (D-3/D-1/D-0 milestones), urgency ramp for tasks. `converse()` applies action to DB and logs the exchange.
+  - `src/reminder_daemon.py` — 60s scheduler loop. Dispatches due reminders according to context. Pomodoro logic: physical tasks fired via TTS at screen lock; follow-up question at unlock. `run_loop()` with SIGTERM/SIGINT handling.
+  - `src/profile.py` — durable, AI-managed user context stored in `~/.local/share/vox-refiner/user_profile.json`. Top-level machine-readable fields (`timezone`, `language`) and 6 AI-managed sections (`identity`, `rhythm`, `recurring_constraints`, `preferences`, `future_commitments`, `other`). Pending questions queue: conservative AI extraction from conversations, clarifying questions stored and surfaced at next startup. Public API: `load_profile`, `save_profile`, `update_from_conversation`, `resolve_pending_question`, `pop_pending_question`. CLI: `python -m src.profile update|resolve|pending`.
+
+  **New shell scripts:**
+  - `reminder.sh` — interactive entry point: add by text `[k]` / voice `[v]` / OCR `[s]`; list pending `[l]`; user profile `[p]` (view, add by text/voice, set timezone/language); daemon terminal launcher `[d]`; fire triggered reminder (TTS + [D]one/[L]ater/[G]oing to do/[V]oice/[X]cancel). Beta notice in menu header.
+  - `reminder-daemon.sh` — start / stop / restart / status; systemd user service wrapper with direct-process fallback.
+
+  **New systemd service:**
+  - `~/.config/systemd/user/vox-reminder.service` — auto-start at login, restart on failure.
+
+  **Menu integration (`vox-refiner-menu.sh`):**
+  - `[W2]` entry in `🔧 WORKFLOWS` section; on-the-fly enable prompt when `REMINDER_ENABLED=false`.
+  - Settings `[s]`: Language `[l]` (sets `OUTPUT_LANG`, syncs `profile.language`, 13 languages + auto), Timezone `[t]` (writes to `profile.timezone`), Reminders toggle `[r]`.
+  - `vox-refiner-update.sh` / `install.sh` — `reminder.sh` and `reminder-daemon.sh` added to exec-bit lists.
+
+  **Daemon terminal launcher `[d]`** (`reminder.sh`): opens `src.reminder_daemon` in a dedicated foreground terminal window. Uses `VOXREFINER_TERMINAL` or auto-detects (mate-terminal → gnome-terminal → xfce4-terminal → konsole → xterm). Single-instance guard via `/tmp/vox-reminder-terminal.pid`. Independent from the VoxRefiner menu window.
+
+  **Tests:** 175 new tests across 6 new test files.
+  - `tests/unit/test_reminder_db.py` — 51 tests.
+  - `tests/unit/test_reminder_add.py` — 22 tests.
+  - `tests/unit/test_reminder_notify.py` — 29 tests.
+  - `tests/unit/test_reminder_converse.py` — 28 tests.
+  - `tests/unit/test_reminder_daemon.py` — 19 tests.
+  - `tests/unit/test_profile.py` — 26 tests.
+
+  **Terminal UI conventions** added to `CLAUDE.md`: Enter = validate only; `[m]` = back to previous menu; no implicit Enter options in choice lists.
+
+### Fixed
+
+- **`src/refine.py` — empty `VOXTRAL_MODELS_FILE` on total failure**: when all refinement models fail, the file is now truncated to empty instead of left with stale content, preventing stale model label display. New test: `test_all_models_fail_writes_empty_file`.
+- **W2 — `[l]` List: Enter no longer exits** — only `[m]` returns to the menu.
+- **Menus — `[Enter] session` → `[m] Menu Settings`**: all "Save as default?" prompts now use an explicit labelled key instead of bare Enter.
+
+---
+
 ## [4.20.4] — 2026-05-07
 
 ### Changed
