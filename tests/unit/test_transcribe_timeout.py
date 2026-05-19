@@ -9,6 +9,7 @@ _format_diarized(): groups consecutive same-speaker segments into labelled
 """
 
 import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -163,3 +164,79 @@ class TestFormatDiarized:
         ]
         result = self._fmt(monkeypatch, segs)
         assert "Actual." in result
+
+
+# ---------------------------------------------------------------------------
+# _VOXTRAL_TIMEOUT_ENABLED flag
+# ---------------------------------------------------------------------------
+
+class TestVoxtralTimeoutFlag:
+    def _success_resp(self):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {"text": "hello"}
+        return resp
+
+    def _load(self, monkeypatch):
+        if "src.transcribe" in sys.modules:
+            del sys.modules["src.transcribe"]
+        import src.transcribe as tm
+        return tm
+
+    def test_disabled_by_default_passes_none_timeout(self, monkeypatch, tmp_path):
+        """VOXTRAL_TIMEOUT_ENABLED absent → requests.post receives timeout=None."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key")
+        monkeypatch.delenv("VOXTRAL_TIMEOUT_ENABLED", raising=False)
+        tm = self._load(monkeypatch)
+
+        audio = tmp_path / "test.mp3"
+        audio.write_bytes(b"x" * 310_797)  # 310 KB → 3s if enabled
+
+        captured: dict = {}
+        def fake_post(url, **kwargs):
+            captured["timeout"] = kwargs.get("timeout")
+            return self._success_resp()
+
+        with patch("src.transcribe.requests.post", side_effect=fake_post):
+            tm._transcribe_single(str(audio), "key")
+
+        assert captured["timeout"] is None
+
+    def test_explicitly_false_passes_none_timeout(self, monkeypatch, tmp_path):
+        """VOXTRAL_TIMEOUT_ENABLED=false → timeout=None."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key")
+        monkeypatch.setenv("VOXTRAL_TIMEOUT_ENABLED", "false")
+        tm = self._load(monkeypatch)
+
+        audio = tmp_path / "test.mp3"
+        audio.write_bytes(b"x" * 310_797)
+
+        captured: dict = {}
+        def fake_post(url, **kwargs):
+            captured["timeout"] = kwargs.get("timeout")
+            return self._success_resp()
+
+        with patch("src.transcribe.requests.post", side_effect=fake_post):
+            tm._transcribe_single(str(audio), "key")
+
+        assert captured["timeout"] is None
+
+    def test_enabled_passes_size_based_timeout(self, monkeypatch, tmp_path):
+        """VOXTRAL_TIMEOUT_ENABLED=true → timeout from _get_timeout(file_size)."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key")
+        monkeypatch.setenv("VOXTRAL_TIMEOUT_ENABLED", "true")
+        tm = self._load(monkeypatch)
+
+        audio = tmp_path / "test.mp3"
+        audio.write_bytes(b"x" * 310_797)  # 310 KB → 3s
+
+        captured: dict = {}
+        def fake_post(url, **kwargs):
+            captured["timeout"] = kwargs.get("timeout")
+            return self._success_resp()
+
+        with patch("src.transcribe.requests.post", side_effect=fake_post):
+            tm._transcribe_single(str(audio), "key")
+
+        assert captured["timeout"] == 3

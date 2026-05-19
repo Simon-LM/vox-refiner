@@ -11,6 +11,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **Voxtral timeout disabled by default** — the size-based HTTP timeout for Voxtral transcription requests is now off by default (`VOXTRAL_TIMEOUT_ENABLED=false`). Set `VOXTRAL_TIMEOUT_ENABLED=true` in `.env` to restore the previous size-based behaviour. The timeout logic itself is unchanged. 3 new unit tests cover the flag (`TestVoxtralTimeoutFlag`).
+
+---
+
+## [4.21.1] — 2026-05-20
+
 ### Fixed
 
 - **503 / transient errors now trigger Eden fallback** — HTTP 502, 503, 504 and network timeouts (`requests.Timeout`, `requests.ConnectionError`) on a direct provider now rotate to Eden AI exactly like a 429, instead of propagating immediately. A new `TransientError` exception distinguishes these from permanent failures (400, 401, etc.); unlike `RateLimitError`, it does not advance the model cascade since the issue is server availability, not rate limits. 10 new unit tests cover the behaviour (`TestCallTransientError`).

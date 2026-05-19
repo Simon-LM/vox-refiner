@@ -19,6 +19,7 @@ _MODEL = "voxtral-mini-latest"
 
 _TRANSCRIBE_RETRIES = int(os.environ.get("TRANSCRIBE_REQUEST_RETRIES", "2"))
 _TRANSCRIBE_RETRY_DELAY = 2.0
+_VOXTRAL_TIMEOUT_ENABLED = os.environ.get("VOXTRAL_TIMEOUT_ENABLED", "false").lower() == "true"
 _VOXTRAL_MAX_FILE_SIZE = 19_500_000  # ~19.5 MB → split into chunks (~60 min at 64 kbps after ×1.5)
 _CHUNK_TARGET_SECONDS = 1800  # ~30 min per chunk
 _TRANSIENT_HTTP_CODES = (429, 500, 502, 503)
@@ -79,7 +80,7 @@ def _format_diarized(segments: list) -> str:
 def _transcribe_single(audio_path: str, api_key: str, diarize: bool = False) -> str:
     """Transcribe one audio file via Voxtral, retrying on transient errors."""
     file_size = Path(audio_path).stat().st_size
-    timeout = _get_timeout(file_size)
+    timeout = _get_timeout(file_size) if _VOXTRAL_TIMEOUT_ENABLED else None
 
     with open(audio_path, "rb") as f:
         audio_data = f.read()
