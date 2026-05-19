@@ -476,6 +476,14 @@ class RateLimitError(Exception):
     """Transient 429 — signals the retry loop to switch provider."""
 
 
+class TransientError(Exception):
+    """Transient server-side failure (502, 503, 504, network timeout).
+
+    Signals the retry loop to switch provider without advancing the model
+    cascade — the service is down, not the model limit.
+    """
+
+
 # == XDG cache ================================================================
 
 def _cache_path() -> Path:
@@ -722,6 +730,10 @@ def _call_openai_adapter(
             json=payload,
             timeout=timeout,
         )
+    except requests.Timeout as exc:
+        raise TransientError(f"{provider.name} timed out: {exc}") from exc
+    except requests.ConnectionError as exc:
+        raise TransientError(f"{provider.name} connection error: {exc}") from exc
     except requests.RequestException as exc:
         raise ProviderError(f"{provider.name} network error: {exc}") from exc
 
@@ -730,6 +742,10 @@ def _call_openai_adapter(
     if resp.status_code == 401:
         mark_invalid(provider.name)
         raise ProviderError(f"{provider.name} key rejected (401)")
+    if resp.status_code in (502, 503, 504):
+        raise TransientError(
+            f"{provider.name} HTTP {resp.status_code}: {resp.text[:200]}"
+        )
     if not resp.ok:
         raise ProviderError(
             f"{provider.name} HTTP {resp.status_code}: {resp.text[:200]}"
@@ -751,11 +767,11 @@ def _call_xai_adapter(
 ) -> str:
     """Execute via xai_sdk (web_search + x_search tools)."""
     try:
-        from xai_sdk import Client as _XAIClient          # noqa: PLC0415
-        from xai_sdk.chat import system as _xai_sys       # noqa: PLC0415
-        from xai_sdk.chat import user as _xai_user        # noqa: PLC0415
-        from xai_sdk.tools import web_search as _wsearch  # noqa: PLC0415
-        from xai_sdk.tools import x_search as _xsearch    # noqa: PLC0415
+        from xai_sdk import Client as _XAIClient          # noqa: PLC0415  # type: ignore[import-untyped]
+        from xai_sdk.chat import system as _xai_sys       # noqa: PLC0415  # type: ignore[import-untyped]
+        from xai_sdk.chat import user as _xai_user        # noqa: PLC0415  # type: ignore[import-untyped]
+        from xai_sdk.tools import web_search as _wsearch  # noqa: PLC0415  # type: ignore[import-untyped]
+        from xai_sdk.tools import x_search as _xsearch    # noqa: PLC0415  # type: ignore[import-untyped]
     except ImportError as exc:
         raise ProviderError(
             "xai-sdk not installed. Run: pip install xai-sdk"
@@ -1051,7 +1067,34 @@ def call(
                     file=sys.stderr,
                 )
             time.sleep(wait)
-        # Non-RateLimitError propagates immediately (no catch)
+
+        except TransientError as exc:
+            last_exc = exc
+            # No cascade advance — the service is down, not the model limited.
+            # The provider is not exhausted; it may recover on a later attempt.
+            remaining = [p for p in providers if p.name not in exhausted]
+            if attempt >= _MAX_ATTEMPTS - 1 or not remaining:
+                continue
+
+            wait = _BACKOFF_SECONDS[attempt]
+            next_provider = (
+                remaining[0] if spec.policy == "sticky"
+                else remaining[(attempt + 1) % len(remaining)]
+            )
+            if next_provider is provider:
+                print(
+                    f"  ⏳ {provider.display_name} unavailable — "
+                    f"retrying in {wait}s...",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"  ⏳ {provider.display_name} unavailable — "
+                    f"trying {next_provider.display_name} in {wait}s...",
+                    file=sys.stderr,
+                )
+            time.sleep(wait)
+        # Non-retriable errors (400, 401, 4xx) propagate immediately (no catch)
 
     raise ProviderError(
         f"All providers exhausted for '{capability}' after {_MAX_ATTEMPTS} attempts. "

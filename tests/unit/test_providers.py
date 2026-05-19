@@ -41,6 +41,7 @@ from src.providers import (
     Provider,
     ProviderError,
     RateLimitError,
+    TransientError,
     _key_hash,
     _load_cache,
     _prepare_eden_opts,
@@ -666,6 +667,175 @@ class TestCall:
         expected_waits = [2, 4, 8, 15, 30]
         actual_waits = [c.args[0] for c in mock_sleep.call_args_list]
         assert actual_waits == expected_waits
+
+
+# == call() — TransientError (503 / timeout) ==================================
+
+class TestCallTransientError:
+    def test_503_fallback_to_eden(self, monkeypatch):
+        """Primary 503 -> Eden succeeds -> returns Eden result."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.setenv("EDENAI_API_KEY",  "key-eden")
+
+        def adapter_side_effect(provider, messages, **opts):
+            if provider.name == "mistral_direct":
+                raise TransientError("mistral_direct HTTP 503: service unavailable")
+            return "eden response"
+
+        with patch("src.providers._call_openai_adapter", side_effect=adapter_side_effect), \
+             patch("src.providers.time.sleep"):
+            result = call("refine", [{"role": "user", "content": "hi"}],
+                          model="mistral-small-latest")
+
+        assert result.text == "eden response"
+        assert result.provider.name == "eden_mistral"
+        assert result.attempts == 2
+
+    def test_503_does_not_advance_model_cascade(self, monkeypatch):
+        """On 503, the model for mistral_direct must not be downgraded."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.setenv("EDENAI_API_KEY",  "key-eden")
+
+        captured_opts = []
+
+        def adapter_side_effect(provider, messages, **opts):
+            captured_opts.append((provider.name, opts.get("model")))
+            if provider.name == "mistral_direct":
+                raise TransientError("503")
+            return "ok"
+
+        with patch("src.providers._call_openai_adapter", side_effect=adapter_side_effect), \
+             patch("src.providers.time.sleep"):
+            call("refine", [{"role": "user", "content": "hi"}],
+                 model="mistral-large-latest")
+
+        mistral_calls = [m for name, m in captured_opts if name == "mistral_direct"]
+        # Model must not have been cascaded down to a fallback
+        assert all(m == "mistral-large-latest" for m in mistral_calls)
+
+    def test_all_503_exhausts_attempts(self, monkeypatch):
+        """6 consecutive 503s -> ProviderError after all attempts."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.setenv("EDENAI_API_KEY",  "key-eden")
+
+        def always_503(provider, messages, **opts):
+            raise TransientError("503 forever")
+
+        with patch("src.providers._call_openai_adapter", side_effect=always_503), \
+             patch("src.providers.time.sleep"):
+            with pytest.raises(ProviderError, match="All providers exhausted"):
+                call("refine", [{"role": "user", "content": "hi"}])
+
+    def test_503_single_provider_retries_same(self, monkeypatch):
+        """With only Mistral available, 503 retries the same provider."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.delenv("EDENAI_API_KEY", raising=False)
+
+        calls = []
+
+        def adapter_side_effect(provider, messages, **opts):
+            calls.append(provider.name)
+            raise TransientError("503")
+
+        with patch("src.providers._call_openai_adapter", side_effect=adapter_side_effect), \
+             patch("src.providers.time.sleep"):
+            with pytest.raises(ProviderError):
+                call("refine", [{"role": "user", "content": "hi"}])
+
+        assert all(c == "mistral_direct" for c in calls)
+        assert len(calls) == 6  # _MAX_ATTEMPTS
+
+    def test_503_backoff_sleep_called(self, monkeypatch):
+        """Verify backoff sleep is applied on 503 retries."""
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.setenv("EDENAI_API_KEY",  "key-eden")
+
+        def always_503(provider, messages, **opts):
+            raise TransientError("503")
+
+        with patch("src.providers._call_openai_adapter", side_effect=always_503), \
+             patch("src.providers.time.sleep") as mock_sleep:
+            with pytest.raises(ProviderError):
+                call("refine", [{"role": "user", "content": "hi"}])
+
+        expected_waits = [2, 4, 8, 15, 30]
+        actual_waits = [c.args[0] for c in mock_sleep.call_args_list]
+        assert actual_waits == expected_waits
+
+    def test_timeout_fallback_to_eden(self, monkeypatch):
+        """Network timeout on Mistral -> Eden succeeds."""
+        import requests as _req
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+        monkeypatch.setenv("EDENAI_API_KEY",  "key-eden")
+
+        def adapter_side_effect(provider, messages, **opts):
+            if provider.name == "mistral_direct":
+                raise TransientError("mistral_direct timed out")
+            return "eden fallback"
+
+        with patch("src.providers._call_openai_adapter", side_effect=adapter_side_effect), \
+             patch("src.providers.time.sleep"):
+            result = call("refine", [{"role": "user", "content": "hi"}])
+
+        assert result.text == "eden fallback"
+        assert result.provider.name == "eden_mistral"
+
+    def test_openai_adapter_raises_transient_on_503(self, monkeypatch):
+        """_call_openai_adapter raises TransientError for HTTP 503."""
+        from src.providers import _call_openai_adapter, PROVIDERS
+
+        provider = PROVIDERS["mistral_direct"]
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+
+        resp = _make_resp(503, {})
+        resp.ok = False
+
+        with patch("src.providers.requests.post", return_value=resp):
+            with pytest.raises(TransientError, match="503"):
+                _call_openai_adapter(provider, [{"role": "user", "content": "hi"}],
+                                     model="mistral-small-latest")
+
+    def test_openai_adapter_raises_transient_on_502(self, monkeypatch):
+        """_call_openai_adapter raises TransientError for HTTP 502."""
+        from src.providers import _call_openai_adapter, PROVIDERS
+
+        provider = PROVIDERS["mistral_direct"]
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+
+        resp = _make_resp(502, {})
+        resp.ok = False
+
+        with patch("src.providers.requests.post", return_value=resp):
+            with pytest.raises(TransientError, match="502"):
+                _call_openai_adapter(provider, [{"role": "user", "content": "hi"}],
+                                     model="mistral-small-latest")
+
+    def test_openai_adapter_raises_transient_on_timeout(self, monkeypatch):
+        """_call_openai_adapter raises TransientError on requests.Timeout."""
+        import requests as _req
+        from src.providers import _call_openai_adapter, PROVIDERS
+
+        provider = PROVIDERS["mistral_direct"]
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+
+        with patch("src.providers.requests.post", side_effect=_req.Timeout("timed out")):
+            with pytest.raises(TransientError, match="timed out"):
+                _call_openai_adapter(provider, [{"role": "user", "content": "hi"}],
+                                     model="mistral-small-latest")
+
+    def test_openai_adapter_raises_transient_on_connection_error(self, monkeypatch):
+        """_call_openai_adapter raises TransientError on requests.ConnectionError."""
+        import requests as _req
+        from src.providers import _call_openai_adapter, PROVIDERS
+
+        provider = PROVIDERS["mistral_direct"]
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-m")
+
+        with patch("src.providers.requests.post",
+                   side_effect=_req.ConnectionError("connection refused")):
+            with pytest.raises(TransientError, match="connection"):
+                _call_openai_adapter(provider, [{"role": "user", "content": "hi"}],
+                                     model="mistral-small-latest")
 
 
 # == call() — sticky policy ===================================================

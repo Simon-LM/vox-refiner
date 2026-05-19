@@ -11,6 +11,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- **503 / transient errors now trigger Eden fallback** — HTTP 502, 503, 504 and network timeouts (`requests.Timeout`, `requests.ConnectionError`) on a direct provider now rotate to Eden AI exactly like a 429, instead of propagating immediately. A new `TransientError` exception distinguishes these from permanent failures (400, 401, etc.); unlike `RateLimitError`, it does not advance the model cascade since the issue is server availability, not rate limits. 10 new unit tests cover the behaviour (`TestCallTransientError`).
+
 ---
 
 ## [4.21.0] — 2026-05-15
