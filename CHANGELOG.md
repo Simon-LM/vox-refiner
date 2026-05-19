@@ -11,6 +11,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+---
+
+## [4.21.2] — 2026-05-20
+
 ### Changed
 
 - **Voxtral timeout disabled by default** — the size-based HTTP timeout for Voxtral transcription requests is now off by default (`VOXTRAL_TIMEOUT_ENABLED=false`). Set `VOXTRAL_TIMEOUT_ENABLED=true` in `.env` to restore the previous size-based behaviour. The timeout logic itself is unchanged. 3 new unit tests cover the flag (`TestVoxtralTimeoutFlag`).
