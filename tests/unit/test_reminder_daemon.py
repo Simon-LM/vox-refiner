@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_daemon.py.
+"""Unit tests for src/reminder/daemon.py.
 
 Tests tick() dispatch logic, Pomodoro follow-up, and context routing
 without any real subprocess calls or DB writes to real paths.
@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-import src.reminder_db as rdb
-import src.reminder_notify as rn
+import src.reminder.db as rdb
+import src.reminder.notify as rn
 
 
 @pytest.fixture(autouse=True)
@@ -24,17 +24,17 @@ def isolated_db(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def isolated_pomodoro_file(tmp_path, monkeypatch):
     pending_path = tmp_path / "pomodoro-pending.json"
-    if "src.reminder_daemon" in sys.modules:
-        del sys.modules["src.reminder_daemon"]
-    import src.reminder_daemon as d
+    if "src.reminder.daemon" in sys.modules:
+        del sys.modules["src.reminder.daemon"]
+    import src.reminder.daemon as d
     monkeypatch.setattr(d, "_POMODORO_FOLLOW_UP_FILE", pending_path)
     return pending_path
 
 
 def _load():
-    if "src.reminder_daemon" in sys.modules:
-        del sys.modules["src.reminder_daemon"]
-    import src.reminder_daemon as d
+    if "src.reminder.daemon" in sys.modules:
+        del sys.modules["src.reminder.daemon"]
+    import src.reminder.daemon as d
     return d
 
 

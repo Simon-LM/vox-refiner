@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Shared utilities for VoxRefiner API modules (refine, voice_rewrite, tts).
+"""Shared utilities for VoxRefiner API modules.
 
 Centralises: Mistral chat API call, security block, context loading,
-model speed factors, timing helpers.
+model speed factors, timing helpers, language override, provider call logging.
 """
 
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -182,3 +183,87 @@ def call_model(
                 continue
             raise
     raise last_exc
+
+
+# ── Language override ─────────────────────────────────────────────────────────
+
+LANG_NAMES: Dict[str, str] = {
+    "en": "English",  "fr": "French",   "de": "German",   "es": "Spanish",
+    "pt": "Portuguese", "it": "Italian", "nl": "Dutch",   "hi": "Hindi",
+    "ar": "Arabic",   "zh": "Chinese (Simplified)", "ja": "Japanese",
+    "ko": "Korean",   "ru": "Russian",  "pl": "Polish",   "sv": "Swedish",
+    "eo": "Esperanto",
+}
+
+
+def with_lang(prompt: str, output_lang: str) -> str:
+    """Replace the generic language placeholder in a system prompt.
+
+    Substitutes "Write in the same language as <anything>." with a concrete
+    language instruction when *output_lang* is set.  When empty, returns the
+    prompt unchanged (model responds in the input's language).
+    """
+    if not output_lang:
+        return prompt
+    lang = LANG_NAMES.get(output_lang, output_lang.capitalize())
+    return re.sub(
+        r"Write in the same language as [^.]+\.",
+        f"Respond in {lang}.",
+        prompt,
+    )
+
+
+# ── Provider call logging ─────────────────────────────────────────────────────
+
+def write_model_meta(result: Any) -> None:
+    """Write provider/model metadata to INSIGHT_MODEL_META_FILE when set.
+
+    Format (one value per line):
+      line 1: requested_model
+      line 2: effective_model
+      line 3: provider internal name  (e.g. "mistral_direct", "eden_mistral")
+      line 4: provider display name   (e.g. "Mistral (direct)", "Mistral via Eden AI")
+      line 5: substituted flag ("1" or "0")
+
+    The shell uses the internal name for happy-path detection and the
+    display name for rendering.
+    """
+    meta_file = os.environ.get("INSIGHT_MODEL_META_FILE")
+    if not meta_file:
+        return
+    try:
+        lines = [
+            result.requested_model or "",
+            result.effective_model or "",
+            result.provider.name or "",
+            result.provider.display_name or "",
+            "1" if result.substituted else "0",
+        ]
+        Path(meta_file).write_text("\n".join(lines), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def log_call_result(result: Any, label: str) -> None:
+    """Log to stderr which provider/model answered, then write shell meta file.
+
+    Silent on the happy path (Mistral direct, requested model, first try).
+    """
+    from src.ui_py import info  # noqa: PLC0415
+    write_model_meta(result)
+    noteworthy = (
+        result.provider.name != "mistral_direct"
+        or result.substituted
+        or result.effective_model != result.requested_model
+        or result.attempts > 1
+    )
+    if not noteworthy:
+        return
+    detail = f"{result.provider.display_name} ({result.effective_model})"
+    if result.substituted:
+        detail += f" — substituted from {result.requested_model}"
+    elif result.effective_model != result.requested_model and result.requested_model:
+        detail += f" — cascaded from {result.requested_model}"
+    if result.attempts > 1:
+        detail += f" — {result.attempts} attempt(s)"
+    info(f"{label} via {detail}")

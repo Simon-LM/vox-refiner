@@ -11,6 +11,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Refactored
+
+- **Module decomposition — insight, search, factcheck** — `src/insight.py` now handles only `summarize()`. Web search and fact-checking have been extracted into dedicated, standalone modules:
+  - `src/search.py` — `search_perplexity()`, `search_grok()`, `search()` dispatcher; CLI `python -m src.search`.
+  - `src/factcheck.py` — `factcheck()` with Perplexity + Grok in parallel and Mistral synthesis; CLI `python -m src.factcheck`.
+  Each module has its own CLI entry point, its own system prompts, and its own timeout/model constants. They are independently importable and composable.
+
+- **Shared utilities moved to `common.py`** — `with_lang()`, `LANG_NAMES`, `log_call_result()`, and `write_model_meta()` migrated from `insight.py` to `src/common.py` as public functions, available to all modules without circular imports.
+
+- **Reminder subpackage** — the five `src/reminder_*.py` flat modules reorganised into a proper Python subpackage `src/reminder/`: `db.py`, `add.py`, `notify.py`, `converse.py`, `daemon.py`. Entry points updated: `python -m src.reminder.daemon`, `python -m src.reminder.add`. Shell scripts and systemd service file updated accordingly.
+
+- **Tests split** — `tests/unit/test_insight.py` trimmed to `TestSummarize` + `TestDetectContentType`. New `tests/unit/test_search.py` (26 tests) and `tests/unit/test_factcheck.py` (8 tests) cover the extracted modules. `test_model_meta.py` updated to import `write_model_meta` from `src.common`. All 5 reminder test files updated for the new package paths.
+
 ---
 
 ## [4.21.2] — 2026-05-20

@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_db.py.
+"""Unit tests for src/reminder/db.py.
 
 All tests operate on a temporary SQLite database injected via monkeypatch
 (no writes to ~/.local/share/vox-refiner/).
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-import src.reminder_db as rdb
+import src.reminder.db as rdb
 
 
 @pytest.fixture(autouse=True)

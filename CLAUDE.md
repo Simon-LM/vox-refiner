@@ -20,19 +20,24 @@ vox-refiner-menu.sh / launch-vox-refiner.sh   ← interactive menu + keyboard sh
 └── reminder-daemon.sh                         ← Reminder daemon start/stop/status
 
 Shared Python modules:
-├── src/transcribe.py         ← audio → raw text (Voxtral)
-├── src/refine.py             ← raw text → refined text (Mistral chat, 3-tier routing)
-├── src/common.py             ← shared utilities, timing, security blocks
-├── src/providers.py          ← multi-provider routing (direct APIs + Eden AI fallback)
-├── src/insight.py            ← summarise, search, fact-check (Perplexity, Grok)
-├── src/tts.py                ← Voxtral TTS + voice cloning
-├── src/voice_rewrite.py      ← clean + translate text for speech
-├── src/correct.py            ← contextual correction (Media Transcribe)
-├── src/reminder_db.py        ← SQLite CRUD layer (reminders.db, 4 tables)
-├── src/reminder_add.py       ← parse text/OCR → extract reminder → store in DB
-├── src/reminder_notify.py    ← context detection (screensaver, DND, lock, fullscreen)
-├── src/reminder_converse.py  ← AI conversation, response interpretation, escalation
-└── src/reminder_daemon.py    ← 60s scheduler loop, Pomodoro logic, dispatch
+├── src/transcribe.py           ← audio → raw text (Voxtral)
+├── src/refine.py               ← raw text → refined text (Mistral chat, 3-tier routing)
+├── src/common.py               ← shared utilities, timing, security blocks, lang helpers
+├── src/providers.py            ← multi-provider routing (direct APIs + Eden AI fallback)
+├── src/insight.py              ← summarise selected text (Mistral) — python -m src.insight
+├── src/search.py               ← web search (Perplexity, Grok) — python -m src.search
+├── src/factcheck.py            ← fact-check + synthesis (Perplexity + Grok + Mistral)
+│                                  python -m src.factcheck
+├── src/tts.py                  ← Voxtral TTS + voice cloning
+├── src/voice_rewrite.py        ← clean + translate text for speech
+├── src/correct.py              ← contextual correction (Media Transcribe)
+└── src/reminder/               ← Reminder subsystem (Python subpackage)
+    ├── __init__.py
+    ├── db.py                   ← SQLite CRUD layer (reminders.db, 4 tables)
+    ├── add.py                  ← parse text/OCR → extract reminder → store in DB
+    ├── notify.py               ← context detection (screensaver, DND, lock, fullscreen)
+    ├── converse.py             ← AI conversation, response interpretation, escalation
+    └── daemon.py               ← 60s scheduler loop, Pomodoro logic, dispatch
 ```
 
 Key design constraints:
@@ -107,7 +112,7 @@ Once the feature is finished, tested, and explicitly validated by the user:
 .venv/bin/python -m pytest tests/ -v
 ```
 
-~348 tests. 1 known flaky: `test_update_script.py::test_apply_auto_resolves_obsolete_local_deletion` — not a regression.
+~1165 tests. 1 known flaky: `test_update_script.py::test_apply_auto_resolves_obsolete_local_deletion` — not a regression.
 
 ## Files that must never be committed
 

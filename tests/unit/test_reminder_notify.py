@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_notify.py.
+"""Unit tests for src/reminder/notify.py.
 
 All subprocess calls are mocked — no actual gdbus/gsettings/xdotool commands run.
 """
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.reminder_notify as rn
+import src.reminder.notify as rn
 
 
 # ── _screen_locked ────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 from typing import NamedTuple
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _LOCK_FILE = _PROJECT_ROOT / "vox-refiner.lock"
 
 # ── Data types ────────────────────────────────────────────────────────────────

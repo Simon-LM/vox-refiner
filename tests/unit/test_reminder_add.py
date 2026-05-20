@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_add.py.
+"""Unit tests for src/reminder/add.py.
 
 Mocks call_model so no network calls are made.
 Uses an isolated temporary SQLite database via monkeypatch on reminder_db.
@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-import src.reminder_db as rdb
+import src.reminder.db as rdb
 
 
 @pytest.fixture(autouse=True)
@@ -22,9 +22,9 @@ def isolated_db(tmp_path, monkeypatch):
 
 def _load(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
-    if "src.reminder_add" in sys.modules:
-        del sys.modules["src.reminder_add"]
-    import src.reminder_add as m
+    if "src.reminder.add" in sys.modules:
+        del sys.modules["src.reminder.add"]
+    import src.reminder.add as m
     return m
 
 

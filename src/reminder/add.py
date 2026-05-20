@@ -7,8 +7,8 @@ is stored via reminder_db and returned as JSON so the caller (shell script)
 can voice-confirm and ask follow-up questions for missing fields.
 
 Usage:
-    python -m src.reminder_add "Doctor appointment Friday 3pm Dr Martin"
-    echo "..." | python -m src.reminder_add --stdin
+    python -m src.reminder.add "Doctor appointment Friday 3pm Dr Martin"
+    echo "..." | python -m src.reminder.add --stdin
 
 Exit codes:
     0  — reminder stored; extracted JSON printed to stdout
@@ -25,10 +25,10 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 from src.common import SECURITY_BLOCK, call_model, compute_timing, effective_timeout  # noqa: E402
-from src.reminder_db import add_reminder, complete_reminder  # noqa: E402, F401
+from src.reminder.db import add_reminder, complete_reminder  # noqa: E402, F401
 from src.ui_py import error, process, warn  # noqa: E402
 
 _MODEL = os.environ.get("REFINE_MODEL_SHORT", "mistral-small-latest")

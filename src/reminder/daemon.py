@@ -16,8 +16,8 @@ Pomodoro logic:
 This module is designed to be run as a systemd user service.
 
 Usage:
-    python -m src.reminder_daemon            (runs forever)
-    python -m src.reminder_daemon --once     (single tick, useful for testing)
+    python -m src.reminder.daemon            (runs forever)
+    python -m src.reminder.daemon --once     (single tick, useful for testing)
 """
 
 from __future__ import annotations
@@ -30,9 +30,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.reminder_converse import compute_next_trigger
-from src.reminder_db import bump_trigger, get_due, snooze, update_status
-from src.reminder_notify import (
+from src.reminder.converse import compute_next_trigger
+from src.reminder.db import bump_trigger, get_due, snooze, update_status
+from src.reminder.notify import (
     Context,
     choose_intervention,
     close_terminal_fire,
