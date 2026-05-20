@@ -213,7 +213,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "send_tts_notification") as mock_tts,
         ):
             d.tick()
@@ -226,7 +227,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "open_terminal_fire", return_value=True) as mock_term,
             patch.object(d, "send_desktop_notification"),
             patch.object(d, "bump_trigger"),
@@ -241,7 +243,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "open_terminal_fire", return_value=False),
             patch.object(d, "send_tts_notification") as mock_tts,
             patch.object(d, "send_desktop_notification"),
@@ -257,7 +260,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "send_tts_notification") as mock_tts,
             patch.object(d, "send_desktop_notification"),
         ):
@@ -272,7 +276,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "send_tts_notification"),
             patch.object(d, "send_desktop_notification"),
         ):
@@ -286,7 +291,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=True),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
             patch.object(d, "send_tts_notification"),
             patch.object(d, "send_desktop_notification"),
         ):
@@ -300,7 +306,8 @@ class TestTick:
             patch.object(rn, "_screen_locked", return_value=False),
             patch.object(rn, "_dnd_enabled", return_value=False),
             patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
         ):
             ctx = d.tick()
         assert isinstance(ctx, rn.Context)

@@ -552,7 +552,7 @@ class TestOutputLang:
         if lang:
             monkeypatch.setenv("OUTPUT_LANG", lang)
         else:
-            monkeypatch.delenv("OUTPUT_LANG", raising=False)
+            monkeypatch.setenv("OUTPUT_LANG", "")
         if "src.refine" in sys.modules:
             del sys.modules["src.refine"]
         import src.refine as refine

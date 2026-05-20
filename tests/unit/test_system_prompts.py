@@ -170,7 +170,7 @@ class TestOutputLang:
 
     def test_output_lang_empty_default(self, monkeypatch):
         """Unset OUTPUT_LANG defaults to empty string."""
-        monkeypatch.delenv("OUTPUT_LANG", raising=False)
+        monkeypatch.setenv("OUTPUT_LANG", "")
         refine = _get_refine(monkeypatch)
         assert refine._OUTPUT_LANG == ""
 

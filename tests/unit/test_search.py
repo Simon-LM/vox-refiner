@@ -4,8 +4,10 @@ Tests cover:
   - search_perplexity(): happy path, API key guard, capability, message shape
   - search_grok(): happy path, API key guard, empty response guard
   - search() dispatcher: auto / perplexity / grok / both modes
+  - _cmd_search(): CLI stdin/stdout integration (mocked providers)
 """
 
+import io
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -15,7 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.search import search, search_grok, search_perplexity
+from src.search import _cmd_search, search, search_grok, search_perplexity
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -296,3 +298,139 @@ class TestSearch:
         with patch("src.search._SEARCH_ENGINE", "bing"):
             with pytest.raises(RuntimeError, match="Unknown INSIGHT_SEARCH_ENGINE"):
                 search("query")
+
+
+# ── search() — both mode ──────────────────────────────────────────────────────
+
+class TestSearchBoth:
+    def test_both_returns_synthesis(self, monkeypatch):
+        monkeypatch.setenv("MISTRAL_API_KEY",    "m-key")
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        monkeypatch.setenv("XAI_API_KEY",        "xai-key")
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_perplexity") as mock_pplx, \
+             patch("src.search.search_grok") as mock_grok, \
+             patch("src.search.call") as mock_call:
+            mock_pplx.return_value = "Perplexity answer."
+            mock_grok.return_value = "Grok answer."
+            mock_call.return_value = _make_synthesis_result("Synthesised answer.")
+            result = search("query", "ctx")
+
+        assert "Synthesised answer." in result
+
+    def test_both_no_insight_returns_concat(self, monkeypatch):
+        _clear_search_env(monkeypatch)
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        monkeypatch.setenv("XAI_API_KEY",        "xai-key")
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_perplexity") as mock_pplx, \
+             patch("src.search.search_grok") as mock_grok:
+            mock_pplx.return_value = "Perplexity answer."
+            mock_grok.return_value = "Grok answer."
+            result = search("query")
+
+        assert "Perplexity answer." in result
+        assert "Grok answer." in result
+
+    def test_both_perplexity_only_when_no_grok(self, monkeypatch):
+        _clear_search_env(monkeypatch)
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_perplexity") as mock_pplx:
+            mock_pplx.return_value = "Perplexity only."
+            result = search("query")
+
+        assert result == "Perplexity only."
+
+    def test_both_grok_only_when_no_perplexity(self, monkeypatch):
+        _clear_search_env(monkeypatch)
+        monkeypatch.setenv("XAI_API_KEY", "xai-key")
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_grok") as mock_grok:
+            mock_grok.return_value = "Grok only."
+            result = search("query")
+
+        assert result == "Grok only."
+
+    def test_both_raises_when_no_keys(self, monkeypatch):
+        _clear_search_env(monkeypatch)
+        with patch("src.search._SEARCH_ENGINE", "both"):
+            with pytest.raises(RuntimeError, match="both requires"):
+                search("query")
+
+    def test_both_raises_when_all_sources_fail(self, monkeypatch):
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        monkeypatch.setenv("XAI_API_KEY",        "xai-key")
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_perplexity", side_effect=RuntimeError("pplx down")), \
+             patch("src.search.search_grok",       side_effect=RuntimeError("grok down")):
+            with pytest.raises(RuntimeError, match="Both search engines failed"):
+                search("query")
+
+    def test_both_synthesis_provider_error_falls_back_to_concat(self, monkeypatch):
+        monkeypatch.setenv("MISTRAL_API_KEY",    "m-key")
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        monkeypatch.setenv("XAI_API_KEY",        "xai-key")
+        from src.providers import ProviderError as _PE
+
+        with patch("src.search._SEARCH_ENGINE", "both"), \
+             patch("src.search.search_perplexity") as mock_pplx, \
+             patch("src.search.search_grok") as mock_grok, \
+             patch("src.search.call", side_effect=_PE("synthesis down")):
+            mock_pplx.return_value = "Perplexity answer."
+            mock_grok.return_value = "Grok answer."
+            result = search("query")
+
+        assert "Perplexity answer." in result
+        assert "Grok answer." in result
+
+
+# ── _cmd_search() — CLI integration ──────────────────────────────────────────
+
+class TestCmdSearch:
+    def test_happy_path_prints_answer(self, monkeypatch, capsys):
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        with patch("sys.stdin", io.StringIO("What is Python?\nSome context.")), \
+             patch("src.search.search", return_value="Python is a language."):
+            _cmd_search()
+        assert "Python is a language." in capsys.readouterr().out
+
+    def test_empty_input_exits_1(self, monkeypatch):
+        with patch("sys.stdin", io.StringIO("")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_search()
+        assert exc.value.code == 1
+
+    def test_blank_query_line_exits_1(self, monkeypatch):
+        with patch("sys.stdin", io.StringIO("   \nsome context")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_search()
+        assert exc.value.code == 1
+
+    def test_no_engines_available_exits_2(self, monkeypatch):
+        _clear_search_env(monkeypatch)
+        with patch("sys.stdin", io.StringIO("query")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_search()
+        assert exc.value.code == 2
+
+    def test_runtime_error_exits_1(self, monkeypatch):
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        with patch("sys.stdin", io.StringIO("query")), \
+             patch("src.search.search", side_effect=RuntimeError("failed")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_search()
+        assert exc.value.code == 1
+
+    def test_context_parsed_from_multiline_stdin(self, monkeypatch):
+        monkeypatch.setenv("PERPLEXITY_API_KEY", "pplx-key")
+        with patch("sys.stdin", io.StringIO("My query\nLine 1\nLine 2")), \
+             patch("src.search.search") as mock_search:
+            mock_search.return_value = "answer"
+            _cmd_search()
+        mock_search.assert_called_once_with("My query", "Line 1\nLine 2")

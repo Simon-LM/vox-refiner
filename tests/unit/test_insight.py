@@ -3,10 +3,12 @@
 Tests cover:
   - summarize() happy path and API key guard
   - detect_content_type() integration (via tts module)
+  - _cmd_summarize(): CLI stdin/stdout integration (mocked providers)
 
 For search and fact-check tests, see test_search.py and test_factcheck.py.
 """
 
+import io
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -17,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.insight import summarize
+from src.insight import _cmd_summarize, summarize
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -158,3 +160,65 @@ class TestDetectContentType:
             mock_post.side_effect = req_module.exceptions.Timeout("timeout")
             result = detect_content_type("some text", "api-key")
         assert result == "generic"
+
+
+# ── _cmd_summarize() — CLI integration ───────────────────────────────────────
+
+class TestCmdSummarize:
+    def test_happy_path_prints_summary(self, monkeypatch, capsys):
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-x")
+        with patch("sys.stdin", io.StringIO("Some article text.")), \
+             patch("src.insight.summarize", return_value="• Bullet point."):
+            _cmd_summarize()
+        assert "• Bullet point." in capsys.readouterr().out
+
+    def test_empty_input_exits_1(self, monkeypatch):
+        with patch("sys.stdin", io.StringIO("   ")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_summarize()
+        assert exc.value.code == 1
+
+    def test_runtime_error_exits_1(self, monkeypatch):
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-x")
+        with patch("sys.stdin", io.StringIO("some text")), \
+             patch("src.insight.summarize", side_effect=RuntimeError("failed")):
+            with pytest.raises(SystemExit) as exc:
+                _cmd_summarize()
+        assert exc.value.code == 1
+
+    def test_meta_file_written(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-x")
+        meta_file = tmp_path / "meta.txt"
+        monkeypatch.setenv("INSIGHT_META_FILE", str(meta_file))
+        with patch("sys.stdin", io.StringIO("article text")), \
+             patch("src.tts.detect_content_type", return_value="news_article"), \
+             patch("src.insight.summarize", return_value="• Bullet."):
+            _cmd_summarize()
+        assert meta_file.read_text() == "news_article"
+
+    def test_detect_content_type_called_with_key(self, monkeypatch):
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-x")
+        with patch("sys.stdin", io.StringIO("article text")), \
+             patch("src.tts.detect_content_type") as mock_detect, \
+             patch("src.insight.summarize", return_value="• Bullet."):
+            mock_detect.return_value = "news_article"
+            _cmd_summarize()
+        mock_detect.assert_called_once_with("article text", "key-x")
+
+    def test_no_mistral_key_skips_detection_uses_generic(self, monkeypatch):
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+        monkeypatch.setenv("EDENAI_API_KEY", "eden-key")
+        with patch("sys.stdin", io.StringIO("text")), \
+             patch("src.insight.summarize") as mock_sum:
+            mock_sum.return_value = "• Bullet."
+            _cmd_summarize()
+        mock_sum.assert_called_once_with("text", "generic")
+
+    def test_detection_failure_falls_back_to_generic(self, monkeypatch):
+        monkeypatch.setenv("MISTRAL_API_KEY", "key-x")
+        with patch("sys.stdin", io.StringIO("text")), \
+             patch("src.tts.detect_content_type", side_effect=Exception("tts error")), \
+             patch("src.insight.summarize") as mock_sum:
+            mock_sum.return_value = "• Bullet."
+            _cmd_summarize()
+        mock_sum.assert_called_once_with("text", "generic")
