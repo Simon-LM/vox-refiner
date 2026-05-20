@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_converse.py.
+"""Unit tests for src/reminder/converse.py.
 
 Covers pure functions (compute_next_trigger, interpret_response with mock,
 converse side-effects) without network calls or real DB writes.
@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-import src.reminder_db as rdb
+import src.reminder.db as rdb
 
 
 @pytest.fixture(autouse=True)
@@ -22,9 +22,9 @@ def isolated_db(tmp_path, monkeypatch):
 
 def _load(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
-    if "src.reminder_converse" in sys.modules:
-        del sys.modules["src.reminder_converse"]
-    import src.reminder_converse as m
+    if "src.reminder.converse" in sys.modules:
+        del sys.modules["src.reminder.converse"]
+    import src.reminder.converse as m
     return m
 
 

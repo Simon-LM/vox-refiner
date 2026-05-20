@@ -1,4 +1,4 @@
-"""Unit tests for src/reminder_notify.py.
+"""Unit tests for src/reminder/notify.py.
 
 All subprocess calls are mocked — no actual gdbus/gsettings/xdotool commands run.
 """
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.reminder_notify as rn
+import src.reminder.notify as rn
 
 
 # ── _screen_locked ────────────────────────────────────────────────────────────
@@ -121,30 +121,33 @@ class TestFullscreenApp:
 class TestDetectContext:
     def test_returns_context_namedtuple(self):
         with (
-            patch.object(rn, "_screen_locked", return_value=False),
-            patch.object(rn, "_dnd_enabled", return_value=False),
-            patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_screen_locked",        return_value=False),
+            patch.object(rn, "_dnd_enabled",          return_value=False),
+            patch.object(rn, "_voxrefiner_active",    return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
         ):
             ctx = rn.detect_context()
         assert isinstance(ctx, rn.Context)
 
     def test_all_false_normal_desktop(self):
         with (
-            patch.object(rn, "_screen_locked", return_value=False),
-            patch.object(rn, "_dnd_enabled", return_value=False),
-            patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_screen_locked",        return_value=False),
+            patch.object(rn, "_dnd_enabled",          return_value=False),
+            patch.object(rn, "_voxrefiner_active",    return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
         ):
             ctx = rn.detect_context()
         assert ctx == rn.Context(False, False, False, False)
 
     def test_screen_locked_propagated(self):
         with (
-            patch.object(rn, "_screen_locked", return_value=True),
-            patch.object(rn, "_dnd_enabled", return_value=False),
-            patch.object(rn, "_voxrefiner_active", return_value=False),
-            patch.object(rn, "_fullscreen_app", return_value=False),
+            patch.object(rn, "_screen_locked",        return_value=True),
+            patch.object(rn, "_dnd_enabled",          return_value=False),
+            patch.object(rn, "_voxrefiner_active",    return_value=False),
+            patch.object(rn, "_fullscreen_app",       return_value=False),
+            patch.object(rn, "_known_blocker_active", return_value=False),
         ):
             ctx = rn.detect_context()
         assert ctx.screen_locked is True

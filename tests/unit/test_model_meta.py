@@ -3,7 +3,7 @@
 Two files write a small plain-text "meta" file that the shell scripts read
 to show the actual provider + effective model in result headers:
 
-  * src.insight._write_model_meta(result)   → INSIGHT_MODEL_META_FILE
+  * src.common.write_model_meta(result)     → INSIGHT_MODEL_META_FILE
   * src.refine.refine(...)                  → VOXTRAL_MODELS_FILE (lines 3-5)
 
 These tests lock the on-disk format so shell readers stay in sync.
@@ -41,15 +41,15 @@ def _make_result(
 
 
 class TestInsightModelMeta:
-    """src.insight._write_model_meta writes 5-line meta when env is set."""
+    """src.common.write_model_meta writes 5-line meta when env is set."""
 
     def test_writes_five_lines_on_happy_path(self, monkeypatch, tmp_path):
-        from src.insight import _write_model_meta
+        from src.common import write_model_meta
 
         meta = tmp_path / "model_meta"
         monkeypatch.setenv("INSIGHT_MODEL_META_FILE", str(meta))
 
-        _write_model_meta(_make_result())
+        write_model_meta(_make_result())
 
         lines = meta.read_text(encoding="utf-8").splitlines()
         assert lines == [
@@ -61,12 +61,12 @@ class TestInsightModelMeta:
         ]
 
     def test_writes_substituted_flag_when_eden_substitutes(self, monkeypatch, tmp_path):
-        from src.insight import _write_model_meta
+        from src.common import write_model_meta
 
         meta = tmp_path / "model_meta"
         monkeypatch.setenv("INSIGHT_MODEL_META_FILE", str(meta))
 
-        _write_model_meta(_make_result(
+        write_model_meta(_make_result(
             provider_name="eden_mistral",
             requested_model="magistral-small-latest",
             effective_model="mistral/mistral-small-latest",
@@ -80,11 +80,11 @@ class TestInsightModelMeta:
         assert lines[4] == "1"
 
     def test_silent_when_env_not_set(self, monkeypatch, tmp_path):
-        from src.insight import _write_model_meta
+        from src.common import write_model_meta
 
         monkeypatch.delenv("INSIGHT_MODEL_META_FILE", raising=False)
         # Must not raise when env var is absent.
-        _write_model_meta(_make_result())
+        write_model_meta(_make_result())
 
     def test_summarize_writes_meta(self, monkeypatch, tmp_path):
         """End-to-end: summarize() writes meta via _log_call_result."""

@@ -154,7 +154,7 @@ _profile_ask_pending() {
 _add_reminder_from_text() {
     local text="$1"
     local result
-    result=$(printf '%s' "$text" | "$VENV_PYTHON" -m src.reminder_add --stdin 2>&3)
+    result=$(printf '%s' "$text" | "$VENV_PYTHON" -m src.reminder.add --stdin 2>&3)
     if [ -z "$result" ]; then
         _error "Failed to parse reminder."
         return 1
@@ -313,7 +313,7 @@ _mode_interactive() {
                 _daemon_ok=0
                 _open_daemon_terminal() {
                     if ! command -v "$1" >/dev/null 2>&1; then return 1; fi
-                    local _dcmd="cd '$SCRIPT_DIR' && '$VENV_PYTHON' -m src.reminder_daemon"
+                    local _dcmd="cd '$SCRIPT_DIR' && '$VENV_PYTHON' -m src.reminder.daemon"
                     case "$1" in
                         mate-terminal|gnome-terminal)
                             "$1" --window -- bash -c "$_dcmd" 2>/dev/null & ;;
@@ -735,7 +735,7 @@ _mode_fire() {
     reminder_json=$("$VENV_PYTHON" -c "
 import json, sys
 sys.path.insert(0, '.')
-from src.reminder_db import get_due
+from src.reminder.db import get_due
 due = get_due('9999-01-01 00:00:00')
 r = next((x for x in due if x['id'] == $reminder_id), None)
 if r:
@@ -768,7 +768,7 @@ if r:
             d|D)
                 _next_t=$("$VENV_PYTHON" -c "
 import sys; sys.path.insert(0, '.')
-from src.reminder_db import complete_reminder
+from src.reminder.db import complete_reminder
 result = complete_reminder($reminder_id)
 print(result or '')
 " 2>&3)
@@ -784,8 +784,8 @@ print(result or '')
                 REMINDER_JSON="$reminder_json" \
                 "$VENV_PYTHON" -c "
 import sys, json, os; sys.path.insert(0, '.')
-from src.reminder_converse import compute_next_trigger
-from src.reminder_db import snooze
+from src.reminder.converse import compute_next_trigger
+from src.reminder.db import snooze
 r = json.loads(os.environ['REMINDER_JSON'])
 next_t = compute_next_trigger(r)
 snooze($reminder_id, next_t)
@@ -797,7 +797,7 @@ snooze($reminder_id, next_t)
             g|G)
                 "$VENV_PYTHON" -c "
 import sys; sys.path.insert(0, '.')
-from src.reminder_db import snooze
+from src.reminder.db import snooze
 from datetime import datetime, timedelta, timezone
 nxt = (datetime.now(tz=timezone.utc) + timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
 snooze($reminder_id, nxt)
@@ -818,7 +818,7 @@ snooze($reminder_id, nxt)
                 _reply=$(REMINDER_JSON="$reminder_json" REMINDER_RESPONSE="$_response" \
                     "$VENV_PYTHON" -c "
 import sys, json, os; sys.path.insert(0, '.')
-from src.reminder_converse import converse
+from src.reminder.converse import converse
 r = json.loads(os.environ['REMINDER_JSON'])
 reply = converse($reminder_id, r, os.environ['REMINDER_RESPONSE'])
 print(reply)
@@ -837,7 +837,7 @@ print(reply)
             x|X)
                 "$VENV_PYTHON" -c "
 import sys; sys.path.insert(0, '.')
-from src.reminder_db import update_status
+from src.reminder.db import update_status
 update_status($reminder_id, 'cancelled')
 " 2>&3
                 _warn "Reminder cancelled."

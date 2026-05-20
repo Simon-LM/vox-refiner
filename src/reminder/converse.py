@@ -25,10 +25,10 @@ from typing import NamedTuple
 import requests
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 from src.common import SECURITY_BLOCK, call_model, compute_timing, effective_timeout  # noqa: E402
-from src.reminder_db import (  # noqa: E402
+from src.reminder.db import (  # noqa: E402
     add_unavailability,
     log_conversation,
     snooze,

@@ -77,7 +77,7 @@ _direct_start() {
     [ -f .env ] && set -a && source .env && set +a
 
     _success "Reminder daemon running — Ctrl+C or close this terminal to stop."
-    exec "$VENV_PYTHON" -m src.reminder_daemon
+    exec "$VENV_PYTHON" -m src.reminder.daemon
 }
 
 _direct_stop() {

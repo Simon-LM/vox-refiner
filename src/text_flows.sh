@@ -312,7 +312,7 @@ _search_flow() {
 
     search_result=$(printf '%s\n%s' "$query_text" "$context_text" | \
         INSIGHT_SEARCH_ENGINE="$_SETTING_SEARCH_ENGINE" \
-        "$VENV_PYTHON" -m src.insight search 2>&3)
+        "$VENV_PYTHON" -m src.search 2>&3)
 
     if [ -z "$search_result" ]; then
         _error "Search returned no result — check your API keys and connection."
@@ -447,7 +447,7 @@ _factcheck_flow() {
     factcheck_result=$(printf '%s' "$input_text" | \
         INSIGHT_SEARCH_ENGINE="$_SETTING_FACTCHECK_ENGINE" \
         INSIGHT_SYNTHESIS_REASONING="$_SETTING_SYNTHESIS_REASONING" \
-        "$VENV_PYTHON" -m src.insight factcheck 2>&3)
+        "$VENV_PYTHON" -m src.factcheck 2>&3)
 
     if [ -z "$factcheck_result" ]; then
         _error "Fact-check failed — check your API keys and connection."
