@@ -49,20 +49,22 @@ def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS reminders (
-            id             INTEGER PRIMARY KEY,
-            title          TEXT NOT NULL,
-            full_context   TEXT,
-            category       TEXT,
-            status         TEXT DEFAULT 'pending',
-            event_datetime DATETIME,
-            next_trigger   DATETIME,
-            snooze_count   INTEGER DEFAULT 0,
-            created_at     DATETIME,
-            last_reminded  DATETIME,
-            metadata       TEXT,
-            conversation   TEXT DEFAULT '[]',
-            recurrence     TEXT,
-            recurrence_end TEXT
+            id                INTEGER PRIMARY KEY,
+            title             TEXT NOT NULL,
+            full_context      TEXT,
+            category          TEXT,
+            status            TEXT DEFAULT 'pending',
+            event_datetime    DATETIME,
+            next_trigger      DATETIME,
+            snooze_count      INTEGER DEFAULT 0,
+            created_at        DATETIME,
+            last_reminded     DATETIME,
+            metadata          TEXT,
+            conversation      TEXT DEFAULT '[]',
+            recurrence        TEXT,
+            recurrence_end    TEXT,
+            estimated_minutes INTEGER,
+            screen_free       INTEGER DEFAULT NULL
         );
         CREATE TABLE IF NOT EXISTS unavailability (
             id         INTEGER PRIMARY KEY,
@@ -90,7 +92,12 @@ def _init_db(conn: sqlite3.Connection) -> None:
         """
     )
     conn.commit()
-    for _col, _type in (("recurrence", "TEXT"), ("recurrence_end", "TEXT")):
+    for _col, _type in (
+        ("recurrence", "TEXT"),
+        ("recurrence_end", "TEXT"),
+        ("estimated_minutes", "INTEGER"),
+        ("screen_free", "INTEGER"),
+    ):
         try:
             conn.execute(f"ALTER TABLE reminders ADD COLUMN {_col} {_type}")
             conn.commit()
@@ -113,6 +120,8 @@ def add_reminder(
     metadata: dict | None = None,
     recurrence: str | None = None,
     recurrence_end: str | None = None,
+    estimated_minutes: int | None = None,
+    screen_free: bool | None = None,
 ) -> int:
     now = _now_iso()
     if next_trigger is None:
@@ -126,8 +135,8 @@ def add_reminder(
             INSERT INTO reminders
                 (title, full_context, category, status, event_datetime,
                  next_trigger, snooze_count, created_at, metadata, conversation,
-                 recurrence, recurrence_end)
-            VALUES (?, ?, ?, 'pending', ?, ?, 0, ?, ?, '[]', ?, ?)
+                 recurrence, recurrence_end, estimated_minutes, screen_free)
+            VALUES (?, ?, ?, 'pending', ?, ?, 0, ?, ?, '[]', ?, ?, ?, ?)
             """,
             (
                 title,
@@ -139,6 +148,8 @@ def add_reminder(
                 json.dumps(metadata, ensure_ascii=False) if metadata else None,
                 recurrence,
                 recurrence_end,
+                estimated_minutes,
+                int(screen_free) if screen_free is not None else None,
             ),
         )
         return cur.lastrowid

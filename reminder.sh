@@ -249,6 +249,210 @@ print(spoken)
     _profile_update "$text"
 }
 
+# ── Mode: Pomodoro settings ───────────────────────────────────────────────────
+
+_pomodoro_status() {
+    if [ -f "/tmp/vox-pomodoro-state.json" ]; then
+        local _phase
+        _phase=$("$VENV_PYTHON" -c "
+import json, sys
+try:
+    d = json.loads(open('/tmp/vox-pomodoro-state.json').read())
+    print(d.get('phase','?'))
+except Exception:
+    print('?')
+" 2>/dev/null)
+        echo "● running (${_phase})"
+    else
+        echo "○ stopped"
+    fi
+}
+
+_pomodoro_load_cfg() {
+    "$VENV_PYTHON" -c "
+import json, sys
+from pathlib import Path
+cfg_path = Path.home() / '.local/share/vox-refiner/pomodoro.json'
+defaults = {'work_minutes':25,'break_minutes':5,'break_margin_minutes':5,'break_locked':True,'enabled':False,'idle_reset_minutes':0}
+if cfg_path.exists():
+    try:
+        d = json.loads(cfg_path.read_text())
+        defaults.update({k:d[k] for k in defaults if k in d})
+    except Exception:
+        pass
+print(defaults['work_minutes'])
+print(defaults['break_minutes'])
+print(defaults['break_margin_minutes'])
+print('yes' if defaults['break_locked'] else 'no')
+print('yes' if defaults['enabled'] else 'no')
+print(defaults['idle_reset_minutes'])
+" 2>&3
+}
+
+_pomodoro_save_cfg() {
+    local _work="$1" _break="$2" _margin="$3" _locked="$4" _enabled="$5" _idle="$6"
+    "$VENV_PYTHON" -c "
+import json
+from pathlib import Path
+cfg_path = Path.home() / '.local/share/vox-refiner/pomodoro.json'
+cfg_path.parent.mkdir(parents=True, exist_ok=True)
+data = {
+    'work_minutes': int('$_work'),
+    'break_minutes': int('$_break'),
+    'break_margin_minutes': int('$_margin'),
+    'break_locked': '$_locked' == 'yes',
+    'enabled': '$_enabled' == 'yes',
+    'idle_reset_minutes': int('$_idle'),
+}
+cfg_path.write_text(json.dumps(data, indent=2))
+" 2>&3
+}
+
+_mode_pomodoro() {
+    while true; do
+        # Load current config
+        local _cfg _work _break _margin _locked _enabled _idle
+        _cfg=$(_pomodoro_load_cfg)
+        _work=$(echo "$_cfg" | sed -n '1p')
+        _break=$(echo "$_cfg" | sed -n '2p')
+        _margin=$(echo "$_cfg" | sed -n '3p')
+        _locked=$(echo "$_cfg" | sed -n '4p')
+        _enabled=$(echo "$_cfg" | sed -n '5p')
+        _idle=$(echo "$_cfg" | sed -n '6p')
+        local _status
+        _status=$(_pomodoro_status)
+        local _break_min _break_max
+        _break_min=$(( _break - _margin < 1 ? 1 : _break - _margin ))
+        _break_max=$(( _break + _margin ))
+        local _idle_display
+        if [ "${_idle:-0}" -eq 0 ]; then
+            _idle_display="off  ${C_DIM}(away from keyboard → work timer resets, no break)${C_RESET}"
+        else
+            _idle_display="${_idle} min  ${C_DIM}(away ≥ ${_idle} min → work timer resets, no break)${C_RESET}"
+        fi
+
+        clear
+        _header "POMODORO" "🍅"
+        echo ""
+        printf "  Status         : ${C_BOLD}%s${C_RESET}\n" "$_status"
+        printf "  Work duration  : ${C_CYAN}%s min${C_RESET}\n" "$_work"
+        printf "  Break duration : ${C_CYAN}%s min${C_RESET}  ${C_DIM}(±%s min → %s–%s min)${C_RESET}\n" "$_break" "$_margin" "$_break_min" "$_break_max"
+        printf "  Break locked   : ${C_CYAN}%s${C_RESET}\n" "$_locked"
+        printf "  Idle reset     : ${C_CYAN}%b${C_RESET}\n" "$_idle_display"
+        echo ""
+        _sep
+        printf "  ${C_BOLD}[w]${C_RESET} Work duration   ${C_BOLD}[b]${C_RESET} Break duration\n"
+        printf "  ${C_BOLD}[g]${C_RESET} Break margin    ${C_BOLD}[l]${C_RESET} Toggle lock — currently: ${C_CYAN}%s${C_RESET}\n" "$_locked"
+        printf "  ${C_BOLD}[i]${C_RESET} Idle reset      ${C_BOLD}[t]${C_RESET} Test overlay (30 s)\n"
+        printf "  ${C_BOLD}[s]${C_RESET} Start           ${C_BOLD}[x]${C_RESET} Stop\n"
+        printf "  ${C_BOLD}[m]${C_RESET} Menu: "
+        read -r _pcmd
+
+        case "$_pcmd" in
+            w|W)
+                echo ""
+                printf "  Work duration in minutes (current: %s): " "$_work"
+                read -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]] && [ "$_val" -gt 0 ]; then
+                    _work="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Work duration set to ${_work} min."
+                else
+                    _warn "Invalid value — must be a positive integer."
+                fi
+                sleep 1
+                ;;
+            b|B)
+                echo ""
+                printf "  Break duration in minutes (current: %s): " "$_break"
+                read -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]] && [ "$_val" -gt 0 ]; then
+                    _break="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Break duration set to ${_break} min."
+                else
+                    _warn "Invalid value — must be a positive integer."
+                fi
+                sleep 1
+                ;;
+            g|G)
+                echo ""
+                printf "  Break margin in minutes (current: %s): " "$_margin"
+                read -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]]; then
+                    _margin="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Break margin set to ±${_margin} min."
+                else
+                    _warn "Invalid value — must be a non-negative integer."
+                fi
+                sleep 1
+                ;;
+            l|L)
+                if [ "$_locked" = "yes" ]; then
+                    _locked="no"
+                else
+                    _locked="yes"
+                fi
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                _success "Break lock set to: ${_locked}."
+                sleep 1
+                ;;
+            i|I)
+                echo ""
+                printf "  Idle reset in minutes — 0 to disable (current: %s): " "${_idle:-0}"
+                read -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]]; then
+                    _idle="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    if [ "$_idle" -eq 0 ]; then
+                        _success "Idle reset disabled."
+                    else
+                        _success "Idle reset set to ${_idle} min."
+                    fi
+                else
+                    _warn "Invalid value — must be a non-negative integer."
+                fi
+                sleep 1
+                ;;
+            t|T)
+                _success "Lancement de l'overlay de test (30 secondes)…"
+                sleep 1
+                python3 "$SCRIPT_DIR/src/reminder/pomodoro_overlay.py" \
+                    --title "Test overlay — 30 s" --minutes 0.5 --locked 2>&3
+                ;;
+            s|S)
+                if [ -f "/tmp/vox-pomodoro-state.json" ]; then
+                    _warn "Pomodoro already running."
+                    sleep 1
+                    continue
+                fi
+                _enabled="yes"
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                "$VENV_PYTHON" -c "
+import sys; sys.path.insert(0,'.')
+from src.reminder.pomodoro import start
+start()
+" 2>&3 && _success "Pomodoro started — work phase: ${_work} min." || _error "Failed to start Pomodoro."
+                sleep 1
+                ;;
+            x|X)
+                "$VENV_PYTHON" -c "
+import sys; sys.path.insert(0,'.')
+from src.reminder.pomodoro import stop
+stop()
+" 2>&3 && _success "Pomodoro stopped." || _error "Failed to stop Pomodoro."
+                _enabled="no"
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                sleep 1
+                ;;
+            m|M)
+                return 0
+                ;;
+        esac
+    done
+}
+
 # ── Mode: add from interactive input ─────────────────────────────────────────
 
 _mode_interactive() {
@@ -260,7 +464,7 @@ _mode_interactive() {
         echo ""
         printf "  ${C_BOLD}[k]${C_RESET} Add (type)   ${C_BOLD}[v]${C_RESET} Add (voice)   ${C_BOLD}[s]${C_RESET} Add (screenshot)\n"
         printf "  ${C_BOLD}[l]${C_RESET} List pending   ${C_BOLD}[p]${C_RESET} Profile   ${C_BOLD}[d]${C_RESET} Start daemon\n"
-        printf "  ${C_BOLD}[x]${C_RESET} Disable feature   ${C_BOLD}[m]${C_RESET} Menu: "
+        printf "  ${C_BOLD}[o]${C_RESET} Pomodoro   ${C_BOLD}[x]${C_RESET} Disable feature   ${C_BOLD}[m]${C_RESET} Menu: "
         read -r _input_mode
 
         case "$_input_mode" in
@@ -343,6 +547,9 @@ _mode_interactive() {
                     echo "$!" > "$_daemon_term_pid"
                     _success "Daemon started in a dedicated terminal."
                 fi
+                ;;
+            o|O)
+                _mode_pomodoro
                 ;;
             x|X)
                 if grep -q "^REMINDER_ENABLED=" .env 2>/dev/null; then

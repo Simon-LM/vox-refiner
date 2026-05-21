@@ -11,6 +11,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **Pomodoro — task-driven break system** — `src/reminder/pomodoro_config.py`, `src/reminder/pomodoro.py`, `src/reminder/pomodoro_overlay.py`.
+  - Work/break cycle driven by physical Reminder tasks; break duration estimated by Mistral from task title and category, clamped to configurable `[break_min, break_max]` window.
+  - GTK fullscreen semi-transparent overlay covers **all connected monitors**; graceful fallback to text-mode when GTK is unavailable. Overlay uses system `python3` (not venv) so `python3-gi` is available even inside a virtualenv.
+  - `break_locked` option prevents closing the overlay before the timer expires.
+  - When break max is exceeded, overlay closes automatically and the confirmation flow fires.
+  - Idle reset: if the user is away from the keyboard for `idle_reset_minutes`, the work timer resets silently (detected via `xprintidle`).
+  - State persisted in `/tmp/vox-pomodoro-state.json`; daemon calls `pomodoro.tick()` on every 60s loop.
+  - Settings stored in `~/.local/share/vox-refiner/pomodoro.json`; managed via new `[o] Pomodoro` submenu in `reminder.sh`. `[t] Test overlay (30 s)` command available in the submenu to verify GTK overlay without waiting for a full cycle.
+  - `estimated_minutes` field added to `reminders` DB table and `add_reminder()` API; `add.py` extracts it via Mistral at creation time for physical-category tasks.
+  - 26 new unit tests (`tests/unit/test_pomodoro.py`).
+  - `install.sh` / `vox-refiner-update.sh` updated: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-3.0`, `xprintidle` added; update script now checks all system dependencies.
+
+- **`screen_free` field on reminders** — boolean field added to the `reminders` DB table. Mistral infers it at creation time from the task title (cleaning, gardening, dishes, shopping → `True`; calls, email, agenda → `False`). `_pick_physical_task()` in `pomodoro.py` now selects only `screen_free=True` tasks (or legacy physical-category tasks with no value set). `dispatch_reminder()` in the daemon holds back `screen_free` tasks during the Pomodoro WORK phase ("queue" mode) so they are only proposed during breaks. 8 new unit tests cover this behaviour.
+
 ---
 
 ## [5.0.0] — 2026-05-20

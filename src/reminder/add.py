@@ -52,7 +52,14 @@ def _build_system_prompt() -> str:
         '                     "monthly"=calendar month (variable length)  null=one-time\n'
         '  "recurrence_end" : "YYYY-MM-DD" or null — last date for recurrence; null if indefinite\n'
         '  "entities"       : object with any of: person, location, phone — null if none\n'
-        '  "missing_fields" : list of fields the user should be asked about (e.g. ["date","time"])\n'
+        '  "missing_fields"    : list of fields the user should be asked about (e.g. ["date","time"])\n'
+        '  "estimated_minutes" : integer — realistic duration of the physical task in minutes, or null\n'
+        '                        Only set for physical tasks (task_short, task_long, errand).\n'
+        '                        Examples: "do the dishes"=15, "water the garden"=20, "take out bins"=5.\n'
+        '                        null for appointments, admin, deadline categories.\n'
+        '  "screen_free"       : true if the task can be done without a screen (cleaning, gardening, dishes, shopping,\n'
+        '                        errands, physical chores) — false if it requires the screen (calls, emails, agenda,\n'
+        '                        any task needing computer or phone interaction). null if genuinely ambiguous.\n'
         "\n"
         "Rules:\n"
         "- Output ONLY a valid JSON array. No markdown, no explanation, no code block.\n"
@@ -148,6 +155,8 @@ def add_from_text(text: str) -> list[tuple[int, dict]]:
     items = extract_reminder(text)
     results = []
     for item in items:
+        est = item.get("estimated_minutes")
+        sf = item.get("screen_free")
         reminder_id = add_reminder(
             title=item.get("title", text[:80]),
             category=item.get("category", "task_short"),
@@ -156,6 +165,8 @@ def add_from_text(text: str) -> list[tuple[int, dict]]:
             metadata=item.get("entities"),
             recurrence=item.get("recurrence"),
             recurrence_end=item.get("recurrence_end"),
+            estimated_minutes=int(est) if est is not None else None,
+            screen_free=bool(sf) if sf is not None else None,
         )
         results.append((reminder_id, item))
     return results

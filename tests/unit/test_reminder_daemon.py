@@ -31,6 +31,14 @@ def isolated_pomodoro_file(tmp_path, monkeypatch):
     return pending_path
 
 
+@pytest.fixture(autouse=True)
+def isolated_pomodoro_state(tmp_path, monkeypatch):
+    """Redirect the Pomodoro state file so system state never leaks into tests."""
+    import src.reminder.pomodoro as pom
+    monkeypatch.setattr(pom, "_STATE_FILE", tmp_path / "pom-state.json")
+    monkeypatch.setattr(pom, "_PID_FILE", tmp_path / "pom-pid")
+
+
 def _load():
     if "src.reminder.daemon" in sys.modules:
         del sys.modules["src.reminder.daemon"]
@@ -166,6 +174,81 @@ class TestDispatchReminder:
             d.dispatch_reminder(r, _normal_ctx())
         mock_bump.assert_called_once()
         mock_snooze.assert_not_called()
+
+
+# ── screen_free + Pomodoro ────────────────────────────────────────────────────
+
+class TestScreenFreePomodoro:
+    def _work_state(self):
+        import src.reminder.pomodoro as pom
+        from datetime import datetime, timedelta, timezone
+        end = (datetime.now(tz=timezone.utc) + timedelta(minutes=20)).isoformat()
+        return pom.PomodoroState(phase=pom.Phase.WORK, phase_end_iso=end)
+
+    def test_screen_free_task_queued_during_work_phase(self, monkeypatch):
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", self._work_state)
+        r = {"id": 1, "title": "Do the dishes", "category": "task_short",
+             "screen_free": 1, "snooze_count": 0, "event_datetime": None}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+    def test_legacy_physical_task_queued_during_work_phase(self, monkeypatch):
+        """Tasks with screen_free=None and physical category are also held back."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", self._work_state)
+        r = {"id": 2, "title": "Water garden", "category": "errand",
+             "screen_free": None, "snooze_count": 0, "event_datetime": None}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+    def test_screen_required_task_fires_during_work_phase(self, monkeypatch):
+        """Tasks with screen_free=False are not held back by Pomodoro."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", self._work_state)
+        r = {"id": 3, "title": "Reply to email", "category": "task_short",
+             "screen_free": 0, "snooze_count": 0, "event_datetime": None}
+        with (
+            patch.object(d, "open_terminal_fire", return_value=True),
+            patch.object(d, "send_desktop_notification"),
+            patch.object(d, "bump_trigger"),
+        ):
+            mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "notify"
+
+    def test_appointment_fires_during_work_phase(self, monkeypatch):
+        """Appointments (not screen-free) always fire regardless of Pomodoro."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", self._work_state)
+        r = {"id": 4, "title": "Dentist", "category": "appointment",
+             "screen_free": None, "snooze_count": 0,
+             "event_datetime": "2099-01-01 00:00:00"}
+        with (
+            patch.object(d, "open_terminal_fire", return_value=True),
+            patch.object(d, "send_desktop_notification"),
+            patch.object(d, "bump_trigger"),
+        ):
+            mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "notify"
+
+    def test_screen_free_fires_normally_when_no_pomodoro(self, monkeypatch):
+        """Without an active Pomodoro, screen-free tasks fire as usual."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        r = {"id": 5, "title": "Do the dishes", "category": "task_short",
+             "screen_free": 1, "snooze_count": 0, "event_datetime": None}
+        with (
+            patch.object(d, "open_terminal_fire", return_value=True),
+            patch.object(d, "send_desktop_notification"),
+            patch.object(d, "bump_trigger"),
+        ):
+            mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "notify"
 
 
 # ── Pomodoro file helpers ─────────────────────────────────────────────────────

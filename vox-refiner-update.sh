@@ -230,16 +230,38 @@ sync_python_deps() {
 }
 
 sync_system_deps() {
-    if command -v xdotool >/dev/null 2>&1; then
+    local _missing=()
+
+    # Binary dependencies
+    local _bins=(ffmpeg sox xclip mpv xdotool zenity xprintidle)
+    for _bin in "${_bins[@]}"; do
+        if ! command -v "$_bin" >/dev/null 2>&1; then
+            _missing+=("$_bin")
+        fi
+    done
+
+    # GTK overlay (python3-gi)
+    if ! python3 -c "import gi" >/dev/null 2>&1; then
+        _missing+=(python3-gi python3-gi-cairo gir1.2-gtk-3.0)
+    fi
+
+    # Optional screenshot tool (warn only, do not force-install)
+    if ! command -v maim >/dev/null 2>&1 && ! command -v scrot >/dev/null 2>&1; then
+        echo "⚠️  No screenshot tool found (needed for OCR reminders)."
+        echo "   sudo apt install maim    (recommended)"
+    fi
+
+    if [ "${#_missing[@]}" -eq 0 ]; then
+        echo "✓  System dependencies up to date."
         return
     fi
-    echo "📦 Installing missing system dependency: xdotool..."
+
+    echo "📦 Missing system dependencies: ${_missing[*]}"
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get install -y xdotool
-        echo "✓  xdotool installed."
+        sudo apt-get install -y "${_missing[@]}"
+        echo "✓  System dependencies installed."
     else
-        echo "⚠️  xdotool is required for Screen to Text (hides the terminal during capture)."
-        echo "   Install it manually:  sudo apt install xdotool"
+        echo "⚠️  Install them manually:  sudo apt install ${_missing[*]}"
     fi
 }
 

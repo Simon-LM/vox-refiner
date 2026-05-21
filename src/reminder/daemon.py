@@ -32,6 +32,8 @@ from pathlib import Path
 
 from src.reminder.converse import compute_next_trigger
 from src.reminder.db import bump_trigger, get_due, snooze, update_status
+from src.reminder import pomodoro as _pomodoro
+from src.reminder.pomodoro_config import load as _load_pomodoro_cfg
 from src.reminder.notify import (
     Context,
     choose_intervention,
@@ -97,11 +99,32 @@ def _fire_reminder(reminder: dict, mode: str) -> None:
         snooze(rid, next_trigger)
 
 
+def _is_screen_free(reminder: dict) -> bool:
+    """Return True if the reminder is explicitly screen-free, or is a legacy physical task."""
+    sf = reminder.get("screen_free")
+    if sf == 1:
+        return True
+    if sf is None and reminder.get("category") in ("task_short", "task_long", "errand"):
+        return True
+    return False
+
+
 def dispatch_reminder(reminder: dict, context: Context) -> str:
     """Decide and execute the right action for *reminder* given *context*.
 
     Returns the mode string ("notify", "tts_only", "queue", "defer_unlock").
+
+    When Pomodoro is active in WORK phase, screen-free tasks are held back
+    ("queue") so they can be picked up at the next break transition.
     """
+    pom_state = _pomodoro.current_state()
+    if (
+        pom_state is not None
+        and pom_state.phase == _pomodoro.Phase.WORK
+        and _is_screen_free(reminder)
+    ):
+        return "queue"
+
     intervention = choose_intervention(context, reminder)
     mode = intervention.mode
 
@@ -119,6 +142,12 @@ def tick(previous_context: Context | None = None) -> Context:
     """
     now = _now()
     context = detect_context()
+
+    # Advance Pomodoro state machine (no-op when disabled)
+    try:
+        _pomodoro.tick()
+    except Exception as exc:  # noqa: BLE001
+        warn(f"Pomodoro tick error: {exc}")
 
     # Unlock transition: ask about physical tasks fired during lock
     if previous_context is not None and previous_context.screen_locked and not context.screen_locked:
