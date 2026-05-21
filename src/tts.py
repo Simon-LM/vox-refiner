@@ -885,6 +885,9 @@ def _split_sentences(para: str, max_chars: int) -> list[str]:
     sentences = [s.strip() for s in sentences if s.strip()]
     if not sentences:
         return [para] if para else []
+    # Preserve the original intra-paragraph separator so rejoined chunks remain
+    # verbatim substrings of the source text (needed for char_start/char_end).
+    _sent_sep = "\n" if "\n" in para else " "
     chunks: list[str] = []
     current = ""
     for sentence in sentences:
@@ -907,7 +910,7 @@ def _split_sentences(para: str, max_chars: int) -> list[str]:
         if not current:
             current = sentence
         elif len(current) + 1 + len(sentence) <= max_chars:
-            current += " " + sentence
+            current += _sent_sep + sentence
         else:
             chunks.append(current)
             current = sentence

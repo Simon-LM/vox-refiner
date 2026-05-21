@@ -390,6 +390,29 @@ class TestSplitSentences:
             # Allow overrun only for unsplittable single token
             assert len(chunk) <= 50 + 50
 
+    def test_newline_separator_preserved_for_bullet_lists(self):
+        # Bullet lists use \n• separators — rejoined chunks must remain verbatim
+        # substrings of the source so char_start/char_end can be computed.
+        bullets = (
+            "• Bullet one sentence here.\n"
+            "• Bullet two sentence here.\n"
+            "• Bullet three sentence here.\n"
+            "• Bullet four sentence here.\n"
+            "• Bullet five sentence here."
+        )
+        result = _tts_module._split_sentences(bullets, max_chars=120)
+        assert len(result) >= 1
+        for chunk in result:
+            assert chunk in bullets, f"chunk is not a verbatim substring: {chunk!r}"
+
+    def test_space_separator_preserved_for_normal_paragraphs(self):
+        # Normal paragraphs use space — chunks must also be substrings.
+        para = "First long sentence ends here. Second long sentence ends here. Third one too."
+        result = _tts_module._split_sentences(para, max_chars=40)
+        assert len(result) >= 2
+        for chunk in result:
+            assert chunk in para, f"chunk is not a verbatim substring: {chunk!r}"
+
 
 # ---------------------------------------------------------------------------
 # _make_chunks

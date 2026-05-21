@@ -519,8 +519,7 @@ export default function TtsDisplay() {
 		}
 		if (state.done && currentDisplayIndex >= state.displayChunks.length)
 			return "✓ Lecture terminée";
-		if (isPreInit) return "⏳ Préparation…";
-		if (!displayChunk) return currentText; // Fallback while meta is loading
+		if (isPreInit || !displayChunk) return "⏳ Préparation…";
 		switch (state.displayMode) {
 			case "keywords":
 				return (
@@ -562,8 +561,9 @@ export default function TtsDisplay() {
 		};
 	})();
 
+	const SHOW_TOPIC = false; // set to true to re-enable the topic bar
 	const showTopic =
-		!isPreInit && state.displayMode !== "fulltext" && !!displayChunk?.topic;
+		SHOW_TOPIC && !isPreInit && state.displayMode !== "fulltext" && !!displayChunk?.topic;
 
 	const onPickMode = (m: DisplayMode) =>
 		setState((prev) => ({ ...prev, displayMode: m }));

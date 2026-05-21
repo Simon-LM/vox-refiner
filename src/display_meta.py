@@ -8,7 +8,7 @@ metadata for the three frontend modes:
 
   fulltext  — chunk text is read verbatim from the source via the anchor
   summary   — `summary_short` (one short sentence)
-  keywords  — `keywords` (3–5 single words, very large font)
+  keywords  — `keywords` (exactly 3 single words, very large font)
 
 CLI:
   python -m src.display_meta     — reads cleaned text from stdin, writes JSON to stdout
@@ -84,7 +84,7 @@ _SYSTEM_TEMPLATE = textwrap.dedent("""
                        — used by the bash flow for string-search positioning. MUST
                        be a character-for-character substring of the input.
       topic         : up to 5 words — eye-readable label, prefer source words.
-      keywords      : 3–5 KEY CONCEPTS lifted FROM the source (not paraphrased).
+      keywords      : 3 KEY CONCEPTS lifted FROM the source (not paraphrased).
                        Each entry is normally a single word, EXCEPT for proper
                        names (people, organisations, places) which MUST be kept
                        whole — including titles, particles, and abbreviations.

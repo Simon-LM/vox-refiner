@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 400 400"
+   width="400"
+   height="400"
+   version="1.1"
+   id="svg98"
+   sodipodi:docname="VoxRefiner_Logo_only.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview100"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="1.18"
+     inkscape:cx="160.59322"
+     inkscape:cy="216.1017"
+     inkscape:window-width="1280"
+     inkscape:window-height="1410"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg98" />
+  <defs
+     id="defs45">
+    <linearGradient
+       id="greenGrad"
+       x1="0%"
+       y1="0%"
+       x2="100%"
+       y2="0%">
+      <stop
+         offset="0%"
+         style="stop-color:#00FF88;stop-opacity:1"
+         id="stop2" />
+      <stop
+         offset="100%"
+         style="stop-color:#00CC66;stop-opacity:1"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       id="morphGrad"
+       x1="0%"
+       y1="0%"
+       x2="100%"
+       y2="0%">
+      <stop
+         offset="0%"
+         style="stop-color:#00FF88;stop-opacity:1"
+         id="stop7" />
+      <stop
+         offset="50%"
+         style="stop-color:#00EE77;stop-opacity:1"
+         id="stop9" />
+      <stop
+         offset="100%"
+         style="stop-color:#00CC66;stop-opacity:1"
+         id="stop11" />
+    </linearGradient>
+    <filter
+       id="glow"
+       x="-0.055384615"
+       y="-0.049315068"
+       width="1.1107692"
+       height="1.0986301">
+      <feGaussianBlur
+         stdDeviation="3"
+         result="coloredBlur"
+         id="feGaussianBlur14" />
+      <feMerge
+         id="feMerge20">
+        <feMergeNode
+           in="coloredBlur"
+           id="feMergeNode16" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode18" />
+      </feMerge>
+    </filter>
+    <filter
+       id="subtleglow"
+       x="-0.04556962"
+       y="-0.041860465"
+       width="1.0911392"
+       height="1.0837209">
+      <feGaussianBlur
+         stdDeviation="1.5"
+         result="coloredBlur"
+         id="feGaussianBlur23" />
+      <feMerge
+         id="feMerge29">
+        <feMergeNode
+           in="coloredBlur"
+           id="feMergeNode25" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode27" />
+      </feMerge>
+    </filter>
+    <filter
+       id="textglow"
+       x="-0.0052679672"
+       y="-0.048387097"
+       width="1.0105359"
+       height="1.0967742">
+      <feGaussianBlur
+         stdDeviation="0.75"
+         result="blur"
+         id="feGaussianBlur32" />
+      <feComponentTransfer
+         in="blur"
+         result="softGlow"
+         id="feComponentTransfer36">
+        <feFuncA
+           type="linear"
+           slope="0.45"
+           id="feFuncA34" />
+      </feComponentTransfer>
+      <feMerge
+         id="feMerge42">
+        <feMergeNode
+           in="softGlow"
+           id="feMergeNode38" />
+        <feMergeNode
+           in="SourceGraphic"
+           id="feMergeNode40" />
+      </feMerge>
+    </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient213"
+       x1="80.903983"
+       y1="40.047472"
+       x2="110.56878"
+       y2="40.047472"
+       gradientTransform="scale(0.37080992,2.6967994)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient215"
+       x1="152.6267"
+       y1="27.714679"
+       x2="188.34784"
+       y2="27.714679"
+       gradientTransform="scale(0.30794088,3.2473766)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient217"
+       x1="136.44846"
+       y1="57.692114"
+       x2="159.90054"
+       y2="57.692114"
+       gradientTransform="scale(0.46904158,2.1320072)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient219"
+       x1="295.09721"
+       y1="20.586437"
+       x2="335.17214"
+       y2="20.586437"
+       gradientTransform="scale(0.27448582,3.6431754)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient221"
+       x1="280.318"
+       y1="36.009104"
+       x2="311.78227"
+       y2="36.009104"
+       gradientTransform="scale(0.34960295,2.8603878)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient223"
+       x1="395.3422"
+       y1="24.143641"
+       x2="433.15754"
+       y2="24.143641"
+       gradientTransform="scale(0.29088724,3.4377583)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient225"
+       x1="323.33265"
+       y1="46.948553"
+       x2="350.27703"
+       y2="46.948553"
+       gradientTransform="scale(0.40824829,2.4494897)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient227"
+       x1="471.17937"
+       y1="29.409182"
+       x2="505.96443"
+       y2="29.409182"
+       gradientTransform="scale(0.31622777,3.1622777)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient229"
+       x1="496.30489"
+       y1="33.85016"
+       x2="528.80105"
+       y2="33.85016"
+       gradientTransform="scale(0.3385016,2.9541958)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient231"
+       x1="479.83425"
+       y1="42.796028"
+       x2="508.36494"
+       y2="42.796028"
+       gradientTransform="scale(0.3855498,2.5936987)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient233"
+       x1="413.07979"
+       y1="61.126206"
+       x2="435.57423"
+       y2="61.126206"
+       gradientTransform="scale(0.48900965,2.0449494)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient235"
+       x1="336.69328"
+       y1="87.809891"
+       x2="353.60481"
+       y2="87.809891"
+       gradientTransform="scale(0.65044364,1.5374122)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient237"
+       x1="246.49396"
+       y1="135.95465"
+       x2="257.98309"
+       y2="135.95465"
+       gradientTransform="scale(0.95742711,1.0444659)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient239"
+       x1="80.855029"
+       y1="354.18947"
+       x2="115.95489"
+       y2="354.18947"
+       gradientTransform="scale(3.1908961,0.31339159)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient241"
+       x1="80.855029"
+       y1="433.96188"
+       x2="115.95489"
+       y2="433.96188"
+       gradientTransform="scale(3.1908961,0.31339159)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient243"
+       x1="80.855029"
+       y1="513.73428"
+       x2="115.95489"
+       y2="513.73428"
+       gradientTransform="scale(3.1908961,0.31339159)"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#morphGrad"
+       id="linearGradient245"
+       x1="102.27442"
+       y1="469.20823"
+       x2="130.02329"
+       y2="469.20823"
+       gradientTransform="scale(2.5226249,0.39641248)"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <!-- Background carré -->
+  <rect
+     width="400"
+     height="400"
+     rx="72"
+     fill="#080808"
+     id="rect47" />
+  <!-- Dot grid -->
+  <pattern
+     id="dots"
+     width="18"
+     height="18"
+     patternUnits="userSpaceOnUse">
+    <circle
+       cx="9"
+       cy="9"
+       r="0.7"
+       fill="#181818"
+       id="circle49" />
+  </pattern>
+  <rect
+     width="400"
+     height="400"
+     rx="72"
+     fill="url(#dots)"
+     id="rect52" />
+  <!-- ===================== -->
+  <!-- ICON: wave → text     -->
+  <!-- Centré sur y=148      -->
+  <!-- ===================== -->
+  <!-- === LEFT: onde sonore chaotique === -->
+  <g
+     filter="url(#glow)"
+     id="g70"
+     transform="translate(0,50)">
+    <rect
+       x="30"
+       y="108"
+       width="11"
+       height="80"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect54"
+       style="fill:url(#linearGradient213)" />
+    <rect
+       x="47"
+       y="90"
+       width="11"
+       height="116"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect56"
+       style="fill:url(#linearGradient215)" />
+    <rect
+       x="64"
+       y="123"
+       width="11"
+       height="50"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect58"
+       style="fill:url(#linearGradient217)" />
+    <rect
+       x="81"
+       y="75"
+       width="11"
+       height="146"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect60"
+       style="fill:url(#linearGradient219)" />
+    <rect
+       x="98"
+       y="103"
+       width="11"
+       height="90"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect62"
+       style="fill:url(#linearGradient221)" />
+    <rect
+       x="115"
+       y="83"
+       width="11"
+       height="130"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect64"
+       style="fill:url(#linearGradient223)" />
+    <rect
+       x="132"
+       y="115"
+       width="11"
+       height="66"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect66"
+       style="fill:url(#linearGradient225)" />
+    <rect
+       x="149"
+       y="93"
+       width="11"
+       height="110"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       id="rect68"
+       style="fill:url(#linearGradient227)" />
+  </g>
+  <!-- === TRANSITION === -->
+  <g
+     filter="url(#subtleglow)"
+     id="g82"
+     transform="translate(0,50)">
+    <rect
+       x="168"
+       y="100"
+       width="11"
+       height="96"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.95"
+       id="rect72"
+       style="fill:url(#linearGradient229)" />
+    <rect
+       x="185"
+       y="111"
+       width="11"
+       height="74"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.88"
+       id="rect74"
+       style="fill:url(#linearGradient231)" />
+    <rect
+       x="202"
+       y="125"
+       width="11"
+       height="46"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.8"
+       id="rect76"
+       style="fill:url(#linearGradient233)" />
+    <rect
+       x="219"
+       y="135"
+       width="11"
+       height="26"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.72"
+       id="rect78"
+       style="fill:url(#linearGradient235)" />
+    <rect
+       x="236"
+       y="142"
+       width="11"
+       height="12"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.65"
+       id="rect80"
+       style="fill:url(#linearGradient237)" />
+  </g>
+  <!-- === RIGHT: lignes de texte propres === -->
+  <g
+     filter="url(#subtleglow)"
+     id="g92"
+     transform="translate(0,50)">
+    <rect
+       x="258"
+       y="111"
+       width="112"
+       height="11"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.95"
+       id="rect84"
+       style="fill:url(#linearGradient239)" />
+    <rect
+       x="258"
+       y="136"
+       width="112"
+       height="11"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.85"
+       id="rect86"
+       style="fill:url(#linearGradient241)" />
+    <rect
+       x="258"
+       y="161"
+       width="112"
+       height="11"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.75"
+       id="rect88"
+       style="fill:url(#linearGradient243)" />
+    <rect
+       x="258"
+       y="186"
+       width="70"
+       height="11"
+       rx="5.5"
+       fill="url(#morphGrad)"
+       opacity="0.5"
+       id="rect90"
+       style="fill:url(#linearGradient245)" />
+  </g>
+  <!-- Séparateur pointillé discret -->
+  <line
+     x1="250"
+     y1="68"
+     x2="250"
+     y2="218"
+     stroke="#00FF88"
+     stroke-width="1"
+     opacity="0.10"
+     stroke-dasharray="4 5"
+     id="line94" />
+  <!-- ===================== -->
+  <!-- WORDMARK pleine largeur -->
+  <!-- ===================== -->
+</svg>

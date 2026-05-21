@@ -13,6 +13,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [5.0.2] — 2026-05-21
+
+### Fixed
+
+- **Auto-advance bug — display vignettes stuck on first chunk** — `_split_sentences` was joining sentences with a hardcoded space (`" "`), producing chunk texts like `"...conformisme. • Depuis les années 70..."` instead of `"...conformisme.\n• Depuis les années 70..."`. Because the bullet-list cleaned text uses `\n•` as separators, `text.find(chunk_text)` failed for all chunks → `char_start = char_end = 0` → `estimateCharPos` always returned `0` → the first display vignette was shown throughout playback. Fix: `_split_sentences` now detects the intra-paragraph separator (`"\n"` when the paragraph contains newlines, `" "` otherwise) and uses it when rejoining, keeping chunks as verbatim substrings of the source. 2 regression tests added.
+
+---
+
 ## [5.0.1] — 2026-05-21
 
 ### Added
