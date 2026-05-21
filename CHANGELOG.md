@@ -13,6 +13,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [5.0.1] — 2026-05-21
+
+### Added
+
+- **Frontend header — VoxRefiner logo** — inline SVG component `VoxRefinerLogo.tsx`; colors adapt to the UI theme via CSS custom properties (`--logo-bg`, `--logo-accent-start/mid/end`, `--logo-separator`).
+- **Frontend header — accessibility button placeholder** — icon button on the right side of the header; no action yet, reserved for the future accessibility menu.
+
+### Changed
+
+- **Logo assets moved to `frontend/public/`** — `Logo/` folder at repo root removed; all assets (`VoxRefiner_Logo.avif/svg/png`, `VoxRefiner_Logo_text.svg`, `LostInTab_Logo.avif`) consolidated into `frontend/public/` as single source of truth. `Readme.md` paths updated accordingly.
+
+---
+
 ## [5.0.0] — 2026-05-20
 
 ### Refactored

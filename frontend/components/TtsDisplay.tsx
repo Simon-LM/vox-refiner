@@ -2,7 +2,9 @@
 
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import VoxRefinerLogo from "./VoxRefinerLogo";
 import styles from "@/styles/TtsDisplay.module.scss";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -605,8 +607,21 @@ export default function TtsDisplay() {
 	return (
 		<div className={styles.app}>
 			<div className={styles.top}>
+				<VoxRefinerLogo className={styles.top__logo} />
 				<span className={styles.top__mode}>{state.mode ?? "…"}</span>
 				<span className={styles.top__display}>{state.displayMode}</span>
+				<button
+					type="button"
+					className={styles.top__a11y}
+					aria-label="Accessibility settings">
+					<Image
+						src="/Icon_Accessibility_Contrasts-Visuals.avif"
+						alt=""
+						width={32}
+						height={32}
+						className={styles.top__a11y_icon}
+					/>
+				</button>
 			</div>
 
 			{showTopic && (

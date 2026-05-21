@@ -19,8 +19,20 @@
 	gap: 1rem;
 	align-items: center;
 	flex-wrap: wrap;
-	padding: 1rem 1.25rem;
+	padding: 0rem 0.5rem;
 	border-bottom: 1px solid $border;
+
+	&__logo {
+		height: 3rem;
+		width: auto;
+		flex-shrink: 0;
+		--logo-bg: transparent;
+		--logo-dot: transparent;
+		--logo-accent-start: #{$accent};
+		--logo-accent-mid: #{$dim};
+		--logo-accent-end: #{$accent};
+		--logo-separator: #{$border};
+	}
 
 	&__mode {
 		background: $accent;
@@ -31,6 +43,27 @@
 		text-transform: uppercase;
 		font-size: 0.6875rem;
 		letter-spacing: 0.045em;
+	}
+
+	&__a11y {
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+
+		&:active img {
+			transform: scale(0.88);
+		}
+	}
+
+	&__a11y_icon {
+		height: 2rem;
+		width: auto;
+		transition: transform 100ms ease;
 	}
 
 	&__display {

@@ -5,7 +5,7 @@
 <!-- markdownlint-disable-next-line MD033 -->
 <p align="center">
   <!-- markdownlint-disable-next-line MD033 -->
-  <img src="Logo/VoxRefiner_Logo.avif"g alt="VoxRefiner logo" width="360" />
+  <img src="frontend/public/VoxRefiner_Logo.avif" alt="VoxRefiner logo" width="360" />
 </p>
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
@@ -590,7 +590,7 @@ No matter how the tool evolves, the core principle will remain the same:
 Built by **[Simon LM](https://simon-lm.dev)** · [GitHub](https://github.com/Simon-LM)
 
 <p align="center">
-  <a href="https://simon-lm.dev"><img src="Logo/LostInTab_Logo.avif" alt="LostInTab" height="320" /></a>
+  <a href="https://simon-lm.dev"><img src="frontend/public/LostInTab_Logo.avif" alt="LostInTab" height="320" /></a>
 </p>
 
 ---
