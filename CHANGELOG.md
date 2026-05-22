@@ -13,6 +13,26 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [5.1.0] — 2026-05-22
+
+### Changed
+
+- **Default display mode — "quote" (Citations)** — the frontend, `web_display.py`, and `web_display.sh` now default to `quote` instead of `summary`. The Citations button is shown first in `TtsDisplay`; Résumé moves to last position.
+
+### Improved
+
+- **`display_meta` prompt — tighter display text** — `summary_short` capped at 8–12 words (was open-ended); `quote_short` capped at 6–12 words and explicitly allowed to be an impactful fragment rather than a complete sentence.
+- **`display_meta` — keyword deduplication** — keywords that already appeared in the immediately preceding vignette are filtered out; at least one keyword is always kept.
+- **`display_meta` — bullet-list vignette count** — paragraph-count heuristic ensures `target_min ≥ paragraph_count − 1` when average paragraph length is below 150 chars, preventing the model from under-splitting insight bullet summaries.
+- **`insight` — consistent bullet separators** — `summarize()` now normalises single `\n` before `•` to `\n\n`, making paragraph detection in `display_meta` reliable regardless of the model's newline style.
+- **`insight` — source line placed first** — prompt now explicitly instructs the model to output the publication line (date, media) before the bullets, so listeners hear it at the start of the reading.
+
+### Fixed
+
+- **`web_display.py` — stale `choices` restriction removed** — `--display-mode` argparse argument no longer lists a hard-coded `choices` set that excluded `quote`, `keywords_quote`, and `summary_keywords`, which caused a crash when launching with the new default mode.
+
+---
+
 ## [5.0.2] — 2026-05-21
 
 ### Fixed

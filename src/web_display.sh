@@ -45,7 +45,7 @@ _web_start() {
     [ -n "${_WEB_PORT:-}" ] && return 0  # already started
 
     local mode="${1:-voice}"
-    local display_mode="${VOX_WEB_DISPLAY_MODE:-summary}"
+    local display_mode="${VOX_WEB_DISPLAY_MODE:-quote}"
     local size="${VOX_WEB_SIZE:-1100x800}"
     local pos="${VOX_WEB_POS:-100x100}"
 

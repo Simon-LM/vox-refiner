@@ -444,8 +444,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="VoxRefiner web display server")
     parser.add_argument("--mode", choices=["voice", "insight"], default="voice")
     parser.add_argument("--display-mode",
-                        choices=["fulltext", "summary", "keywords"],
-                        default=os.environ.get("VOX_WEB_DISPLAY_MODE", "summary"))
+                        default=os.environ.get("VOX_WEB_DISPLAY_MODE", "quote"))
     parser.add_argument("--size", default=os.environ.get("VOX_WEB_SIZE", "1100x800"))
     parser.add_argument("--pos",  default=os.environ.get("VOX_WEB_POS",  "100x100"))
     parser.add_argument("--port-file", default=None)
