@@ -91,14 +91,13 @@ _SYSTEM_TEMPLATE = textwrap.dedent("""
                        Examples of valid multi-word keywords: "Sadio Camara",
                        "Abdelkarim B.", "Africa Corps", "FLA". Never split a
                        proper name across two entries.
-      summary_short : ONE short sentence, ≤ 15 words, that REUSES the chunk's own
+      summary_short : ONE short sentence, 8–12 words, that REUSES the chunk's own
                        vocabulary as much as possible. Think "tightened sentence",
-                       not "rephrased summary". When the source contains a clause
-                       that already says it concisely, quote that clause.
-      quote_short   : a VERBATIM contiguous substring of the chunk, 8–15 words long,
-                       carrying the chunk's main idea. Pick a complete clause if
-                       possible. Like the anchor, MUST be character-for-character
-                       present in the input.
+                       not "rephrased summary".
+      quote_short   : a VERBATIM contiguous substring of the chunk, 6–12 words long,
+                       carrying the chunk's strongest idea. Favour a sharp, impactful
+                       fragment — completeness is not required. Like the anchor, MUST
+                       be character-for-character present in the input.
 
     OUTPUT RULES:
     - Reply with ONLY valid JSON. No prose, no markdown code fences.
@@ -143,6 +142,19 @@ def generate(cleaned_text: str) -> dict:
     n = len(cleaned_text)
     target_min = max(4, n // 150)
     target_max = max(target_min + 2, n // 80)
+
+    # For short-paragraph content (bullet summaries, insight output): ensure at
+    # least one display chunk per paragraph. Triggered when the average paragraph
+    # length is below 150 chars — a reliable signal for list-style content that
+    # does not depend on bullet characters being present in the text.
+    paragraphs = [p for p in cleaned_text.split("\n\n") if p.strip()]
+    paragraph_count = len(paragraphs)
+    if paragraph_count > 1:
+        avg_para_len = n / paragraph_count
+        if avg_para_len < 150:
+            target_min = max(target_min, paragraph_count - 1)
+            target_max = max(target_min + 2, target_max)
+
     dynamic_max_tokens = max(_MAX_TOKENS, target_max * 150)
 
     # Open the debug section eagerly so any failure leaves a trace.
@@ -240,6 +252,16 @@ def generate(cleaned_text: str) -> dict:
             "stripped_text": raw[:400],
         })
         raise
+
+    # Remove keywords that already appeared in the immediately preceding chunk.
+    # Keeps at minimum 1 keyword (the first of the original list) so the
+    # keywords display mode always has something to show.
+    chunks = parsed.get("display_chunks", [])
+    for i in range(1, len(chunks)):
+        prev_kw = {kw.lower() for kw in chunks[i - 1].get("keywords", [])}
+        original = chunks[i].get("keywords", [])
+        filtered = [kw for kw in original if kw.lower() not in prev_kw]
+        chunks[i]["keywords"] = filtered if filtered else original[:1]
 
     _dbg.merge_into("display_meta", {
         "status": "ok",

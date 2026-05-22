@@ -26,6 +26,7 @@ Environment variables (loaded from .env):
 """
 
 import os
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -78,6 +79,7 @@ _SUMMARY_SYSTEM = with_lang(textwrap.dedent("""
     Only output a source line if the actual publication date or media name is
     explicitly present in the text. Do NOT invent, approximate, or use placeholder
     values — if any piece of information is missing, omit the entire source line.
+    Always place the source line FIRST (before the bullets), or omit it entirely.
       "[Media], publié le [actual date] à [actual time]."
       With update time: "[Media], publié le [actual date] à [actual time], mis à jour à [actual update time]."
       No media name: "Publié le [actual date] à [actual time]."
@@ -139,8 +141,12 @@ def summarize(text: str, content_type: str = "generic") -> str:
         raise RuntimeError(f"Summarize failed: {exc}") from exc
 
     log_call_result(result, label="Summary")
-    success(f"Summary ready ({len(result.text)} chars).")
-    return result.text
+    # Normalize bullet separators to blank lines so downstream consumers
+    # (display_meta paragraph detection, TTS chunking) see a consistent
+    # paragraph structure regardless of the model's single/double newline choice.
+    normalized = re.sub(r'\n(?=•)', '\n\n', result.text)
+    success(f"Summary ready ({len(normalized)} chars).")
+    return normalized
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────────

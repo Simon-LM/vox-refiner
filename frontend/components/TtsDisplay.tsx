@@ -40,11 +40,11 @@ type DisplayMode =
 	| "fulltext";
 
 const ALL_MODES: DisplayMode[] = [
-	"summary",
-	"summary_keywords",
-	"keywords",
-	"keywords_quote",
 	"quote",
+	"keywords_quote",
+	"keywords",
+	"summary_keywords",
+	"summary",
 	"fulltext",
 ];
 const MODE_LABEL: Record<DisplayMode, string> = {
@@ -58,11 +58,11 @@ const MODE_LABEL: Record<DisplayMode, string> = {
 
 /** Modes principaux affichés dans la rangée (sans "Texte exact") */
 const PRIMARY_MODES: DisplayMode[] = [
-	"summary",
-	"summary_keywords",
-	"keywords",
-	"keywords_quote",
 	"quote",
+	"keywords_quote",
+	"keywords",
+	"summary_keywords",
+	"summary",
 ];
 
 interface TtsState {
@@ -83,10 +83,10 @@ interface TtsState {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function readDisplayMode(): DisplayMode {
-	if (typeof window === "undefined") return "summary";
+	if (typeof window === "undefined") return "quote";
 	const p = new URLSearchParams(window.location.search).get("displayMode");
 	if (p && (ALL_MODES as string[]).includes(p)) return p as DisplayMode;
-	return "summary";
+	return "quote";
 }
 
 function findDisplayChunk(
@@ -218,7 +218,7 @@ const mockDisplayChunks: DisplayChunk[] = (() => {
 
 const initialState: TtsState = {
 	mode: null,
-	displayMode: "summary",
+	displayMode: "quote",
 	total: 0,
 	chunks: {},
 	fullChunks: [],
