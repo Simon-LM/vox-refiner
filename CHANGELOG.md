@@ -11,6 +11,33 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **`src/reminder/conversation.py` — smarter scheduling and source handling.**
+  - AI now searches for business/professional hours **before** asking any scheduling question. For tasks that involve contacting or visiting a real entity (doctor, dentist, office), a web search fires first; then the AI presents what it found together with the scheduling question in a single combined message.
+  - Query suffix changed to `" fiche établissement Google"` (was `" Google Maps"`) to steer Perplexity toward Google Business Profile data.
+  - `_SEARCH_SOURCE_PRIORITY` annotation injected immediately before each search result: when both Google Business Profile data and third-party booking directories (mondocteur.fr, doctolib.fr, etc.) are present, the Google source is authoritative. The AI always presents the hours it found and indicates the source, then proceeds to schedule.
+  - General capability constraint added to the system prompt preamble: the AI is a text-only assistant — it can ask questions and trigger web searches, but cannot perform any real-world action (phone calls, bookings, emails, etc.) and must never offer to do so. Prevents the AI from proposing to call a business.
+  - Pomodoro section updated: screen-free tasks now trigger a web search for business hours first, then ask ONE combined question presenting the found schedule alongside the Pomodoro/specific-time choice.
+  - Step 4 post-search rule updated from "ask user to verify before scheduling" to "present hours and source, then proceed to help the user schedule."
+
+- **`reminder.sh` — readline on all interactive prompts.**
+  All 20 `read -r` prompts in interactive input positions replaced with `read -e -r`, enabling arrow-key navigation, Backspace, Ctrl+A/E in the terminal. The one `read -r` inside a pipe (`while IFS= read -r _chunk; do`) is intentionally unchanged.
+
+### Fixed
+
+- **`src/reminder/pomodoro_overlay.py` — skip button during break shows confirmation.**
+  Clicking "Skip" on the overlay while in the **break phase** with an associated task now calls `_switch_to_confirm()` instead of dismissing silently. The user is asked whether the task was done, going to do, or not done — identical to the normal end-of-break flow. Clicking Skip during the work phase (no task context) still dismisses immediately.
+
+- **`reminder.sh` — `[c+ID]` reminder view no longer loops back immediately.**
+  After displaying a reminder detail, the list was immediately clearing and looping back without giving the user time to read. Fixed by adding an explicit `[m] Retour à la liste` labeled pause before `continue`.
+
+- **`reminder.sh` — `time_constraint` display handles split schedules.**
+  The reminder summary previously only rendered `time_constraint` when stored as a single dict. When the AI stores a split schedule as a list (e.g. `[{"earliest_hour": 8, "latest_hour": 12}, {"earliest_hour": 14, "latest_hour": 18}]`), all windows are now displayed: `Créneau : 8h–12h, 14h–18h`.
+
+- **`reminder.sh` — `callable_hours` displayed as formatted schedule instead of raw JSON.**
+  Business hours stored as `[{"day": ..., "start": ..., "end": ...}]` are now rendered as a human-readable day-grouped schedule (`Lun : 9h–13h, 14h–19h`, etc.). Raw string fallback retained when the value is not a structured list.
+
 ### Added
 
 - **Pomodoro — task-driven break system** — `src/reminder/pomodoro_config.py`, `src/reminder/pomodoro.py`, `src/reminder/pomodoro_overlay.py`.

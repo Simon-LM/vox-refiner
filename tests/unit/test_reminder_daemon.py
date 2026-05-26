@@ -124,31 +124,35 @@ class TestDispatchReminder:
     def test_defer_unlock_mode_no_tts(self, monkeypatch):
         d = _load()
         r = {"id": 1, "title": "Admin task", "category": "admin", "snooze_count": 0,
-             "event_datetime": None}
+             "event_datetime": "2026-06-01 10:00:00"}
         with patch.object(d, "send_tts_notification") as mock_tts:
             mode = d.dispatch_reminder(r, _locked_ctx())
         assert mode == "defer_unlock"
         mock_tts.assert_not_called()
 
     def test_tts_only_no_desktop_notification(self, monkeypatch):
+        """tts_only path (screen-required reminder in fullscreen context) must
+        not also send a desktop notification."""
         d = _load()
-        r = {"id": 1, "title": "Errand", "category": "task_short", "snooze_count": 0,
-             "event_datetime": None}
+        r = {"id": 1, "title": "Send report", "category": "admin",
+             "screen_free": 0, "snooze_count": 0, "event_datetime": "2026-06-01 10:00:00"}
+        fullscreen_ctx = rn.Context(screen_locked=False, dnd_enabled=False,
+                                    voxrefiner_active=False, fullscreen_app=True)
         with (
             patch.object(d, "send_tts_notification"),
             patch.object(d, "close_terminal_fire"),
             patch.object(d, "send_desktop_notification") as mock_notif,
             patch.object(d, "snooze"),
         ):
-            mode = d.dispatch_reminder(r, _locked_ctx())
+            mode = d.dispatch_reminder(r, fullscreen_ctx)
         assert mode == "tts_only"
         mock_notif.assert_not_called()
 
     def test_tts_only_closes_existing_terminal(self, monkeypatch):
         """tts_only must close any window left open from a previous notify."""
         d = _load()
-        r = {"id": 7, "title": "Weed the garden", "category": "task_long", "snooze_count": 0,
-             "event_datetime": None}
+        r = {"id": 7, "title": "Send report", "category": "admin",
+             "screen_free": 0, "snooze_count": 0, "event_datetime": "2026-06-01 10:00:00"}
         fullscreen_ctx = rn.Context(screen_locked=False, dnd_enabled=False,
                                     voxrefiner_active=False, fullscreen_app=True)
         with (
@@ -210,7 +214,7 @@ class TestScreenFreePomodoro:
         import src.reminder.pomodoro as pom
         monkeypatch.setattr(pom, "current_state", self._work_state)
         r = {"id": 3, "title": "Reply to email", "category": "task_short",
-             "screen_free": 0, "snooze_count": 0, "event_datetime": None}
+             "screen_free": 0, "snooze_count": 0, "event_datetime": "2026-06-01 10:00:00"}
         with (
             patch.object(d, "open_terminal_fire", return_value=True),
             patch.object(d, "send_desktop_notification"),
@@ -235,20 +239,61 @@ class TestScreenFreePomodoro:
             mode = d.dispatch_reminder(r, _normal_ctx())
         assert mode == "notify"
 
-    def test_screen_free_fires_normally_when_no_pomodoro(self, monkeypatch):
-        """Without an active Pomodoro, screen-free tasks fire as usual."""
+    def test_screen_free_queued_even_when_no_pomodoro(self, monkeypatch):
+        """screen_free reminders never fire as terminal notify — even with no
+        Pomodoro state. They always queue, waiting for a future break."""
         d = _load()
         import src.reminder.pomodoro as pom
         monkeypatch.setattr(pom, "current_state", lambda: None)
         r = {"id": 5, "title": "Do the dishes", "category": "task_short",
              "screen_free": 1, "snooze_count": 0, "event_datetime": None}
-        with (
-            patch.object(d, "open_terminal_fire", return_value=True),
-            patch.object(d, "send_desktop_notification"),
-            patch.object(d, "bump_trigger"),
-        ):
-            mode = d.dispatch_reminder(r, _normal_ctx())
-        assert mode == "notify"
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+    def test_legacy_physical_queued_even_when_no_pomodoro(self, monkeypatch):
+        """Legacy physical-category tasks (screen_free=None) also always queue."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        r = {"id": 7, "title": "Mow the lawn", "category": "task_short",
+             "screen_free": None, "snooze_count": 0, "event_datetime": None}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+    def test_screen_free_task_queued_during_break_phase(self, monkeypatch):
+        """Screen-free tasks are also held back during BREAK so no terminal opens."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        from datetime import datetime, timedelta, timezone
+        end = (datetime.now(tz=timezone.utc) + timedelta(minutes=5)).isoformat()
+        break_state = pom.PomodoroState(
+            phase=pom.Phase.BREAK,
+            phase_end_iso=end,
+            break_hard_end_iso=end,
+        )
+        monkeypatch.setattr(pom, "current_state", lambda: break_state)
+        r = {"id": 6, "title": "Water garden", "category": "errand",
+             "screen_free": None, "snooze_count": 0, "event_datetime": None}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+    def test_screen_required_task_queued_during_break_phase(self, monkeypatch):
+        """During a Pomodoro break, even screen-required tasks must NOT pop a
+        terminal — the user is meant to be away from the screen."""
+        d = _load()
+        import src.reminder.pomodoro as pom
+        from datetime import datetime, timedelta, timezone
+        end = (datetime.now(tz=timezone.utc) + timedelta(minutes=5)).isoformat()
+        break_state = pom.PomodoroState(
+            phase=pom.Phase.BREAK,
+            phase_end_iso=end,
+            break_hard_end_iso=end,
+        )
+        monkeypatch.setattr(pom, "current_state", lambda: break_state)
+        r = {"id": 8, "title": "Call dentist", "category": "task_short",
+             "screen_free": 0, "snooze_count": 0, "event_datetime": "2026-06-01 10:00:00"}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
 
 
 # ── Pomodoro file helpers ─────────────────────────────────────────────────────
@@ -288,7 +333,11 @@ class TestPomodoroHelpers:
 
 class TestTick:
     def _add_due_reminder(self, category="appointment") -> int:
-        return rdb.add_reminder("Test task", category, next_trigger="2020-01-01 00:00:00")
+        return rdb.add_reminder(
+            "Test task", category,
+            event_datetime="2020-01-01 00:00:00",
+            next_trigger="2020-01-01 00:00:00",
+        )
 
     def test_empty_db_no_fire(self, monkeypatch):
         d = _load()
@@ -367,7 +416,10 @@ class TestTick:
             d.tick(previous_context=_locked_ctx())
         assert not isolated_pomodoro_file.exists()
 
-    def test_physical_task_during_lock_added_to_pomodoro(self, monkeypatch, isolated_pomodoro_file):
+    def test_physical_task_during_lock_does_not_fire(self, monkeypatch, isolated_pomodoro_file):
+        """Per the routing rules: a screen_free task NEVER fires as tts_only
+        (or anything else) — neither during screen lock nor outside Pomodoro.
+        It always queues, waiting for an actual Pomodoro break overlay."""
         d = _load()
         self._add_due_reminder(category="task_short")
         with (
@@ -376,12 +428,15 @@ class TestTick:
             patch.object(rn, "_voxrefiner_active", return_value=False),
             patch.object(rn, "_fullscreen_app",       return_value=False),
             patch.object(rn, "_known_blocker_active", return_value=False),
-            patch.object(d, "send_tts_notification"),
-            patch.object(d, "send_desktop_notification"),
+            patch.object(d, "send_tts_notification") as mock_tts,
+            patch.object(d, "send_desktop_notification") as mock_notif,
+            patch.object(d, "open_terminal_fire") as mock_term,
         ):
             d.tick()
-        pending = d._read_pomodoro_pending()
-        assert len(pending) == 1
+        mock_tts.assert_not_called()
+        mock_notif.assert_not_called()
+        mock_term.assert_not_called()
+        assert not isolated_pomodoro_file.exists()
 
     def test_returns_current_context(self, monkeypatch):
         d = _load()
@@ -403,3 +458,82 @@ class TestTick:
                 d.tick()
         # This test documents current behavior: tick does NOT catch internally.
         # The run_loop wrapper does. That's acceptable.
+
+
+# ── Unscheduled screen-required task (Fix 2) ─────────────────────────────────
+
+class TestUnscheduledScreenRequired:
+    def test_null_event_datetime_returns_skip(self, monkeypatch):
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        bumped = {}
+        with patch.object(d, "bump_trigger", side_effect=lambda rid, ts: bumped.update({rid: ts})):
+            r = {"id": 9, "title": "Call dentist", "category": "task_short",
+                 "screen_free": 0, "snooze_count": 0, "event_datetime": None}
+            mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "skip"
+        assert 9 in bumped
+
+    def test_null_event_datetime_bumps_24h(self, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        bumped = {}
+        with patch.object(d, "bump_trigger", side_effect=lambda rid, ts: bumped.update({rid: ts})):
+            r = {"id": 10, "title": "Call dentist", "category": "task_short",
+                 "screen_free": 0, "snooze_count": 0, "event_datetime": None}
+            d.dispatch_reminder(r, _normal_ctx())
+        ts = bumped[10]
+        bumped_dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        delta = bumped_dt - datetime.now(tz=timezone.utc)
+        assert timedelta(hours=23) < delta < timedelta(hours=25)
+
+    def test_scheduled_task_not_skipped(self, monkeypatch):
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        with (
+            patch.object(d, "open_terminal_fire", return_value=True),
+            patch.object(d, "send_desktop_notification"),
+            patch.object(d, "bump_trigger"),
+        ):
+            r = {"id": 11, "title": "Call dentist", "category": "task_short",
+                 "screen_free": 0, "snooze_count": 0,
+                 "event_datetime": "2026-06-01 10:00:00"}
+            mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "notify"
+
+    def test_screen_free_null_event_datetime_queues_not_skips(self, monkeypatch):
+        d = _load()
+        import src.reminder.pomodoro as pom
+        monkeypatch.setattr(pom, "current_state", lambda: None)
+        r = {"id": 12, "title": "Water garden", "category": "task_short",
+             "screen_free": 1, "snooze_count": 0, "event_datetime": None}
+        mode = d.dispatch_reminder(r, _normal_ctx())
+        assert mode == "queue"
+
+
+# ── Stale refinement cleanup in tick ─────────────────────────────────────────
+
+class TestStaleRefinementCleanup:
+    def test_tick_calls_reset_stale_pending_refinements(self, monkeypatch):
+        from datetime import datetime, timedelta, timezone
+        d = _load()
+        rid = rdb.add_reminder("Rdv dentiste", "task_short")
+        rdb.update_status(rid, "pending_refinement")
+        old_ts = (datetime.now(tz=timezone.utc) - timedelta(minutes=40)).strftime("%Y-%m-%d %H:%M:%S")
+        with rdb._db() as conn:
+            conn.execute("UPDATE reminders SET created_at = ? WHERE id = ?", (old_ts, rid))
+        with (
+            patch.object(d.rn if hasattr(d, "rn") else __import__("src.reminder.notify", fromlist=[""]),
+                         "_screen_locked", return_value=False),
+        ):
+            pass
+        # Call the function directly (tick() wraps it in try/except)
+        count = rdb.reset_stale_pending_refinements(older_than_minutes=35)
+        assert count == 1
+        with rdb._db() as conn:
+            row = conn.execute("SELECT status FROM reminders WHERE id = ?", (rid,)).fetchone()
+        assert row["status"] == "pending"

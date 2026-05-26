@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -32,8 +32,10 @@ from src.reminder.pomodoro_config import PomodoroConfig, load as load_config
 
 _STATE_FILE = Path("/tmp/vox-pomodoro-state.json")
 _PID_FILE = Path("/tmp/vox-pomodoro.pid")
+_FIRE_RESULT_FILE = Path("/tmp/vox-pomodoro-fire-result.json")
+_OVERLAY_PID_FILE = Path("/tmp/vox-pomodoro-overlay.pid")
 
-_PHYSICAL_CATEGORIES = {"task_short", "task_long", "errand"}
+_WARNING_BEFORE_SECONDS = 90  # show pre-break warning within this many seconds of break
 
 
 class Phase(str, Enum):
@@ -49,12 +51,14 @@ class PomodoroState:
         break_hard_end_iso: str | None = None,
         task_id: int | None = None,
         task_title: str | None = None,
+        warned: bool = False,
     ) -> None:
         self.phase = phase
         self.phase_end_iso = phase_end_iso
         self.break_hard_end_iso = break_hard_end_iso
         self.task_id = task_id
         self.task_title = task_title
+        self.warned = warned
 
     def to_dict(self) -> dict:
         return {
@@ -63,6 +67,7 @@ class PomodoroState:
             "break_hard_end_iso": self.break_hard_end_iso,
             "task_id": self.task_id,
             "task_title": self.task_title,
+            "warned": self.warned,
         }
 
     @classmethod
@@ -73,6 +78,7 @@ class PomodoroState:
             break_hard_end_iso=data.get("break_hard_end_iso"),
             task_id=data.get("task_id"),
             task_title=data.get("task_title"),
+            warned=data.get("warned", False),
         )
 
 
@@ -108,28 +114,28 @@ def _clear_state() -> None:
 
 
 def _pick_physical_task() -> tuple[int, str, int] | None:
-    """Return (id, title, estimated_minutes) of the most urgent due screen-free task, or None.
+    """Return (id, title, estimated_minutes) of the best screen-free task, or None.
 
-    Prefers tasks explicitly marked screen_free=True. Falls back to physical
-    categories when screen_free is NULL (legacy tasks without the field).
+    Delegates filtering + ranking to `src.reminder.picker`, with the current
+    scheduling context (weather, time of day, …). A rainy day pushes outdoor
+    tasks out of the candidate set; a phone-only task outside its callable
+    window is skipped, and so on.
     """
     try:
+        from src.reminder.context import gather
         from src.reminder.db import get_due
+        from src.reminder.picker import filter_screen_free, pick_best_task
         now = _now_iso()[:19].replace("T", " ")
-        due = get_due(now)
-        # First pass: explicit screen_free=True
-        for r in due:
-            if r.get("screen_free") == 1:
-                est = r.get("estimated_minutes") or 0
-                return r["id"], r["title"], est
-        # Second pass: legacy tasks in physical categories with no screen_free set
-        for r in due:
-            if r.get("screen_free") is None and r.get("category") in _PHYSICAL_CATEGORIES:
-                est = r.get("estimated_minutes") or 0
-                return r["id"], r["title"], est
+        candidates = filter_screen_free(get_due(now))
+        if not candidates:
+            return None
+        best = pick_best_task(candidates, gather())
+        if best is None:
+            return None
+        est = best.get("estimated_minutes") or 0
+        return best["id"], best["title"], est
     except Exception:
-        pass
-    return None
+        return None
 
 
 def _clamp_break(estimated: int, cfg: PomodoroConfig) -> int:
@@ -138,44 +144,109 @@ def _clamp_break(estimated: int, cfg: PomodoroConfig) -> int:
     return max(cfg.break_min, min(cfg.break_max, estimated))
 
 
-def _open_overlay(task_title: str, duration_minutes: int, locked: bool) -> None:
-    """Launch the GTK overlay in background (non-blocking).
-
-    Uses the system python3 interpreter so that python3-gi (a system package)
-    is available even when the daemon runs inside a venv that lacks it.
-    """
+def _open_warning(seconds: int) -> None:
+    """Launch the small pre-break warning window (non-blocking, no focus steal)."""
     from pathlib import Path
     script = Path(__file__).parent / "pomodoro_overlay.py"
     subprocess.Popen(
-        ["python3", str(script),
-         "--title", task_title,
-         "--minutes", str(duration_minutes),
-         "--locked" if locked else "--no-locked"],
+        ["python3", str(script), "--warning",
+         "--minutes", str(round(seconds / 60, 3))],
         start_new_session=True,
     )
 
 
+def _open_overlay(task_title: str, duration_minutes: int, locked: bool,
+                   task_id: int | None = None) -> None:
+    """Launch the GTK overlay in background (non-blocking).
+
+    Uses the system python3 interpreter so that python3-gi (a system package)
+    is available even when the daemon runs inside a venv that lacks it.
+    When task_id is provided, the overlay shows a confirmation screen after the
+    timer ends instead of auto-dismissing, and writes the user's choice to
+    _FIRE_RESULT_FILE for the daemon to act on.
+    """
+    from pathlib import Path
+    script = Path(__file__).parent / "pomodoro_overlay.py"
+    cmd = [
+        "python3", str(script),
+        "--title", task_title,
+        "--minutes", str(duration_minutes),
+        "--locked" if locked else "--no-locked",
+    ]
+    if task_id is not None:
+        cmd += ["--task-id", str(task_id)]
+    subprocess.Popen(cmd, start_new_session=True)
+
+
 def _close_overlay() -> None:
     """Signal the overlay to close if running."""
-    overlay_pid_file = Path("/tmp/vox-pomodoro-overlay.pid")
-    if not overlay_pid_file.exists():
+    if not _OVERLAY_PID_FILE.exists():
         return
     try:
         import signal as _signal
         import os
-        pid = int(overlay_pid_file.read_text().strip())
+        pid = int(_OVERLAY_PID_FILE.read_text().strip())
         os.kill(pid, _signal.SIGTERM)
     except (ValueError, OSError):
         pass
     finally:
-        overlay_pid_file.unlink(missing_ok=True)
+        _OVERLAY_PID_FILE.unlink(missing_ok=True)
 
 
-def _fire_reminder(task_id: int) -> None:
-    """Open reminder.sh --fire <id> in a terminal (reuses existing mechanism)."""
+def _overlay_still_running() -> bool:
+    """Return True if the confirmation overlay subprocess is still alive.
+
+    Used to suspend the BREAK→WORK transition while the user is away — if the
+    overlay is still up, they haven't clicked any button yet, so launching a
+    new cycle would just stack another overlay on top.
+    """
+    if not _OVERLAY_PID_FILE.exists():
+        return False
     try:
-        from src.reminder.notify import open_terminal_fire
-        open_terminal_fire(task_id)
+        import os
+        pid = int(_OVERLAY_PID_FILE.read_text().strip())
+        os.kill(pid, 0)  # signal 0 → "does this process exist?"
+        return True
+    except (ValueError, OSError):
+        _OVERLAY_PID_FILE.unlink(missing_ok=True)
+        return False
+
+
+def _check_fire_result() -> None:
+    """Apply the confirmation choice written by the overlay to the reminder DB."""
+    if not _FIRE_RESULT_FILE.exists():
+        return
+    try:
+        data = json.loads(_FIRE_RESULT_FILE.read_text(encoding="utf-8"))
+        task_id = data.get("task_id")
+        action = data.get("action", "skip")
+        if task_id is not None:
+            _apply_fire_action(task_id, action)
+    except (json.JSONDecodeError, OSError, KeyError):
+        pass
+    finally:
+        _FIRE_RESULT_FILE.unlink(missing_ok=True)
+
+
+def _apply_fire_action(task_id: int, action: str) -> None:
+    """Update the DB based on the user's in-overlay choice.
+
+    'done'   → complete_reminder: logs occurrence, advances recurring task or
+               marks one-time task as done.
+    'skip'   → log_occurrence('skipped'): records the miss, task stays in queue
+               for the next break.
+    'snooze' → snooze by 1 h: no occurrence log, just a delay.
+    """
+    try:
+        from src.reminder.db import complete_reminder, log_occurrence, snooze
+        now = datetime.now(tz=timezone.utc)
+        if action == "done":
+            complete_reminder(task_id)
+        elif action == "skip":
+            log_occurrence(task_id, "skipped")
+        elif action == "snooze":
+            next_t = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            snooze(task_id, next_t)
     except Exception:
         pass
 
@@ -246,6 +317,8 @@ def current_state() -> PomodoroState | None:
 
 def tick() -> PomodoroState | None:
     """Advance the Pomodoro by one daemon tick. Returns current state or None if idle."""
+    _check_fire_result()
+
     cfg = load_config()
     if not cfg.enabled:
         return None
@@ -256,6 +329,22 @@ def tick() -> PomodoroState | None:
 
     now_dt = _iso_to_dt(_now_iso())
     phase_end_dt = _iso_to_dt(state.phase_end_iso)
+
+    # Stale WORK state: if a WORK phase ended more than one full cycle ago
+    # the daemon was likely suspended (laptop closed, system hibernated, …)
+    # while WORK was active. Clear instead of triggering a phantom BREAK on
+    # resume.
+    #
+    # No stale check on BREAK: a BREAK can legitimately stay in an "expired"
+    # state for hours while the user is away — the confirmation overlay is
+    # designed to wait indefinitely. When the user finally clicks, the normal
+    # BREAK handler below sees the overlay is gone and transitions to a new
+    # WORK cycle. Clearing here would silently end the Pomodoro session, which
+    # is exactly the bug we hit before.
+    stale_delta = timedelta(minutes=cfg.work_minutes + cfg.break_max)
+    if state.phase == Phase.WORK and now_dt - phase_end_dt > stale_delta:
+        _clear_state()
+        return None
 
     # Idle reset: if user was away long enough, restart work cycle silently
     if cfg.idle_reset_minutes > 0:
@@ -271,6 +360,14 @@ def tick() -> PomodoroState | None:
             return state
 
     if state.phase == Phase.WORK:
+        remaining_seconds = (phase_end_dt - now_dt).total_seconds()
+
+        # Pre-break warning: show a small non-blocking window before the break starts
+        if not state.warned and 0 < remaining_seconds <= _WARNING_BEFORE_SECONDS:
+            _open_warning(int(remaining_seconds))
+            state.warned = True
+            _save_state(state)
+
         if now_dt >= phase_end_dt:
             _play_chime()
             task = _pick_physical_task()
@@ -291,7 +388,8 @@ def tick() -> PomodoroState | None:
                 task_title=task_title,
             )
             _save_state(state)
-            _open_overlay(task_title or "Break", duration, cfg.break_locked)
+            _open_overlay(task_title or "Break", duration, cfg.break_locked,
+                          task_id=task_id)
 
     elif state.phase == Phase.BREAK:
         hard_end_dt = _iso_to_dt(state.break_hard_end_iso) if state.break_hard_end_iso else phase_end_dt
@@ -299,9 +397,10 @@ def tick() -> PomodoroState | None:
         hard_exceeded = now_dt >= hard_end_dt
 
         if break_over or hard_exceeded:
-            _close_overlay()
-            if state.task_id is not None:
-                _fire_reminder(state.task_id)
+            # If the confirmation overlay is still up, the user hasn't returned.
+            # Suspend the cycle until they click a button (or the overlay dies).
+            if _overlay_still_running():
+                return state
             _play_chime()
             now_iso = _now_iso()
             state = PomodoroState(

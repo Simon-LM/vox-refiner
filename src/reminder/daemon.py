@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.reminder.converse import compute_next_trigger
-from src.reminder.db import bump_trigger, get_due, snooze, update_status
+from src.reminder.db import bump_trigger, get_due, reset_stale_pending_refinements, snooze, update_status
 from src.reminder import pomodoro as _pomodoro
 from src.reminder.pomodoro_config import load as _load_pomodoro_cfg
 from src.reminder.notify import (
@@ -110,19 +110,36 @@ def _is_screen_free(reminder: dict) -> bool:
 
 
 def dispatch_reminder(reminder: dict, context: Context) -> str:
-    """Decide and execute the right action for *reminder* given *context*.
+    """Route a due reminder per docs/agenda-reminder-architecture.md §4.
 
-    Returns the mode string ("notify", "tts_only", "queue", "defer_unlock").
+    Hard rules (independent of Pomodoro state):
+      - `screen_free` reminders NEVER fire as terminal notify/tts.
+        They always queue, waiting for a Pomodoro break overlay to pick
+        them up via `_pick_physical_task`. This is true even when no
+        Pomodoro state exists (disabled, stale, daemon just restarted).
+      - `screen-required` reminders with no `event_datetime` (not yet
+        scheduled) are skipped until the user sets a specific time. The
+        next_trigger is bumped by 24 h to avoid re-appearing every tick.
+      - `screen-required` reminders are withheld during a Pomodoro BREAK
+        (the user is meant to be away from the screen). They fire normally
+        during WORK or when Pomodoro is inactive.
 
-    When Pomodoro is active in WORK phase, screen-free tasks are held back
-    ("queue") so they can be picked up at the next break transition.
+    Returns the mode string ("notify", "tts_only", "queue", "skip",
+    "defer_unlock").
     """
+    if _is_screen_free(reminder):
+        return "queue"
+
+    if reminder.get("event_datetime") is None:
+        # No scheduled time yet — skip and come back in 24 h.
+        next_check = (
+            datetime.now(tz=timezone.utc) + timedelta(hours=24)
+        ).strftime("%Y-%m-%d %H:%M:%S")
+        bump_trigger(reminder["id"], next_check)
+        return "skip"
+
     pom_state = _pomodoro.current_state()
-    if (
-        pom_state is not None
-        and pom_state.phase == _pomodoro.Phase.WORK
-        and _is_screen_free(reminder)
-    ):
+    if pom_state is not None and pom_state.phase == _pomodoro.Phase.BREAK:
         return "queue"
 
     intervention = choose_intervention(context, reminder)
@@ -142,6 +159,12 @@ def tick(previous_context: Context | None = None) -> Context:
     """
     now = _now()
     context = detect_context()
+
+    # Release reminders whose refinement conversation was abandoned (TTL expired).
+    try:
+        reset_stale_pending_refinements()
+    except Exception as exc:  # noqa: BLE001
+        warn(f"Stale refinement cleanup error: {exc}")
 
     # Advance Pomodoro state machine (no-op when disabled)
     try:
@@ -192,6 +215,12 @@ def run_loop(poll_interval: int = _POLL_INTERVAL) -> None:
     signal.signal(signal.SIGINT, _stop)
 
     info(f"Reminder daemon started — polling every {poll_interval}s. Ctrl+C or close this terminal to stop.")
+
+    pom_cfg = _load_pomodoro_cfg()
+    if pom_cfg.enabled:
+        _pomodoro.start()
+        info(f"Pomodoro: new work cycle started ({pom_cfg.work_minutes} min).")
+
     previous_context: Context | None = None
     tick_count = 0
 

@@ -10,6 +10,9 @@ Public API
 ----------
     add_reminder(title, category, ...)    -> int  (new row id)
     get_due(now)                          -> list[dict]
+    complete_reminder(id)                 -> str | None  (logs occurrence + advances recurrence)
+    log_occurrence(id, status)            -> int  (record done/skipped without touching reminder)
+    get_occurrences(id)                   -> list[dict]
     update_status(id, status)             -> None
     snooze(id, next_trigger)              -> None
     log_conversation(id, entry)           -> None
@@ -24,6 +27,7 @@ from __future__ import annotations
 import calendar
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -89,6 +93,13 @@ def _init_db(conn: sqlite3.Connection) -> None:
             enabled     INTEGER DEFAULT 1,
             day_of_week INTEGER
         );
+        CREATE TABLE IF NOT EXISTS occurrences (
+            id            INTEGER PRIMARY KEY,
+            reminder_id   INTEGER NOT NULL,
+            scheduled_for DATE,
+            completed_at  DATETIME,
+            status        TEXT
+        );
         """
     )
     conn.commit()
@@ -153,6 +164,36 @@ def add_reminder(
             ),
         )
         return cur.lastrowid
+
+
+def log_occurrence(reminder_id: int, status: str,
+                   scheduled_for: str | None = None) -> int:
+    """Record one occurrence of a reminder without touching the reminder row.
+
+    *status*: 'done' | 'skipped'.
+    *scheduled_for*: ISO date (YYYY-MM-DD); defaults to today.
+
+    Returns the new occurrence id.
+    """
+    now = _now_iso()
+    with _db() as conn:
+        cur = conn.execute(
+            "INSERT INTO occurrences (reminder_id, scheduled_for, completed_at, status)"
+            " VALUES (?, ?, ?, ?)",
+            (reminder_id, scheduled_for or now[:10], now, status),
+        )
+        return cur.lastrowid
+
+
+def get_occurrences(reminder_id: int) -> list[dict]:
+    """Return all logged occurrences for *reminder_id*, most recent first."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM occurrences WHERE reminder_id = ?"
+            " ORDER BY scheduled_for DESC, completed_at DESC",
+            (reminder_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 _NAMED_TO_DAYS = {"daily": 1, "weekly": 7, "biweekly": 14}
@@ -241,10 +282,15 @@ def _next_recurring_trigger(reminder: dict) -> str | None:
 
 
 def complete_reminder(reminder_id: int) -> str | None:
-    """Mark a reminder done. If recurring, reset to pending and return the next trigger.
+    """Mark a reminder as completed for this occurrence.
 
-    Returns the next_trigger string if recurring, None if one-time (marked done).
+    Always logs a row in the `occurrences` table (status='done').
+    - Recurring reminders: advance next_trigger and stay 'pending'.
+    - One-time reminders: set status to 'done'.
+
+    Returns the next_trigger string if recurring, None if one-time.
     """
+    now = _now_iso()
     with _db() as conn:
         row = conn.execute(
             "SELECT * FROM reminders WHERE id = ?", (reminder_id,)
@@ -252,6 +298,11 @@ def complete_reminder(reminder_id: int) -> str | None:
         if row is None:
             return None
         reminder = dict(row)
+        conn.execute(
+            "INSERT INTO occurrences (reminder_id, scheduled_for, completed_at, status)"
+            " VALUES (?, ?, ?, 'done')",
+            (reminder_id, now[:10], now),
+        )
         next_t = _next_recurring_trigger(reminder)
         if next_t:
             conn.execute(
@@ -259,7 +310,7 @@ def complete_reminder(reminder_id: int) -> str | None:
                    SET status = 'pending', next_trigger = ?, snooze_count = 0,
                        last_reminded = ?
                    WHERE id = ?""",
-                (next_t, _now_iso(), reminder_id),
+                (next_t, now, reminder_id),
             )
             return next_t
         conn.execute(
@@ -269,7 +320,11 @@ def complete_reminder(reminder_id: int) -> str | None:
 
 
 def get_due(now: str | None = None) -> list[dict]:
-    """Return all reminders with next_trigger <= *now* and status pending/snoozed."""
+    """Return all reminders with next_trigger <= *now* and status pending/snoozed.
+
+    'pending_refinement' is intentionally excluded — those reminders have an
+    active conversation session in progress and must not be triggered.
+    """
     if now is None:
         now = _now_iso()
     with _db() as conn:
@@ -283,6 +338,27 @@ def get_due(now: str | None = None) -> list[dict]:
             (now,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def reset_stale_pending_refinements(older_than_minutes: int = 35) -> int:
+    """Reset reminders stuck in 'pending_refinement' for more than *older_than_minutes*.
+
+    Called by the daemon on each tick as a safety net for conversations that were
+    abandoned without calling finalize() (terminal killed, crash, API failure).
+    The conversation session TTL is 30 min, so 35 min is a safe margin.
+
+    Returns the number of rows updated.
+    """
+    threshold = (
+        datetime.now(tz=timezone.utc) - timedelta(minutes=older_than_minutes)
+    ).strftime("%Y-%m-%d %H:%M:%S")
+    with _db() as conn:
+        cur = conn.execute(
+            "UPDATE reminders SET status = 'pending' "
+            "WHERE status = 'pending_refinement' AND created_at <= ?",
+            (threshold,),
+        )
+        return cur.rowcount
 
 
 def update_status(reminder_id: int, status: str) -> None:
@@ -411,3 +487,70 @@ def get_cached_business(name: str) -> dict | None:
     if result.get("opening_hours"):
         result["opening_hours"] = json.loads(result["opening_hours"])
     return result
+
+
+# ── History search ────────────────────────────────────────────────────────────
+
+# Short stop words (FR + EN). Kept tiny on purpose: anything below the
+# length threshold is filtered out, this list only catches the few common
+# 4+ letter fillers that still slip through.
+_HISTORY_STOP_WORDS = frozenset({
+    # FR
+    "alors", "ainsi", "avec", "aussi", "celle", "celles", "celui", "ceux",
+    "chez", "comme", "dans", "demain", "donc", "encore", "hier", "jamais",
+    "leur", "leurs", "lorsque", "mais", "même", "moins", "plus", "pour",
+    "puis", "quand", "rien", "sans", "sous", "souvent", "toujours", "tout",
+    "tous", "toute", "toutes", "trop", "très",
+    # EN
+    "about", "above", "after", "again", "below", "been", "before", "could",
+    "from", "have", "here", "into", "just", "less", "many", "more", "most",
+    "much", "none", "onto", "should", "some", "still", "than", "that",
+    "their", "them", "then", "there", "these", "they", "this", "those",
+    "very", "what", "when", "where", "which", "will", "with", "without",
+    "would",
+})
+
+
+def _extract_history_keywords(text: str) -> list[str]:
+    """Return unique 3+ char keywords from *text*, lower-cased, stop words removed."""
+    tokens = re.findall(r"[a-zà-ÿ0-9]+", text.lower())
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in tokens:
+        if len(t) < 3 or t in _HISTORY_STOP_WORDS or t in seen:
+            continue
+        seen.add(t)
+        out.append(t)
+    return out
+
+
+def search_history(query: str, limit: int = 5) -> list[dict]:
+    """Find past reminders related to *query* via keyword LIKE matching.
+
+    Returns up to *limit* matching reminders, most recent first (event_datetime
+    if set, else created_at). All statuses are included so the caller can see
+    completed/cancelled context alongside active tasks. Returns [] when *query*
+    contains no usable keywords.
+    """
+    keywords = _extract_history_keywords(query)
+    if not keywords:
+        return []
+    clauses: list[str] = []
+    params: list[object] = []
+    for kw in keywords:
+        like = f"%{kw}%"
+        clauses.append("(LOWER(title) LIKE ? OR LOWER(full_context) LIKE ?)")
+        params.append(like)
+        params.append(like)
+    where = " OR ".join(clauses)
+    sql = (
+        "SELECT id, title, category, status, event_datetime, created_at, full_context "
+        "FROM reminders "
+        f"WHERE {where} "
+        "ORDER BY COALESCE(event_datetime, created_at) DESC "
+        "LIMIT ?"
+    )
+    params.append(limit)
+    with _db() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [dict(r) for r in rows]
