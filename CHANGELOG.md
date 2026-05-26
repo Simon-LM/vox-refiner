@@ -11,6 +11,49 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- **`src/reminder/conversation.py` — smarter scheduling and source handling.**
+  - AI now searches for business/professional hours **before** asking any scheduling question. For tasks that involve contacting or visiting a real entity (doctor, dentist, office), a web search fires first; then the AI presents what it found together with the scheduling question in a single combined message.
+  - Query suffix changed to `" fiche établissement Google"` (was `" Google Maps"`) to steer Perplexity toward Google Business Profile data.
+  - `_SEARCH_SOURCE_PRIORITY` annotation injected immediately before each search result: when both Google Business Profile data and third-party booking directories (mondocteur.fr, doctolib.fr, etc.) are present, the Google source is authoritative. The AI always presents the hours it found and indicates the source, then proceeds to schedule.
+  - General capability constraint added to the system prompt preamble: the AI is a text-only assistant — it can ask questions and trigger web searches, but cannot perform any real-world action (phone calls, bookings, emails, etc.) and must never offer to do so. Prevents the AI from proposing to call a business.
+  - Pomodoro section updated: screen-free tasks now trigger a web search for business hours first, then ask ONE combined question presenting the found schedule alongside the Pomodoro/specific-time choice.
+  - Step 4 post-search rule updated from "ask user to verify before scheduling" to "present hours and source, then proceed to help the user schedule."
+
+- **`reminder.sh` — readline on all interactive prompts.**
+  All 20 `read -r` prompts in interactive input positions replaced with `read -e -r`, enabling arrow-key navigation, Backspace, Ctrl+A/E in the terminal. The one `read -r` inside a pipe (`while IFS= read -r _chunk; do`) is intentionally unchanged.
+
+### Fixed
+
+- **`src/reminder/pomodoro_overlay.py` — skip button during break shows confirmation.**
+  Clicking "Skip" on the overlay while in the **break phase** with an associated task now calls `_switch_to_confirm()` instead of dismissing silently. The user is asked whether the task was done, going to do, or not done — identical to the normal end-of-break flow. Clicking Skip during the work phase (no task context) still dismisses immediately.
+
+- **`reminder.sh` — `[c+ID]` reminder view no longer loops back immediately.**
+  After displaying a reminder detail, the list was immediately clearing and looping back without giving the user time to read. Fixed by adding an explicit `[m] Retour à la liste` labeled pause before `continue`.
+
+- **`reminder.sh` — `time_constraint` display handles split schedules.**
+  The reminder summary previously only rendered `time_constraint` when stored as a single dict. When the AI stores a split schedule as a list (e.g. `[{"earliest_hour": 8, "latest_hour": 12}, {"earliest_hour": 14, "latest_hour": 18}]`), all windows are now displayed: `Créneau : 8h–12h, 14h–18h`.
+
+- **`reminder.sh` — `callable_hours` displayed as formatted schedule instead of raw JSON.**
+  Business hours stored as `[{"day": ..., "start": ..., "end": ...}]` are now rendered as a human-readable day-grouped schedule (`Lun : 9h–13h, 14h–19h`, etc.). Raw string fallback retained when the value is not a structured list.
+
+### Added
+
+- **Pomodoro — task-driven break system** — `src/reminder/pomodoro_config.py`, `src/reminder/pomodoro.py`, `src/reminder/pomodoro_overlay.py`.
+  - Work/break cycle driven by physical Reminder tasks; break duration estimated by Mistral from task title and category, clamped to configurable `[break_min, break_max]` window.
+  - GTK fullscreen semi-transparent overlay covers **all connected monitors**; graceful fallback to text-mode when GTK is unavailable. Overlay uses system `python3` (not venv) so `python3-gi` is available even inside a virtualenv.
+  - `break_locked` option prevents closing the overlay before the timer expires.
+  - When break max is exceeded, overlay closes automatically and the confirmation flow fires.
+  - Idle reset: if the user is away from the keyboard for `idle_reset_minutes`, the work timer resets silently (detected via `xprintidle`).
+  - State persisted in `/tmp/vox-pomodoro-state.json`; daemon calls `pomodoro.tick()` on every 60s loop.
+  - Settings stored in `~/.local/share/vox-refiner/pomodoro.json`; managed via new `[o] Pomodoro` submenu in `reminder.sh`. `[t] Test overlay (30 s)` command available in the submenu to verify GTK overlay without waiting for a full cycle.
+  - `estimated_minutes` field added to `reminders` DB table and `add_reminder()` API; `add.py` extracts it via Mistral at creation time for physical-category tasks.
+  - 26 new unit tests (`tests/unit/test_pomodoro.py`).
+  - `install.sh` / `vox-refiner-update.sh` updated: `python3-gi`, `python3-gi-cairo`, `gir1.2-gtk-3.0`, `xprintidle` added; update script now checks all system dependencies.
+
+- **`screen_free` field on reminders** — boolean field added to the `reminders` DB table. Mistral infers it at creation time from the task title (cleaning, gardening, dishes, shopping → `True`; calls, email, agenda → `False`). `_pick_physical_task()` in `pomodoro.py` now selects only `screen_free=True` tasks (or legacy physical-category tasks with no value set). `dispatch_reminder()` in the daemon holds back `screen_free` tasks during the Pomodoro WORK phase ("queue" mode) so they are only proposed during breaks. 8 new unit tests cover this behaviour.
+
 ---
 
 ## [5.1.0] — 2026-05-22

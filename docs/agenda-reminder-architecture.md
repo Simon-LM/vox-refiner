@@ -130,22 +130,56 @@ File: `~/.config/systemd/user/vox-reminder.service`
 | VoxRefiner active       | project lock file                                            |
 | Fullscreen application  | `xdotool getactivewindow getwindowgeometry`                  |
 
-### Context → Intervention Matrix
+### Routing Rules (V2 — Pomodoro-aware)
 
-| Context                                      | Action doable off-screen? | Intervention                                             |
-| -------------------------------------------- | ------------------------- | -------------------------------------------------------- |
-| Normal desktop                               | —                         | TTS + desktop notification + response options            |
-| VoxRefiner active                            | —                         | Queue, fire on release (≤60s)                            |
-| DND enabled                                  | —                         | Queue until DND is lifted                                |
-| Fullscreen app                               | —                         | Minimal discreet notification, light TTS                 |
-| **Screen locked (Pomodoro) — physical task** | **Yes**                   | **TTS at lock start** ("good time to take out the bins") |
-| Screen locked (Pomodoro) — screen task       | No                        | Defer to unlock                                          |
+Every reminder carries a `screen_free` boolean (set by the AI at creation,
+`true` for physical/off-screen tasks like garden / cleaning / errands, `false`
+for screen-required tasks like phone calls / web research / admin). The daemon's
+`dispatch_reminder` routes each due reminder by combining `screen_free` with
+the current Pomodoro phase:
 
-**Pomodoro Logic:**
+| Reminder kind       | Pomodoro WORK / disabled / stale | Pomodoro BREAK                                  |
+| ------------------- | -------------------------------- | ----------------------------------------------- |
+| **screen_free**     | `queue` — waits for next break   | picked by the overlay via `_pick_physical_task` |
+| **screen-required** | fire (terminal + desktop notif)  | `queue` — waits for next WORK phase             |
 
-- At **lock start**: fire reminders of physical category (errands, bins, simple phone call, etc.).
-- At **unlock**: ask whether the action was completed ("You're back — were you able to take out the bins?").
-- For tasks requiring the screen (admin, form, email): do not fire during lock, wait for unlock.
+**Hard guarantees:**
+
+- A `screen_free` reminder **never** fires as `notify` (terminal pop-up) or
+  `tts_only`, regardless of Pomodoro state. Even when the state file is
+  missing (Pomodoro never started, daemon restarted, or stale-cleanup
+  removed it), the reminder simply waits — it does not fall back to a
+  terminal notification. Surfacing an off-screen task in front of an active
+  screen would defeat its purpose.
+- A `screen-required` reminder is **withheld during a Pomodoro break** (or
+  while the post-break confirmation overlay is still up). It only fires
+  when the cycle is back in WORK or Pomodoro is inactive.
+- Detection of `screen_free`: `metadata.screen_free == 1`, **or**
+  `metadata.screen_free` absent and `category ∈ {task_short, task_long,
+  errand}` (legacy fallback). See `_is_screen_free` in `daemon.py`.
+
+**Secondary contextual rules (apply only once the Pomodoro gate above has
+deemed the reminder eligible to fire):**
+
+- VoxRefiner active → queue, fire on release.
+- DND enabled → queue until DND is lifted.
+- Fullscreen app → discreet notification, light TTS.
+
+**End-of-day handling** (what to do with `screen_free` reminders that piled
+up because no break ever ran) is intentionally **out of scope for V2** and
+will be addressed later.
+
+**Pomodoro lifecycle reminders:**
+
+- WORK → BREAK transition: the overlay is opened with the most urgent
+  `screen_free` due task selected by the contextual picker (weather,
+  daylight, time-window, …).
+- BREAK → WORK transition: blocked while the overlay is still running
+  (waiting for the user's confirmation click). The conversation is
+  suspended, no new cycle starts. See [src/reminder/pomodoro.py](../src/reminder/pomodoro.py)
+  `_overlay_still_running`.
+- Stale-state cleanup: also guarded by `_overlay_still_running` — never
+  clears state while the user might be about to come back and answer.
 
 ## 5. Response Interface — Voice-first, Multimodal
 

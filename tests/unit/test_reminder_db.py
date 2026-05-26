@@ -472,6 +472,78 @@ class TestCompleteReminder:
         result = rdb.complete_reminder(9999)
         assert result is None
 
+    def test_complete_one_time_logs_done_occurrence(self):
+        rid = rdb.add_reminder("Buy milk", "task_short")
+        rdb.complete_reminder(rid)
+        occ = rdb.get_occurrences(rid)
+        assert len(occ) == 1
+        assert occ[0]["status"] == "done"
+        assert occ[0]["reminder_id"] == rid
+
+    def test_complete_recurring_logs_done_occurrence(self):
+        rid = rdb.add_reminder("Water garden", "task_short", recurrence="1")
+        rdb.complete_reminder(rid)
+        occ = rdb.get_occurrences(rid)
+        assert len(occ) == 1
+        assert occ[0]["status"] == "done"
+
+    def test_complete_recurring_multiple_times_accumulates(self):
+        rid = rdb.add_reminder("Daily walk", "task_short", recurrence="1")
+        rdb.complete_reminder(rid)
+        rdb.complete_reminder(rid)
+        rdb.complete_reminder(rid)
+        occ = rdb.get_occurrences(rid)
+        assert len(occ) == 3
+        assert all(o["status"] == "done" for o in occ)
+
+
+# ── TestOccurrences ───────────────────────────────────────────────────────────
+
+class TestOccurrences:
+    def test_log_occurrence_done(self):
+        rid = rdb.add_reminder("Water plants", "task_short")
+        oid = rdb.log_occurrence(rid, "done")
+        assert isinstance(oid, int)
+        occ = rdb.get_occurrences(rid)
+        assert len(occ) == 1
+        assert occ[0]["status"] == "done"
+        assert occ[0]["reminder_id"] == rid
+
+    def test_log_occurrence_skipped(self):
+        rid = rdb.add_reminder("Water plants", "task_short")
+        rdb.log_occurrence(rid, "skipped")
+        occ = rdb.get_occurrences(rid)
+        assert occ[0]["status"] == "skipped"
+
+    def test_log_occurrence_custom_date(self):
+        rid = rdb.add_reminder("Water plants", "task_short")
+        rdb.log_occurrence(rid, "done", scheduled_for="2026-05-20")
+        occ = rdb.get_occurrences(rid)
+        assert occ[0]["scheduled_for"] == "2026-05-20"
+
+    def test_get_occurrences_returns_most_recent_first(self):
+        rid = rdb.add_reminder("Water plants", "task_short")
+        rdb.log_occurrence(rid, "done", scheduled_for="2026-05-20")
+        rdb.log_occurrence(rid, "skipped", scheduled_for="2026-05-21")
+        rdb.log_occurrence(rid, "done", scheduled_for="2026-05-22")
+        occ = rdb.get_occurrences(rid)
+        assert occ[0]["scheduled_for"] == "2026-05-22"
+        assert occ[-1]["scheduled_for"] == "2026-05-20"
+
+    def test_get_occurrences_empty_for_new_reminder(self):
+        rid = rdb.add_reminder("New task", "task_short")
+        assert rdb.get_occurrences(rid) == []
+
+    def test_get_occurrences_isolated_by_reminder(self):
+        rid_a = rdb.add_reminder("Task A", "task_short")
+        rid_b = rdb.add_reminder("Task B", "task_short")
+        rdb.log_occurrence(rid_a, "done")
+        rdb.log_occurrence(rid_b, "skipped")
+        assert len(rdb.get_occurrences(rid_a)) == 1
+        assert rdb.get_occurrences(rid_a)[0]["status"] == "done"
+        assert len(rdb.get_occurrences(rid_b)) == 1
+        assert rdb.get_occurrences(rid_b)[0]["status"] == "skipped"
+
 
 # ── TestNumericRecurrence ────────────────────────────────────────────────────
 
@@ -664,3 +736,189 @@ class TestMigration:
         due = rdb.get_due("9999-01-01 00:00:00")
         row = next(r for r in due if r["id"] == rid)
         assert "recurrence" in row
+
+
+# ── Keyword extraction ────────────────────────────────────────────────────────
+
+class TestExtractHistoryKeywords:
+    def test_empty_text_returns_empty(self):
+        assert rdb._extract_history_keywords("") == []
+
+    def test_short_tokens_filtered(self):
+        # Tokens < 3 chars removed (le, à, du, etc.)
+        result = rdb._extract_history_keywords("Le du à de")
+        assert result == []
+
+    def test_stop_words_filtered(self):
+        # Common 4+ letter stop words also dropped
+        result = rdb._extract_history_keywords("avec dans pour about with that")
+        assert result == []
+
+    def test_keeps_relevant_tokens(self):
+        result = rdb._extract_history_keywords("Prendre rendez-vous chez le dentiste")
+        # "prendre" survives the 3-char threshold and is not in the stop list
+        assert "prendre" in result
+        assert "rendez" in result
+        assert "vous" in result
+        assert "dentiste" in result
+        assert "chez" not in result  # stop word
+        assert "le" not in result    # too short
+
+    def test_case_insensitive(self):
+        result = rdb._extract_history_keywords("DENTISTE Dentiste dentiste")
+        assert result == ["dentiste"]  # deduplicated, lower-cased
+
+    def test_handles_accents(self):
+        result = rdb._extract_history_keywords("rétablir équilibre")
+        assert "rétablir" in result
+        assert "équilibre" in result
+
+    def test_preserves_first_seen_order(self):
+        result = rdb._extract_history_keywords("zebra alpha alpha zebra")
+        assert result == ["zebra", "alpha"]
+
+
+# ── search_history ────────────────────────────────────────────────────────────
+
+class TestSearchHistory:
+    def _seed(self, *titles_and_dates):
+        """Insert reminders with explicit created_at via direct UPDATE."""
+        ids = []
+        for title, created_at, context in titles_and_dates:
+            rid = rdb.add_reminder(title, "task_short", full_context=context)
+            with rdb._db() as conn:
+                conn.execute(
+                    "UPDATE reminders SET created_at = ?, event_datetime = NULL WHERE id = ?",
+                    (created_at, rid),
+                )
+            ids.append(rid)
+        return ids
+
+    def test_empty_query_returns_empty(self):
+        rdb.add_reminder("Rendez-vous dentiste", "appointment")
+        assert rdb.search_history("") == []
+        assert rdb.search_history("le à du") == []  # only short tokens
+
+    def test_empty_db_returns_empty(self):
+        assert rdb.search_history("dentiste") == []
+
+    def test_finds_by_title_keyword(self):
+        rdb.add_reminder("Rendez-vous chez le dentiste", "appointment")
+        rdb.add_reminder("Tondre la pelouse", "task_short")
+        result = rdb.search_history("dentiste")
+        assert len(result) == 1
+        assert "dentiste" in result[0]["title"].lower()
+
+    def test_finds_by_full_context_keyword(self):
+        rdb.add_reminder("Appel", "task_short", full_context="Appeler Dr Martin du cabinet dentaire")
+        result = rdb.search_history("dentaire")
+        assert len(result) == 1
+        assert result[0]["full_context"].lower().find("dentaire") >= 0
+
+    def test_case_insensitive_matching(self):
+        rdb.add_reminder("Visite DENTISTE", "appointment")
+        result = rdb.search_history("dentiste")
+        assert len(result) == 1
+
+    def test_or_semantics_multiple_keywords(self):
+        rdb.add_reminder("Tondre pelouse", "task_short")
+        rdb.add_reminder("Visite dentiste", "appointment")
+        rdb.add_reminder("Rien à voir", "task_short")
+        result = rdb.search_history("pelouse dentiste")
+        ids = {r["id"] for r in result}
+        assert len(ids) == 2
+
+    def test_respects_limit(self):
+        for i in range(7):
+            rdb.add_reminder(f"Tâche jardin {i}", "task_short")
+        result = rdb.search_history("jardin", limit=3)
+        assert len(result) == 3
+
+    def test_orders_most_recent_first(self):
+        ids = self._seed(
+            ("Vieille tâche dentiste", "2024-01-01 10:00:00", ""),
+            ("Tâche dentiste récente", "2026-01-01 10:00:00", ""),
+            ("Tâche dentiste moyenne", "2025-06-01 10:00:00", ""),
+        )
+        result = rdb.search_history("dentiste")
+        assert [r["title"] for r in result] == [
+            "Tâche dentiste récente",
+            "Tâche dentiste moyenne",
+            "Vieille tâche dentiste",
+        ]
+
+    def test_event_datetime_takes_priority_over_created_at(self):
+        # Created long ago but scheduled for the future → ranks highest
+        rid_future = rdb.add_reminder(
+            "Future dentiste", "appointment",
+            event_datetime="2030-01-01 10:00:00",
+        )
+        rid_recent = rdb.add_reminder("Recent dentiste", "appointment")
+        with rdb._db() as conn:
+            conn.execute("UPDATE reminders SET created_at = ? WHERE id = ?",
+                         ("2020-01-01 00:00:00", rid_future))
+        result = rdb.search_history("dentiste")
+        assert result[0]["id"] == rid_future
+        assert result[1]["id"] == rid_recent
+
+    def test_includes_done_and_cancelled_reminders(self):
+        rid_done = rdb.add_reminder("Visite dentiste", "appointment")
+        rdb.update_status(rid_done, "done")
+        rid_cancel = rdb.add_reminder("Autre visite dentiste", "appointment")
+        rdb.update_status(rid_cancel, "cancelled")
+        rdb.add_reminder("Encore dentiste", "appointment")
+        result = rdb.search_history("dentiste")
+        statuses = {r["status"] for r in result}
+        assert statuses == {"done", "cancelled", "pending"}
+
+    def test_returns_status_and_dates(self):
+        rdb.add_reminder("Visite dentiste", "appointment",
+                         event_datetime="2026-06-01 14:00:00")
+        result = rdb.search_history("dentiste")
+        assert result[0]["status"] == "pending"
+        assert result[0]["event_datetime"] == "2026-06-01 14:00:00"
+        assert result[0]["category"] == "appointment"
+
+
+# ── reset_stale_pending_refinements ──────────────────────────────────────────
+
+class TestResetStalePendingRefinements:
+    def test_does_not_touch_recent_pending_refinement(self):
+        rid = rdb.add_reminder("Rdv dentiste", "task_short")
+        rdb.update_status(rid, "pending_refinement")
+        # created_at is "now" — well within the TTL
+        count = rdb.reset_stale_pending_refinements(older_than_minutes=35)
+        assert count == 0
+        with rdb._db() as conn:
+            row = conn.execute("SELECT status FROM reminders WHERE id = ?", (rid,)).fetchone()
+        assert row["status"] == "pending_refinement"
+
+    def test_resets_old_pending_refinement(self):
+        from datetime import datetime, timedelta, timezone
+        rid = rdb.add_reminder("Rdv dentiste", "task_short")
+        rdb.update_status(rid, "pending_refinement")
+        old_ts = (datetime.now(tz=timezone.utc) - timedelta(minutes=40)).strftime("%Y-%m-%d %H:%M:%S")
+        with rdb._db() as conn:
+            conn.execute("UPDATE reminders SET created_at = ? WHERE id = ?", (old_ts, rid))
+        count = rdb.reset_stale_pending_refinements(older_than_minutes=35)
+        assert count == 1
+        with rdb._db() as conn:
+            row = conn.execute("SELECT status FROM reminders WHERE id = ?", (rid,)).fetchone()
+        assert row["status"] == "pending"
+
+    def test_does_not_touch_other_statuses(self):
+        rid = rdb.add_reminder("Rdv dentiste", "task_short")
+        # status stays 'pending' — must not be touched
+        count = rdb.reset_stale_pending_refinements(older_than_minutes=0)
+        assert count == 0
+
+    def test_returns_count_of_reset_rows(self):
+        from datetime import datetime, timedelta, timezone
+        old_ts = (datetime.now(tz=timezone.utc) - timedelta(minutes=40)).strftime("%Y-%m-%d %H:%M:%S")
+        for title in ("Task A", "Task B", "Task C"):
+            rid = rdb.add_reminder(title, "task_short")
+            rdb.update_status(rid, "pending_refinement")
+            with rdb._db() as conn:
+                conn.execute("UPDATE reminders SET created_at = ? WHERE id = ?", (old_ts, rid))
+        count = rdb.reset_stale_pending_refinements(older_than_minutes=35)
+        assert count == 3

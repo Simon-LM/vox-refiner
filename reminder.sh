@@ -130,7 +130,7 @@ _profile_ask_question() {
     echo ""
     _info "$_qtext"
     printf "  > "
-    if ! read -r _answer; then return 0; fi
+    if ! read -e -r _answer; then return 0; fi
     if [ -z "$_answer" ]; then return 0; fi
     "$VENV_PYTHON" -m src.profile resolve "$_qid" "$_answer" 2>&3 || true
 }
@@ -151,10 +151,251 @@ _profile_ask_pending() {
     if [ -n "$_q_json" ]; then _profile_ask_question "$_q_json"; fi
 }
 
+# Ask a single per-task question and store the answer in the reminder metadata.
+# Usage: _task_ask_question <reminder_id> "$question_json"  (JSON with id + question fields)
+_task_ask_question() {
+    local _rid="$1"
+    local _q_json="$2"
+    local _qid _qtext _answer
+    _qid=$(printf '%s' "$_q_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null) || return 0
+    _qtext=$(printf '%s' "$_q_json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('question',''))" 2>/dev/null) || return 0
+    if [ -z "$_qid" ] || [ -z "$_qtext" ]; then return 0; fi
+    echo ""
+    _info "$_qtext"
+    printf "  > "
+    if ! read -e -r _answer; then return 0; fi
+    if [ -z "$_answer" ]; then return 0; fi
+    "$VENV_PYTHON" -m src.reminder.questions resolve "$_rid" "$_qid" "$_answer" 2>&3 || true
+}
+
+# Ask every pending question attached to a freshly-created reminder.
+# Usage: _task_ask_pending_for <reminder_id>
+_task_ask_pending_for() {
+    local _rid="$1"
+    local _list
+    _list=$("$VENV_PYTHON" -m src.reminder.questions for-reminder "$_rid" 2>&3) || return 0
+    if [ -z "$_list" ]; then return 0; fi
+    local _count
+    _count=$(printf '%s' "$_list" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null) || _count=0
+    local _idx=0
+    while [ "$_idx" -lt "$_count" ]; do
+        local _q
+        _q=$(printf '%s' "$_list" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)[$_idx], ensure_ascii=False))" 2>/dev/null) || break
+        _task_ask_question "$_rid" "$_q"
+        _idx=$(( _idx + 1 ))
+    done
+}
+
+# Surface the most urgent pending task question if any (called at startup).
+_task_ask_next_pending() {
+    local _entry
+    _entry=$("$VENV_PYTHON" -m src.reminder.questions next 2>&3) || return 0
+    if [ -z "$_entry" ]; then return 0; fi
+    local _rid
+    _rid=$(printf '%s' "$_entry" | python3 -c "import sys,json; print(json.load(sys.stdin).get('reminder_id',''))" 2>/dev/null) || return 0
+    if [ -z "$_rid" ]; then return 0; fi
+    _task_ask_question "$_rid" "$_entry"
+}
+
+# Read the user's answer to a conversation question (text by default, voice if
+# the user enters the literal "v"). Result is left in the global $_conv_answer.
+# If voice capture comes back empty (silence, mic failure, …) we fall back to
+# a text prompt rather than silently ending the conversation.
+# $_conv_answer_source is set to "voice" when speech-to-text produced the
+# answer, "text" otherwise (including the typed fallback after empty voice).
+_conv_read_answer() {
+    _conv_answer=""
+    _conv_answer_source="text"
+    local _input
+    if ! read -e -r _input; then return 1; fi
+    if [ "$_input" = "v" ] || [ "$_input" = "V" ]; then
+        _read_voice_input
+        _conv_answer="$_voice_text"
+        if [ -z "$_conv_answer" ]; then
+            echo ""
+            _warn "Réponse vocale vide — tapez votre réponse :"
+            printf "  > "
+            if ! read -e -r _input; then return 1; fi
+            _conv_answer="$_input"
+            _conv_answer_source="text"
+        else
+            _info "Réponse captée : $_conv_answer"
+            _conv_answer_source="voice"
+        fi
+    else
+        _conv_answer="$_input"
+        _conv_answer_source="text"
+    fi
+    return 0
+}
+
+# Run a multi-turn refinement conversation for a freshly-created reminder.
+# Mistral asks one question at a time; each question is displayed + spoken.
+# Usage: _task_refine_conversation <reminder_id> "<original_text>" "<metadata_json>" [source]
+# source: "voice" if the original request was dictated, "text" (default) if typed.
+_task_refine_conversation() {
+    local _rid="$1"
+    local _text="$2"
+    local _metadata_json="${3:-{}}"
+    local _source="${4:-text}"
+    [ -z "$_rid" ] && return 0
+
+    local _start_args=(--text "$_text" --metadata "$_metadata_json")
+    if [ "$_source" = "voice" ]; then
+        _start_args+=(--voice)
+    fi
+
+    local _response _session_id _action _question
+    _response=$("$VENV_PYTHON" -m src.reminder.conversation start "$_rid" \
+        "${_start_args[@]}" 2>&3) || return 0
+    if [ -z "$_response" ]; then return 0; fi
+    _session_id=$(printf '%s' "$_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null) || return 0
+    if [ -z "$_session_id" ]; then return 0; fi
+
+    while true; do
+        _action=$(printf '%s' "$_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('action',''))" 2>/dev/null) || break
+        if [ "$_action" != "ask" ]; then break; fi
+        _question=$(printf '%s' "$_response" | python3 -c "import sys,json; print(json.load(sys.stdin).get('question',''))" 2>/dev/null)
+        if [ -z "$_question" ]; then break; fi
+
+        echo ""
+        _info "$_question"
+        _speak "$_question"
+        printf "  > (texte, ou 'v' Enter pour répondre à la voix) : "
+        if ! _conv_read_answer; then break; fi
+        if [ -z "$_conv_answer" ]; then break; fi
+
+        local _ans_args=("$_session_id" "$_conv_answer")
+        if [ "$_conv_answer_source" = "voice" ]; then
+            _ans_args+=(--voice)
+        fi
+        _response=$("$VENV_PYTHON" -m src.reminder.conversation answer \
+            "${_ans_args[@]}" 2>&3) || break
+    done
+
+    local _fin_result
+    _fin_result=$("$VENV_PYTHON" -m src.reminder.conversation finalize "$_session_id" 2>&3) || true
+    local _answers_text
+    _answers_text=$(printf '%s' "$_fin_result" | python3 -c "
+import sys, json
+try:
+    print(json.load(sys.stdin).get('answers_text', ''))
+except Exception:
+    print('')
+" 2>/dev/null) || true
+    if [ -n "$_answers_text" ]; then
+        _profile_update "$_answers_text"
+    fi
+}
+
+_show_reminder_summary_and_correct() {
+    local _rid="$1"
+    local _source="${2:-text}"
+    [ -z "$_rid" ] && return 0
+
+    echo ""
+    _sep
+    printf "  ${C_BOLD}Récapitulatif${C_RESET}\n"
+    echo ""
+
+    "$VENV_PYTHON" -c "
+import json, sys
+sys.path.insert(0, '.')
+from src.reminder.db import _db
+C='\033[0;36m'; G='\033[0;32m'; B='\033[1m'; R='\033[0m'
+with _db() as conn:
+    r = conn.execute('SELECT * FROM reminders WHERE id = ?', ($_rid,)).fetchone()
+if not r:
+    sys.exit(0)
+meta = {}
+if r['metadata']:
+    try:
+        meta = json.loads(r['metadata'])
+    except Exception:
+        pass
+print(f'  {B}Tâche      :{R} {r[\"title\"]}')
+print(f'  Catégorie  : {r[\"category\"]}')
+rec = r['recurrence']
+if rec:
+    try:
+        d = int(rec)
+        lbl = 'quotidien' if d == 1 else (f'toutes les {d//7} sem.' if d % 7 == 0 else f'tous les {d} jours')
+    except ValueError:
+        lbl = rec
+    print(f'  Récurrence : ↻ {lbl}')
+if r['event_datetime']:
+    print(f'  Date/heure : {C}{r[\"event_datetime\"]}{R}')
+if meta.get('screen_free'):
+    print(f'  Pomodoro   : {G}✓{R} proposée pendant les pauses')
+tc = meta.get('time_constraint')
+_tc_windows = []
+if isinstance(tc, dict):
+    _tc_windows = [tc]
+elif isinstance(tc, list):
+    _tc_windows = tc
+_tc_valid = [w for w in _tc_windows if isinstance(w, dict) and isinstance(w.get('earliest_hour'), int) and isinstance(w.get('latest_hour'), int)]
+if _tc_valid:
+    _tc_slots = ', '.join(f\"{w['earliest_hour']}h–{w['latest_hour']}h\" for w in _tc_valid)
+    print(f'  Créneau    : {C}{_tc_slots}{R}')
+if meta.get('location'):
+    print(f'  Lieu       : {meta[\"location\"]}')
+_ch = meta.get('callable_hours')
+if _ch:
+    if isinstance(_ch, list):
+        def _hm(t):
+            _p = t.split(':') if ':' in t else [t, '00']
+            return (f\"{int(_p[0])}h{_p[1]}\" if _p[1] != '00' else f\"{int(_p[0])}h\")
+        _ch_days = {}
+        for _slot in _ch:
+            if not isinstance(_slot, dict):
+                continue
+            _dname = _slot.get('day', '')
+            _s = _slot.get('start', '')
+            _e = _slot.get('end', '')
+            if not (_dname and _s and _e):
+                continue
+            _ch_days.setdefault(_dname, []).append(f\"{_hm(_s)}–{_hm(_e)}\")
+        if _ch_days:
+            print('  Horaires   :')
+            for _dname, _slots in _ch_days.items():
+                print(f'    {_dname[:3]} : {\", \".join(_slots)}')
+        else:
+            print(f'  Horaires   : {_ch}')
+    else:
+        print(f'  Horaires   : {_ch}')
+if meta.get('requires_daylight'):
+    print('  Lumière    : requise')
+" 2>&3 || true
+
+    echo ""
+    _sep
+    printf "  ${C_DIM}Correction ? (texte, ou laisser vide pour terminer)${C_RESET} : "
+    local _corr
+    if ! read -e -r _corr; then return 0; fi
+    [ -z "$_corr" ] && return 0
+
+    local _current_meta
+    _current_meta=$("$VENV_PYTHON" -c "
+import json, sys
+sys.path.insert(0, '.')
+from src.reminder.db import _db
+with _db() as conn:
+    r = conn.execute('SELECT metadata FROM reminders WHERE id = ?', ($_rid,)).fetchone()
+print(r['metadata'] if r and r['metadata'] else '{}')
+" 2>&3) || _current_meta="{}"
+
+    _task_refine_conversation "$_rid" "$_corr" "$_current_meta" "$_source"
+}
+
 _add_reminder_from_text() {
     local text="$1"
+    local source="${2:-text}"   # "voice" if dictated, "text" (default) if typed/OCR.
     local result
-    result=$(printf '%s' "$text" | "$VENV_PYTHON" -m src.reminder.add --stdin 2>&3)
+    local _add_args=(--stdin)
+    if [ "$source" = "voice" ]; then
+        _add_args+=(--voice)
+    fi
+    result=$(printf '%s' "$text" | "$VENV_PYTHON" -m src.reminder.add "${_add_args[@]}" 2>&3)
     if [ -z "$result" ]; then
         _error "Failed to parse reminder."
         return 1
@@ -174,7 +415,7 @@ print(len(data) if isinstance(data, list) else 1)
 
     local i=0
     while [ "$i" -lt "$count" ]; do
-        local title category missing recurrence recurrence_spoken
+        local title category recurrence recurrence_spoken
         title=$(printf '%s' "$result" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
@@ -185,11 +426,18 @@ import sys, json
 data = json.load(sys.stdin)
 print(data[$i].get('category',''))
 " 2>&3) || true
-        missing=$(printf '%s' "$result" | python3 -c "
+        local _rid
+        _rid=$(printf '%s' "$result" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-print(','.join(data[$i].get('missing_fields') or []))
+print(data[$i].get('id') or '')
 " 2>&3) || true
+        local _initial_metadata
+        _initial_metadata=$(printf '%s' "$result" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+print(json.dumps(data[$i].get('metadata') or {}, ensure_ascii=False))
+" 2>&3) || _initial_metadata="{}"
         local _recur_raw
         _recur_raw=$(printf '%s' "$result" | python3 -c "
 import sys, json
@@ -231,22 +479,229 @@ print(spoken)
 
         local _recur_tag=""
         [ -n "$recurrence" ] && _recur_tag=" [↻ $recurrence]"
-        _success "Reminder added: $title [$category]$_recur_tag"
 
-        if [ -n "$missing" ]; then
-            _warn "Missing information: $missing — follow-up questions not yet implemented."
+        if [ -n "$_rid" ]; then
+            _task_refine_conversation "$_rid" "$text" "$_initial_metadata" "$source"
+            _show_reminder_summary_and_correct "$_rid" "$source"
         fi
+
+        _success "Reminder added: $title [$category]$_recur_tag"
 
         if [ -n "$recurrence_spoken" ]; then
             _speak "$_P_ADDED : $title, $recurrence_spoken"
         else
             _speak "$_P_ADDED : $title"
         fi
+
         i=$(( i + 1 ))
     done
 
     # Update user profile with any generalizable info from the input text
     _profile_update "$text"
+}
+
+# ── Mode: Pomodoro settings ───────────────────────────────────────────────────
+
+_pomodoro_status() {
+    if [ -f "/tmp/vox-pomodoro-state.json" ]; then
+        local _phase
+        _phase=$("$VENV_PYTHON" -c "
+import json, sys
+try:
+    d = json.loads(open('/tmp/vox-pomodoro-state.json').read())
+    print(d.get('phase','?'))
+except Exception:
+    print('?')
+" 2>/dev/null)
+        echo "● running (${_phase})"
+    else
+        echo "○ stopped"
+    fi
+}
+
+_pomodoro_load_cfg() {
+    "$VENV_PYTHON" -c "
+import json, sys
+from pathlib import Path
+cfg_path = Path.home() / '.local/share/vox-refiner/pomodoro.json'
+defaults = {'work_minutes':25,'break_minutes':5,'break_margin_minutes':5,'break_locked':True,'enabled':False,'idle_reset_minutes':0}
+if cfg_path.exists():
+    try:
+        d = json.loads(cfg_path.read_text())
+        defaults.update({k:d[k] for k in defaults if k in d})
+    except Exception:
+        pass
+print(defaults['work_minutes'])
+print(defaults['break_minutes'])
+print(defaults['break_margin_minutes'])
+print('yes' if defaults['break_locked'] else 'no')
+print('yes' if defaults['enabled'] else 'no')
+print(defaults['idle_reset_minutes'])
+" 2>&3
+}
+
+_pomodoro_save_cfg() {
+    local _work="$1" _break="$2" _margin="$3" _locked="$4" _enabled="$5" _idle="$6"
+    "$VENV_PYTHON" -c "
+import json
+from pathlib import Path
+cfg_path = Path.home() / '.local/share/vox-refiner/pomodoro.json'
+cfg_path.parent.mkdir(parents=True, exist_ok=True)
+data = {
+    'work_minutes': int('$_work'),
+    'break_minutes': int('$_break'),
+    'break_margin_minutes': int('$_margin'),
+    'break_locked': '$_locked' == 'yes',
+    'enabled': '$_enabled' == 'yes',
+    'idle_reset_minutes': int('$_idle'),
+}
+cfg_path.write_text(json.dumps(data, indent=2))
+" 2>&3
+}
+
+_mode_pomodoro() {
+    while true; do
+        # Load current config
+        local _cfg _work _break _margin _locked _enabled _idle
+        _cfg=$(_pomodoro_load_cfg)
+        _work=$(echo "$_cfg" | sed -n '1p')
+        _break=$(echo "$_cfg" | sed -n '2p')
+        _margin=$(echo "$_cfg" | sed -n '3p')
+        _locked=$(echo "$_cfg" | sed -n '4p')
+        _enabled=$(echo "$_cfg" | sed -n '5p')
+        _idle=$(echo "$_cfg" | sed -n '6p')
+        local _status
+        _status=$(_pomodoro_status)
+        local _break_min _break_max
+        _break_min=$(( _break - _margin < 1 ? 1 : _break - _margin ))
+        _break_max=$(( _break + _margin ))
+        local _idle_display
+        if [ "${_idle:-0}" -eq 0 ]; then
+            _idle_display="off  ${C_DIM}(away from keyboard → work timer resets, no break)${C_RESET}"
+        else
+            _idle_display="${_idle} min  ${C_DIM}(away ≥ ${_idle} min → work timer resets, no break)${C_RESET}"
+        fi
+
+        clear
+        _header "POMODORO" "🍅"
+        echo ""
+        printf "  Status         : ${C_BOLD}%s${C_RESET}\n" "$_status"
+        printf "  Work duration  : ${C_CYAN}%s min${C_RESET}\n" "$_work"
+        printf "  Break duration : ${C_CYAN}%s min${C_RESET}  ${C_DIM}(±%s min → %s–%s min)${C_RESET}\n" "$_break" "$_margin" "$_break_min" "$_break_max"
+        printf "  Break locked   : ${C_CYAN}%s${C_RESET}\n" "$_locked"
+        printf "  Idle reset     : ${C_CYAN}%b${C_RESET}\n" "$_idle_display"
+        echo ""
+        _sep
+        printf "  ${C_BOLD}[w]${C_RESET} Work duration   ${C_BOLD}[b]${C_RESET} Break duration\n"
+        printf "  ${C_BOLD}[g]${C_RESET} Break margin    ${C_BOLD}[l]${C_RESET} Toggle lock — currently: ${C_CYAN}%s${C_RESET}\n" "$_locked"
+        printf "  ${C_BOLD}[i]${C_RESET} Idle reset      ${C_BOLD}[t]${C_RESET} Test overlay (30 s)\n"
+        printf "  ${C_BOLD}[s]${C_RESET} Start           ${C_BOLD}[x]${C_RESET} Stop\n"
+        printf "  ${C_BOLD}[m]${C_RESET} Menu: "
+        read -e -r _pcmd
+
+        case "$_pcmd" in
+            w|W)
+                echo ""
+                printf "  Work duration in minutes (current: %s): " "$_work"
+                read -e -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]] && [ "$_val" -gt 0 ]; then
+                    _work="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Work duration set to ${_work} min."
+                else
+                    _warn "Invalid value — must be a positive integer."
+                fi
+                sleep 1
+                ;;
+            b|B)
+                echo ""
+                printf "  Break duration in minutes (current: %s): " "$_break"
+                read -e -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]] && [ "$_val" -gt 0 ]; then
+                    _break="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Break duration set to ${_break} min."
+                else
+                    _warn "Invalid value — must be a positive integer."
+                fi
+                sleep 1
+                ;;
+            g|G)
+                echo ""
+                printf "  Break margin in minutes (current: %s): " "$_margin"
+                read -e -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]]; then
+                    _margin="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    _success "Break margin set to ±${_margin} min."
+                else
+                    _warn "Invalid value — must be a non-negative integer."
+                fi
+                sleep 1
+                ;;
+            l|L)
+                if [ "$_locked" = "yes" ]; then
+                    _locked="no"
+                else
+                    _locked="yes"
+                fi
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                _success "Break lock set to: ${_locked}."
+                sleep 1
+                ;;
+            i|I)
+                echo ""
+                printf "  Idle reset in minutes — 0 to disable (current: %s): " "${_idle:-0}"
+                read -e -r _val
+                if [[ "$_val" =~ ^[0-9]+$ ]]; then
+                    _idle="$_val"
+                    _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                    if [ "$_idle" -eq 0 ]; then
+                        _success "Idle reset disabled."
+                    else
+                        _success "Idle reset set to ${_idle} min."
+                    fi
+                else
+                    _warn "Invalid value — must be a non-negative integer."
+                fi
+                sleep 1
+                ;;
+            t|T)
+                _success "Lancement de l'overlay de test (30 secondes)…"
+                sleep 1
+                python3 "$SCRIPT_DIR/src/reminder/pomodoro_overlay.py" \
+                    --title "Test overlay — 30 s" --minutes 0.5 --locked 2>&3
+                ;;
+            s|S)
+                if [ -f "/tmp/vox-pomodoro-state.json" ]; then
+                    _warn "Pomodoro already running."
+                    sleep 1
+                    continue
+                fi
+                _enabled="yes"
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                "$VENV_PYTHON" -c "
+import sys; sys.path.insert(0,'.')
+from src.reminder.pomodoro import start
+start()
+" 2>&3 && _success "Pomodoro started — work phase: ${_work} min." || _error "Failed to start Pomodoro."
+                sleep 1
+                ;;
+            x|X)
+                "$VENV_PYTHON" -c "
+import sys; sys.path.insert(0,'.')
+from src.reminder.pomodoro import stop
+stop()
+" 2>&3 && _success "Pomodoro stopped." || _error "Failed to stop Pomodoro."
+                _enabled="no"
+                _pomodoro_save_cfg "$_work" "$_break" "$_margin" "$_locked" "$_enabled" "$_idle"
+                sleep 1
+                ;;
+            m|M)
+                return 0
+                ;;
+        esac
+    done
 }
 
 # ── Mode: add from interactive input ─────────────────────────────────────────
@@ -260,18 +715,17 @@ _mode_interactive() {
         echo ""
         printf "  ${C_BOLD}[k]${C_RESET} Add (type)   ${C_BOLD}[v]${C_RESET} Add (voice)   ${C_BOLD}[s]${C_RESET} Add (screenshot)\n"
         printf "  ${C_BOLD}[l]${C_RESET} List pending   ${C_BOLD}[p]${C_RESET} Profile   ${C_BOLD}[d]${C_RESET} Start daemon\n"
-        printf "  ${C_BOLD}[x]${C_RESET} Disable feature   ${C_BOLD}[m]${C_RESET} Menu: "
-        read -r _input_mode
+        printf "  ${C_BOLD}[o]${C_RESET} Pomodoro   ${C_BOLD}[x]${C_RESET} Disable feature   ${C_BOLD}[m]${C_RESET} Menu: "
+        read -e -r _input_mode
 
         case "$_input_mode" in
             k|K)
                 echo ""
                 printf "  Reminder text: "
-                read -r _text
+                read -e -r _text
                 [ -z "$_text" ] && continue
                 _add_reminder_from_text "$_text"
                 echo ""
-                read -rp "  Press Enter to return to menu…" _dummy || true
                 ;;
             v|V)
                 echo ""
@@ -281,18 +735,15 @@ _mode_interactive() {
                 if [ -z "$_text" ]; then
                     _warn "No speech detected."
                     echo ""
-                    read -rp "  Press Enter to return to menu…" _dummy || true
                     continue
                 fi
                 _process "Processing: $_text"
-                _add_reminder_from_text "$_text"
+                _add_reminder_from_text "$_text" voice
                 echo ""
-                read -rp "  Press Enter to return to menu…" _dummy || true
                 ;;
             s|S)
                 _mode_ocr || true
                 echo ""
-                read -rp "  Press Enter to return to menu…" _dummy || true
                 ;;
             l|L)
                 _mode_list
@@ -314,11 +765,18 @@ _mode_interactive() {
                 _open_daemon_terminal() {
                     if ! command -v "$1" >/dev/null 2>&1; then return 1; fi
                     local _dcmd="cd '$SCRIPT_DIR' && '$VENV_PYTHON' -m src.reminder.daemon"
+                    # --disable-factory / --wait / --standalone: same reason as
+                    # in launch-vox-refiner.sh — keep this terminal independent
+                    # of any shared factory so its PID is the real window and
+                    # other VoxRefiner shortcuts can manage their own terminals
+                    # without colliding.
                     case "$1" in
-                        mate-terminal|gnome-terminal)
-                            "$1" --window -- bash -c "$_dcmd" 2>/dev/null & ;;
+                        mate-terminal)
+                            "$1" --disable-factory --window -- bash -c "$_dcmd" 2>/dev/null & ;;
+                        gnome-terminal)
+                            "$1" --wait --window -- bash -c "$_dcmd" 2>/dev/null & ;;
                         xfce4-terminal)
-                            "$1" --standalone -e "bash -c \"$_dcmd\"" 2>/dev/null & ;;
+                            "$1" --disable-server --standalone -e "bash -c \"$_dcmd\"" 2>/dev/null & ;;
                         konsole)
                             "$1" -e bash -c "$_dcmd" 2>/dev/null & ;;
                         xterm)
@@ -343,6 +801,9 @@ _mode_interactive() {
                     echo "$!" > "$_daemon_term_pid"
                     _success "Daemon started in a dedicated terminal."
                 fi
+                ;;
+            o|O)
+                _mode_pomodoro
                 ;;
             x|X)
                 if grep -q "^REMINDER_ENABLED=" .env 2>/dev/null; then
@@ -428,23 +889,22 @@ if pending:
         printf "  ${C_BOLD}[k]${C_RESET} Add info (type)   ${C_BOLD}[v]${C_RESET} Add info (voice)\n"
         printf "  ${C_BOLD}[t]${C_RESET} Set timezone   ${C_BOLD}[l]${C_RESET} Set language  —  ${C_CYAN}${OUTPUT_LANG:-auto}${C_RESET}\n"
         printf "  ${C_BOLD}[m]${C_RESET} Menu: "
-        read -r _pcmd
+        read -e -r _pcmd
 
         case "$_pcmd" in
             k|K)
                 echo ""
                 printf "  Info to add (e.g. \"I work 9am–6pm Mon–Fri\"): "
-                read -r _ptext
+                read -e -r _ptext
                 if [ -z "$_ptext" ]; then continue; fi
                 _process "Processing…"
                 _profile_update "$_ptext"
                 echo ""
-                read -rp "  Press Enter to continue…" _dummy || true
                 ;;
             t|T)
                 echo ""
                 printf "  Timezone (e.g. Europe/Paris, America/New_York): "
-                read -r _tz
+                read -e -r _tz
                 if [ -z "$_tz" ]; then continue; fi
                 "$VENV_PYTHON" -c "
 import json
@@ -469,7 +929,6 @@ p_path.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding='utf-8')
 print('ok')
 " 2>&3 && _success "Timezone set to: $_tz" || _error "Failed to update profile."
                 echo ""
-                read -rp "  Press Enter to continue…" _dummy || true
                 ;;
             l|L)
                 echo ""
@@ -481,7 +940,7 @@ print('ok')
                 printf "  ${C_BOLD}[a]${C_RESET}  auto          ${C_DIM}same as spoken input (default)${C_RESET}\n"
                 echo ""
                 printf "  ${C_DIM}Current: ${C_CYAN}${OUTPUT_LANG:-auto}${C_RESET}  —  Enter = keep current: "
-                read -r _lng
+                read -e -r _lng
                 _new_lang=""
                 case "$_lng" in
                     1)   _new_lang="ar" ;;
@@ -527,7 +986,6 @@ p_path.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding='utf-8')
                     _success "Language set to: ${OUTPUT_LANG:-auto}"
                 fi
                 echo ""
-                read -rp "  Press Enter to continue…" _dummy || true
                 ;;
             v|V)
                 echo ""
@@ -541,7 +999,6 @@ p_path.write_text(json.dumps(p, ensure_ascii=False, indent=2), encoding='utf-8')
                     _profile_update "$_ptext"
                 fi
                 echo ""
-                read -rp "  Press Enter to continue…" _dummy || true
                 ;;
             m|M)
                 return 0
@@ -600,7 +1057,7 @@ for r in rows:
 " 2>&3
         echo ""
         printf "  ${C_BOLD}[c+ID]${C_RESET} View   ${C_BOLD}[d+ID]${C_RESET} Delete   ${C_BOLD}[m]${C_RESET} Menu  (ex: c9, d1): "
-        read -r _cmd || true
+        read -e -r _cmd || true
         case "$_cmd" in
             m|M) break ;;
         esac
@@ -660,9 +1117,10 @@ if r['metadata']:
         pass
 if r['full_context'] and r['full_context'] != r['title']:
     print(f\"  Original     : {r['full_context']}\")
-" 2>&3
+" 2>&3 || true
             echo ""
-            read -rp "  Press Enter to return to list…" _dummy || true
+            printf "  ${C_BOLD}[m]${C_RESET} Retour à la liste: "
+            read -e -r _back || true
             continue
         fi
 
@@ -683,7 +1141,7 @@ print(row[0] if row else '')
             continue
         fi
         printf "  Delete #$_rid \"%s\"? ${C_BOLD}[y/N]${C_RESET}: " "$_title"
-        read -r _confirm || true
+        read -e -r _confirm || true
         case "$_confirm" in
             y|Y)
                 "$VENV_PYTHON" -c "
@@ -761,7 +1219,7 @@ if r:
 
     while true; do
         printf "  ${C_BOLD}[D]${C_RESET} Done   ${C_BOLD}[L]${C_RESET} Later   ${C_BOLD}[G]${C_RESET} Going to do it   ${C_BOLD}[V]${C_RESET} Voice response   ${C_BOLD}[X]${C_RESET} Cancel: "
-        read -r _key
+        read -e -r _key
         echo ""
 
         case "$_key" in
@@ -831,7 +1289,6 @@ print(reply)
                 echo ""
                 # Update user profile with any generalizable info from the response
                 _profile_update "$_response"
-                read -rp "  Appuie sur Entrée pour fermer…" _dummy || true
                 break
                 ;;
             x|X)
@@ -876,6 +1333,7 @@ main() {
             ;;
         "")
             _profile_ask_pending
+            _task_ask_next_pending
             _mode_interactive
             ;;
         *)

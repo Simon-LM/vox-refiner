@@ -76,13 +76,21 @@ fi
 GEOMETRY="80x30"  
 
 run_in_terminal() {
+    # --disable-factory / --wait / --disable-server: force each terminal to be
+    # its own independent process so the PID we capture in $! is the actual
+    # window. Without these flags, mate-terminal/gnome-terminal/xfce4-terminal
+    # delegate to a shared factory process and the launcher exits immediately,
+    # leaving us with a stale PID that can never be killed to close the window.
     local _cmd="${SCRIPT_ENV:+$SCRIPT_ENV }\"$SCRIPT_PATH\""
     case "$1" in
-        mate-terminal|gnome-terminal)
-            "$1" --geometry="$GEOMETRY" -- bash -c "${_cmd}; exec bash" &
+        mate-terminal)
+            "$1" --disable-factory --geometry="$GEOMETRY" -- bash -c "${_cmd}; exec bash" &
+            ;;
+        gnome-terminal)
+            "$1" --wait --geometry="$GEOMETRY" -- bash -c "${_cmd}; exec bash" &
             ;;
         xfce4-terminal)
-            "$1" --geometry="$GEOMETRY" -e "bash -c \"${_cmd}; exec bash\"" &
+            "$1" --disable-server --geometry="$GEOMETRY" -e "bash -c \"${_cmd}; exec bash\"" &
             ;;
         konsole)
             "$1" --geometry "$GEOMETRY" -e bash -c "${_cmd}; exec bash" &

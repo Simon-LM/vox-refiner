@@ -34,7 +34,8 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
         if command -v apt-get >/dev/null 2>&1; then
             echo "🔧 Installing system dependencies via apt..."
             sudo apt-get update
-            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool zenity
+            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool zenity \
+                python3-gi python3-gi-cairo gir1.2-gtk-3.0 xprintidle
         else
             echo "❌ --install-system-deps is only supported automatically on apt-based systems."
             exit 1
@@ -42,7 +43,8 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
     else
         echo "Install them manually, for example on Ubuntu:"
         echo "  sudo apt-get update"
-        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xdotool"
+        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xdotool \\"
+        echo "      python3-gi python3-gi-cairo gir1.2-gtk-3.0"
         echo ""
         echo "Then run: ./install.sh"
         exit 1
@@ -73,6 +75,16 @@ fi
 if ! command -v zenity >/dev/null 2>&1; then
     echo "⚠️  zenity not found (needed for the Media Transcribe file picker)."
     echo "     sudo apt install zenity"
+fi
+
+if ! python3 -c "import gi" >/dev/null 2>&1; then
+    echo "⚠️  python3-gi not found (needed for the Pomodoro overlay)."
+    echo "     sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0"
+fi
+
+if ! command -v xprintidle >/dev/null 2>&1; then
+    echo "⚠️  xprintidle not found (needed for Pomodoro idle detection)."
+    echo "     sudo apt install xprintidle"
 fi
 
 if [ ! -d ".venv" ]; then
