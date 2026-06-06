@@ -230,16 +230,32 @@ sync_python_deps() {
 }
 
 sync_system_deps() {
-    if command -v xdotool >/dev/null 2>&1; then
+    # Full parity with install.sh: check every system dependency VoxRefiner
+    # needs so a user who accidentally uninstalled one gets it back on update.
+    local missing=()
+
+    command -v python3  >/dev/null 2>&1 || missing+=("python3")
+    command -v ffmpeg   >/dev/null 2>&1 || missing+=("ffmpeg")
+    command -v rec      >/dev/null 2>&1 || missing+=("sox")
+    command -v xclip    >/dev/null 2>&1 || missing+=("xclip")
+    command -v mpv      >/dev/null 2>&1 || missing+=("mpv")
+    command -v xdotool  >/dev/null 2>&1 || missing+=("xdotool")
+    command -v xterm    >/dev/null 2>&1 || missing+=("xterm")
+    command -v zenity   >/dev/null 2>&1 || missing+=("zenity")
+    command -v pactl    >/dev/null 2>&1 || missing+=("pulseaudio-utils")
+    python3 -m venv --help >/dev/null 2>&1 || missing+=("python3-venv")
+
+    if [ ${#missing[@]} -eq 0 ]; then
         return
     fi
-    echo "📦 Installing missing system dependency: xdotool..."
+
     if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get install -y xdotool
-        echo "✓  xdotool installed."
+        echo "📦 Installing missing system dependencies: ${missing[*]}..."
+        sudo apt-get install -y "${missing[@]}"
+        echo "✓  System dependencies installed."
     else
-        echo "⚠️  xdotool is required for Screen to Text (hides the terminal during capture)."
-        echo "   Install it manually:  sudo apt install xdotool"
+        echo "⚠️  Missing system dependencies: ${missing[*]}"
+        echo "   Install them manually:  sudo apt install ${missing[*]}"
     fi
 }
 

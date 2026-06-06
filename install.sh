@@ -9,7 +9,7 @@ if [ "${1:-}" = "--install-system-deps" ]; then
 fi
 
 missing_cmds=()
-for cmd in python3 ffmpeg rec xclip mpv; do
+for cmd in python3 ffmpeg rec xclip mpv pactl; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         missing_cmds+=("$cmd")
     fi
@@ -34,7 +34,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
         if command -v apt-get >/dev/null 2>&1; then
             echo "🔧 Installing system dependencies via apt..."
             sudo apt-get update
-            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool zenity
+            sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xterm xdotool zenity pulseaudio-utils
         else
             echo "❌ --install-system-deps is only supported automatically on apt-based systems."
             exit 1
@@ -42,7 +42,7 @@ if [ ${#missing_cmds[@]} -gt 0 ] || [ "$venv_module_ok" = "false" ]; then
     else
         echo "Install them manually, for example on Ubuntu:"
         echo "  sudo apt-get update"
-        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xdotool"
+        echo "  sudo apt-get install -y python3 python3-venv ffmpeg sox xclip mpv xdotool pulseaudio-utils"
         echo ""
         echo "Then run: ./install.sh"
         exit 1

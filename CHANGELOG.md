@@ -13,6 +13,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [5.1.1] — 2026-06-06
+
+### Fixed
+
+- **Missing `pactl` dependency** — `pulseaudio-utils` (which provides `pactl`) was used by the mic-detection check in `record_and_transcribe_local.sh` and `voice_translate.sh` but never declared as a system dependency. On machines where it was absent (e.g. Ubuntu Mate with PipeWire only), the check silently returned empty output, causing a false "Aucun micro détecté" error even with a working microphone. Added `pactl` to the command check and `pulseaudio-utils` to the `apt-get install` list in `install.sh`.
+- **Update script dependency parity** — `sync_system_deps()` in `vox-refiner-update.sh` previously only checked `xdotool` and `pactl`. It now checks every system dependency declared in `install.sh` (`python3`, `ffmpeg`, `rec`/`sox`, `xclip`, `mpv`, `xdotool`, `xterm`, `zenity`, `pactl`/`pulseaudio-utils`, `python3-venv`), so a dependency accidentally uninstalled by the user is automatically restored on the next update.
+
+---
+
 ## [5.1.0] — 2026-05-22
 
 ### Changed
